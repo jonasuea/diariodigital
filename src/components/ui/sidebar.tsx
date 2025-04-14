@@ -360,7 +360,9 @@ const SidebarHeader = React.forwardRef<
       data-sidebar="header"
       className={cn("flex flex-col gap-2 p-2", className)}
       {...props}
-    />
+    >
+      diariodigital
+    </div>
   )
 })
 SidebarHeader.displayName = "SidebarHeader"
@@ -460,10 +462,12 @@ const SidebarGroupAction = React.forwardRef<
       ref={ref}
       data-sidebar="group-action"
       className={cn(
-        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 peer-hover/menu-button:text-sidebar-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0",
         // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 after:md:hidden",
         "group-data-[collapsible=icon]:hidden",
+        showOnHover &&
+          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
         className
       )}
       {...props}
