@@ -68,9 +68,7 @@ export default function Home() {
               </div>
               {/* SEDUC Logos */}
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">
-                  SEDUC Amazonas
-                </span>
+                
               </div>
             </div>
 
@@ -114,3 +112,4 @@ export default function Home() {
     </div>
   );
 }
+
