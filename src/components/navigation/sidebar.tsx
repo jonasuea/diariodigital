@@ -22,7 +22,7 @@ export default function MainSidebar() {
         <SidebarTrigger />
         <SidebarContent>
           <SidebarHeader>
-            SchoolSync Journal
+            diariodigital
           </SidebarHeader>
           <SidebarGroup>
             <SidebarMenu>
@@ -70,7 +70,7 @@ export default function MainSidebar() {
           </SidebarGroup>
           <SidebarFooter>
             <p className="text-xs text-muted-foreground">
-              © {new Date().getFullYear()} SchoolSync Journal
+              © {new Date().getFullYear()} diariodigital
             </p>
           </SidebarFooter>
         </SidebarContent>
@@ -78,3 +78,4 @@ export default function MainSidebar() {
     </SidebarProvider>
   );
 }
+

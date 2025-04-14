@@ -56,7 +56,7 @@ export default function Home() {
                   >
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4h2v4h-2zm0-8V7h2v3h-2z" />
                     </svg>
-                  SchoolSync Journal
+                  diariodigital
                 </div>
                 <div className="mt-2">
                   <img
@@ -114,3 +114,4 @@ export default function Home() {
     </div>
   );
 }
+
