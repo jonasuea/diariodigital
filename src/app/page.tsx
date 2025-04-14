@@ -3,17 +3,20 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { auth, googleProvider } from './firebase';
+import { signInWithPopup } from "firebase/auth";
 
 export default function Home() {
   const [loggedIn, setLoggedIn] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
-    // Simulate login status. In real app, check for a token or session.
-    const isLoggedIn = localStorage.getItem("isLoggedIn");
-    if (isLoggedIn === "true") {
-      setLoggedIn(true);
-    }
+    // Check for login status.
+    const unsubscribe = auth.onAuthStateChanged(user => {
+      setLoggedIn(!!user);
+    });
+
+    return () => unsubscribe(); // Cleanup subscription
   }, []);
 
   useEffect(() => {
@@ -22,6 +25,16 @@ export default function Home() {
       router.push('/journal');
     }
   }, [loggedIn, router]);
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Google sign-in error", error);
+      // Handle errors here, like displaying a message to the user
+    }
+  };
+
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[url('https://picsum.photos/1920/1080')] bg-cover">
@@ -80,12 +93,9 @@ export default function Home() {
                 </p>
                 <button
                   className="w-full bg-blue-600 text-white hover:bg-blue-700 font-semibold rounded-md shadow p-2"
-                  onClick={() => {
-                    localStorage.setItem("isLoggedIn", "true");
-                    setLoggedIn(true);
-                  }}
+                  onClick={handleGoogleLogin}
                 >
-                  Entrar
+                  Entrar com Google
                 </button>
               </CardContent>
             </div>
