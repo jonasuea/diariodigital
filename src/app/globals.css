@@ -8,19 +8,19 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 0 0% 96.1%; /* Light Gray */
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
+    --primary: 207 71% 53%; /* Calming Blue */
     --primary-foreground: 0 0% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96.1%;
     --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
+    --accent: 142 60% 48%; /* Vibrant Green */
     --accent-foreground: 0 0% 9%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
@@ -76,6 +76,10 @@ body {
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
+  body {
+    font-family: sans-serif;
+  }
 }
 
 @layer base {
@@ -86,3 +90,4 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
