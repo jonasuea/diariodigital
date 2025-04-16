@@ -13,6 +13,7 @@ const nextConfig: NextConfig = {
   
   allowedDevOrigins: [
     '8081-idx-studio-1744587529099.cluster-kc2r6y3mtba5mswcmol45orivs.cloudworkstations.dev',
+    'localhost:3000', // Adicione localhost com a porta, se necessário
   ],
 };
 
