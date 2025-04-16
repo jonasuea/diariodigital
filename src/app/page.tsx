@@ -1,115 +1,97 @@
-"use client";
+"use client"; // Adicione esta linha no topo do arquivo
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { auth, googleProvider } from './firebase';
-import { signInWithPopup } from "firebase/auth";
+import React from 'react';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation';
+import { getAuth, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from './firebase'; // Importe a configuração do Firebase
 
-export default function Home() {
-  const [loggedIn, setLoggedIn] = useState(false);
+const LoginPage: React.FC = () => {
   const router = useRouter();
 
-  useEffect(() => {
-    // Check for login status.
-    const unsubscribe = auth.onAuthStateChanged(user => {
-      setLoggedIn(!!user);
-    });
-
-    return () => unsubscribe(); // Cleanup subscription
-  }, []);
-
-  useEffect(() => {
-    if (loggedIn) {
-      // Navigate to the journal page after login
-      router.push('/journal');
-    }
-  }, [loggedIn, router]);
-
   const handleGoogleLogin = async () => {
+    const provider = new GoogleAuthProvider();
+
     try {
-      await signInWithPopup(auth, googleProvider);
+      // Login com Google usando Firebase Authentication
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      // Agora você tem o email do usuário
+      const userEmail = user.email;
+
+      // Envia o email para a API para validação
+      const response = await fetch('/api/auth', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: userEmail }),
+      });
+
+      const data = await response.json();
+
+      if (data.authorized) {
+        console.log('Attempting to redirect to dashboard');
+        // Redireciona para o dashboard se autorizado
+        window.location.href = '/dashboard';
+      } else {
+        alert(data.message || 'Login falhou');
+      }
     } catch (error) {
-      console.error("Google sign-in error", error);
-      // Handle errors here, like displaying a message to the user
+      console.error('Erro ao fazer login com o Google', error);
     }
   };
 
-
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-[url('https://picsum.photos/1920/1080')] bg-cover">
-      {!loggedIn ? (
-        <Card className="w-full max-w-4xl shadow-xl rounded-xl overflow-hidden">
-          <div className="flex flex-row h-96">
-            {/* Left Side: Logo and Illustration */}
-            <div className="w-1/2 p-8 flex flex-col justify-between bg-green-100">
-              <div>
-                {/* Logo and App Title */}
-                <div className="flex items-center text-2xl font-semibold text-gray-800">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="24"
-                    height="24"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="mr-2 text-green-500"
-                  >
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4h2v4h-2zm0-8V7h2v3h-2z" />
-                    </svg>
-                  diariodigital
-                </div>
-                <div className="mt-2">
-                  <img
-                    src="https://picsum.photos/400/300"
-                    alt="Illustration"
-                    className="rounded-lg shadow-md"
-                  />
-                </div>
-              </div>
-              {/* SEDUC Logos */}
-              <div className="flex items-center space-x-4">
-                
-              </div>
-            </div>
-
-            {/* Right Side: Welcome and Login */}
-            <div className="w-1/2 p-8 flex flex-col justify-center items-center bg-white">
-              {/* Brazilian Flag Inspired Top Bar */}
-              <div className="w-full h-2 flex">
-                <div className="bg-green-500 w-1/3"></div>
-                <div className="bg-yellow-500 w-1/3"></div>
-                <div className="bg-blue-500 w-1/3"></div>
-              </div>
-              <CardHeader className="text-center">
-                <CardTitle className="text-3xl font-semibold text-gray-900">
-                  Bem-vindo!
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-md text-gray-700 mb-4 text-center">
-                  Acessar com a conta institucional.
-                </p>
-                <button
-                  className="w-full bg-blue-600 text-white hover:bg-blue-700 font-semibold rounded-md shadow p-2"
-                  onClick={handleGoogleLogin}
-                >
-                  Entrar com Google
-                </button>
-              </CardContent>
-            </div>
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="flex flex-col md:flex-row items-stretch w-full max-w-5xl bg-white rounded-2xl shadow-lg overflow-hidden">
+        <div className="w-full md:w-3/5 bg-blue-100 flex flex-col items-center justify-center p-8 relative">
+          <div className="w-4/5 h-32 flex items-center justify-center rounded-lg mb-8">
+            <Image
+              src="https://cdn-ilcgdkj.nitrocdn.com/FdeVvMZDqfPqUrrZKlHXzkIDWMpgqjam/assets/images/optimized/rev-0f0f589/colegiodompedro.com.br/wp-content/uploads/2022/05/logo-colegiodompedro.png"
+              alt="Logo Dom Paulo"
+              width={200}
+              height={80}
+              priority={true}
+              className="object-contain"
+              unoptimized
+            />
           </div>
-        </Card>
-      ) : (
-        <Card className="w-full">
-          <CardHeader>
-            <CardTitle>Dashboard</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p>You are logged in!</p>
-          </CardContent>
-        </Card>
-      )}
+          <h2 className="text-2xl text-center text-gray-800 font-semibold mb-2">Escola Dom Paulo</h2>
+          <p className="text-gray-700 text-center">Secretaria Municipal de Educação</p>
+          <div className="w-4/5 h-32 flex items-center justify-center rounded-lg mt-8">
+            <Image
+              src="https://prefeituradeitacoatiara.com.br/wp-content/uploads/2024/01/HEADER-CARD-ITACOATIARA.jpg"
+              alt="Logo SEMED"
+              width={200}
+              height={80}
+              priority={true}
+              className="object-contain"
+              unoptimized
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-col w-2 h-auto">
+          <span className="bg-blue-800 flex-1"></span>
+          <span className="bg-green-600 flex-1"></span>
+          <span className="bg-yellow-300 flex-1"></span>
+        </div>
+
+        <div className="w-full md:w-2/5 flex flex-col items-center justify-center p-8">
+          <h1 className="text-4xl text-blue-600 font-bold mb-6">Bem-vindo!</h1>
+          <p className="text-gray-600 mb-6 text-center">Acesse com sua conta institucional.</p>
+          <button
+            onClick={handleGoogleLogin}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition duration-300"
+          >
+            Entrar com Google
+          </button>
+        </div>
+      </div>
     </div>
   );
-}
+};
 
+export default LoginPage;

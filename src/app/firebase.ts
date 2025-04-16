@@ -4,14 +4,16 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBT3vLsTW-qWHUJOtlZ-lM1mcHxC1oDWTU",
-  authDomain: "diariodigital-e35c2.firebaseapp.com",
-  projectId: "diariodigital-e35c2",
-  storageBucket: "diariodigital-e35c2.firebasestorage.app",
-  messagingSenderId: "521750766445",
-  appId: "1:521750766445:web:ed6cc1eb16c6c9736f7064",
+  apiKey: "AIzaSyAqqQc40zPjlX4K5bN8BlQU32lt4TcLXmQ",
+  authDomain: "diariodigital-398c9.firebaseapp.com",
+  projectId: "diariodigital",
+  storageBucket: "diariodigital.firebasestorage.app",
+  messagingSenderId: "632574845450",
+  appId: "1:632574845450:web:97293488f521417b3575f3", // Adicionei a vírgula aqui
   measurementId: "G-H6GQEPCTXE"
 };
+
+
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
@@ -20,4 +22,3 @@ export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
 export default app;
-
