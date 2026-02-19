@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useUserRole } from '@/hooks/useUserRole';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 export default function Painel() {
   const navigate = useNavigate();
+  const { role } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
     totalAlunos: 0,
     totalTurmas: 0,
@@ -54,10 +56,16 @@ export default function Painel() {
   const [periodoFrequencia, setPeriodoFrequencia] = useState('mes');
   const [loading, setLoading] = useState(true);
 
+  // Define who can see the recent activities log
+  // Includes admin and management roles (gestor, secretario, pedagogo)
+  const canViewRecentActivities = role === 'admin' || role === 'gestor';
+
   useEffect(() => {
     fetchData();
-    fetchAtividadesRecentes();
-  }, []);
+    if (canViewRecentActivities) {
+      fetchAtividadesRecentes();
+    }
+  }, [canViewRecentActivities]);
 
   useEffect(() => {
     fetchFrequenciaData();
@@ -424,38 +432,40 @@ export default function Painel() {
         </div>
 
         {/* Atividades Recentes */}
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold">Atividades Recentes</CardTitle>
-              <Button variant="link" className="text-primary p-0 h-auto" onClick={() => fetchAtividadesRecentes()}>
-                Atualizar
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {atividadesRecentes.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhuma atividade recente
-                </p>
-              ) : (
-                atividadesRecentes.map((atividade) => (
-                  <div key={atividade.id} className="flex items-start gap-3">
-                    <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${getAtividadeColor(atividade.tipo)}`}>
-                      {getAtividadeIcon(atividade.tipo)}
+        {canViewRecentActivities && (
+          <Card>
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg font-semibold">Atividades Recentes</CardTitle>
+                <Button variant="link" className="text-primary p-0 h-auto" onClick={() => fetchAtividadesRecentes()}>
+                  Atualizar
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {atividadesRecentes.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">
+                    Nenhuma atividade recente
+                  </p>
+                ) : (
+                  atividadesRecentes.map((atividade) => (
+                    <div key={atividade.id} className="flex items-start gap-3">
+                      <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${getAtividadeColor(atividade.tipo)}`}>
+                        {getAtividadeIcon(atividade.tipo)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-foreground">{atividade.descricao}</p>
+                        <p className="text-xs text-muted-foreground">{atividade.tempo}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm text-foreground">{atividade.descricao}</p>
-                      <p className="text-xs text-muted-foreground">{atividade.tempo}</p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </CardContent>
-        </Card>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </AppLayout>
   );

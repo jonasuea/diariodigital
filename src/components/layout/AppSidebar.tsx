@@ -1,41 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSidebar } from '@/components/ui/sidebar';
 import { 
-  LayoutDashboard, 
-  Users, 
-  UserCog, 
   GraduationCap, 
-  School, 
-  Clock, 
-  FileText, 
-  Calendar, 
-  BookOpen, 
-  Settings,
   LogOut,
   PanelLeftClose,
-  PanelLeft
 } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
-
-const menuItems = [
-  { title: 'Painel', url: '/painel', icon: LayoutDashboard },
-  { title: 'Alunos', url: '/alunos', icon: Users },
-  { title: 'Professores', url: '/professores', icon: GraduationCap },
-  { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog },
-  { title: 'Turmas', url: '/turmas', icon: School },
-  { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen },
-  { title: 'Horário', url: '/horario', icon: Clock },
-  { title: 'Relatórios', url: '/relatorios', icon: FileText },
-  { title: 'Calendário', url: '/calendario', icon: Calendar },
-  { title: 'Usuários', url: '/usuarios', icon: UserCog }, // Adicionado para admin
-  { title: 'Configurações', url: '/configuracoes', icon: Settings },
-];
 
 export function AppSidebar() {
   const { signOut } = useAuth();
   const { open, setOpen, isMobile, toggleSidebar, openMobile } = useSidebar();
+  const { menuItems } = useUserRole();
   const [hovered, setHovered] = useState(false);
 
   const isExpanded = isMobile ? openMobile : open;

@@ -2,6 +2,7 @@ import { Search, Bell, Menu } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useSidebar } from '@/components/ui/sidebar';
 
@@ -11,10 +12,16 @@ interface AppHeaderProps {
 
 export function AppHeader({ title }: AppHeaderProps) {
   const { user } = useAuth();
+  const { role } = useUserRole();
   const { toggleSidebar, isMobile } = useSidebar();
   
   const getInitials = (email: string) => {
     return email.substring(0, 2).toUpperCase();
+  };
+
+  const capitalize = (s: string | null) => {
+    if (!s) return '';
+    return s.charAt(0).toUpperCase() + s.slice(1);
   };
 
   return (
@@ -62,7 +69,7 @@ export function AppHeader({ title }: AppHeaderProps) {
           <p className="text-sm font-medium text-foreground truncate max-w-[150px]">
             {user?.email}
           </p>
-          <p className="text-xs text-muted-foreground">Administrador</p>
+          <p className="text-xs text-muted-foreground">{capitalize(role)}</p>
         </div>
       </div>
     </header>

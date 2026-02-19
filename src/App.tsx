@@ -39,39 +39,37 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-
-            {/* Agora a raiz abre normalmente sem redirect */}
             <Route path="/" element={<Auth />} />
-
             <Route path="/auth" element={<Auth />} />
-            <Route path="/painel" element={<ProtectedRoute><Painel /></ProtectedRoute>} />
 
-            <Route path="/alunos" element={<ProtectedRoute><Alunos /></ProtectedRoute>} />
-            <Route path="/alunos/novo" element={<ProtectedRoute><NovoAluno /></ProtectedRoute>} />
-            <Route path="/alunos/:id" element={<ProtectedRoute><PerfilAluno /></ProtectedRoute>} />
-            <Route path="/alunos/:id/editar" element={<ProtectedRoute><NovoAluno /></ProtectedRoute>} />
+            <Route path="/painel" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Painel /></ProtectedRoute>} />
 
-            <Route path="/professores" element={<ProtectedRoute><Professores /></ProtectedRoute>} />
-            <Route path="/professores/novo" element={<ProtectedRoute><NovoProfessor /></ProtectedRoute>} />
-            <Route path="/professores/:id" element={<ProtectedRoute><PerfilProfessor /></ProtectedRoute>} />
-            <Route path="/professores/:id/editar" element={<ProtectedRoute><NovoProfessor /></ProtectedRoute>} />
+            <Route path="/alunos" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><Alunos /></ProtectedRoute>} />
+            <Route path="/alunos/novo" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoAluno /></ProtectedRoute>} />
+            <Route path="/alunos/:id" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilAluno /></ProtectedRoute>} />
+            <Route path="/alunos/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilAluno /></ProtectedRoute>} />
 
-            <Route path="/turmas" element={<ProtectedRoute><Turmas /></ProtectedRoute>} />
-            <Route path="/turmas/:turmaId/notas" element={<ProtectedRoute><Notas /></ProtectedRoute>} />
-            <Route path="/turmas/:turmaId/frequencia" element={<ProtectedRoute><Frequencia /></ProtectedRoute>} />
-            <Route path="/turmas/:turmaId/ata-final" element={<ProtectedRoute><AtaFinal /></ProtectedRoute>} />
+            <Route path="/professores" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><Professores /></ProtectedRoute>} />
+            <Route path="/professores/novo" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute>} />
+            <Route path="/professores/:id" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilProfessor /></ProtectedRoute>} />
+            <Route path="/professores/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilProfessor /></ProtectedRoute>} />
 
-            <Route path="/equipe-gestora" element={<ProtectedRoute><EquipeGestora /></ProtectedRoute>} />
-            <Route path="/equipe-gestora/novo" element={<ProtectedRoute><NovoMembro /></ProtectedRoute>} />
-            <Route path="/equipe-gestora/:id" element={<ProtectedRoute><PerfilMembro /></ProtectedRoute>} />
-            <Route path="/equipe-gestora/:id/editar" element={<ProtectedRoute><NovoMembro /></ProtectedRoute>} />
+            <Route path="/turmas" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Turmas /></ProtectedRoute>} />
+            <Route path="/turmas/:turmaId/notas" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Notas /></ProtectedRoute>} />
+            <Route path="/turmas/:turmaId/frequencia" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Frequencia /></ProtectedRoute>} />
+            <Route path="/turmas/:turmaId/ata-final" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><AtaFinal /></ProtectedRoute>} />
 
-            <Route path="/horario" element={<ProtectedRoute><Horario /></ProtectedRoute>} />
-            <Route path="/calendario" element={<ProtectedRoute><Calendario /></ProtectedRoute>} />
-            <Route path="/diario-digital" element={<ProtectedRoute><DiarioDigital /></ProtectedRoute>} />
-            <Route path="/relatorios" element={<ProtectedRoute><Relatorios /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
-            <Route path="/usuarios" element={<ProtectedRoute><Usuarios /></ProtectedRoute>} />
+            <Route path="/equipe-gestora" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><EquipeGestora /></ProtectedRoute>} />
+            <Route path="/equipe-gestora/novo" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoMembro /></ProtectedRoute>} />
+            <Route path="/equipe-gestora/:id" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilMembro /></ProtectedRoute>} />
+            <Route path="/equipe-gestora/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilMembro /></ProtectedRoute>} />
+
+            <Route path="/horario" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Horario /></ProtectedRoute>} />
+            <Route path="/calendario" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor', 'aluno']}><Calendario /></ProtectedRoute>} />
+            <Route path="/diario-digital" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><DiarioDigital /></ProtectedRoute>} />
+            <Route path="/relatorios" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><Relatorios /></ProtectedRoute>} />
+            <Route path="/configuracoes" element={<ProtectedRoute allowedRoles={['admin']}><Configuracoes /></ProtectedRoute>} />
+            <Route path="/usuarios" element={<ProtectedRoute allowedRoles={['admin']}><Usuarios /></ProtectedRoute>} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

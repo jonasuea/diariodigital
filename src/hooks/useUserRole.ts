@@ -2,16 +2,52 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { 
+  LayoutDashboard, 
+  Users, 
+  UserCog, 
+  GraduationCap, 
+  School, 
+  Clock, 
+  FileText, 
+  Calendar, 
+  BookOpen, 
+  Settings,
+  LucideIcon
+} from 'lucide-react';
+
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: LucideIcon;
+  allowedRoles: string[];
+}
+
+const allMenuItems: MenuItem[] = [
+  { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'gestor', 'professor'] },
+  { title: 'Alunos', url: '/alunos', icon: Users, allowedRoles: ['admin', 'gestor'] },
+  { title: 'Professores', url: '/professores', icon: GraduationCap, allowedRoles: ['admin', 'gestor'] },
+  { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog, allowedRoles: ['admin', 'gestor'] },
+  { title: 'Turmas', url: '/turmas', icon: School, allowedRoles: ['admin', 'gestor', 'professor'] },
+  { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'professor'] },
+  { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['admin', 'gestor', 'professor'] },
+  { title: 'Relatórios', url: '/relatorios', icon: FileText, allowedRoles: ['admin', 'gestor'] },
+  { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'gestor', 'professor', 'aluno'] },
+  { title: 'Usuários', url: '/usuarios', icon: UserCog, allowedRoles: ['admin'] },
+  { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['admin'] },
+];
 
 export function useUserRole() {
   const { user } = useAuth();
   const [role, setRole] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
 
   useEffect(() => {
     async function fetchUserRole() {
       if (!user) {
         setRole(null);
+        setMenuItems([]);
         setLoading(false);
         return;
       }
@@ -19,15 +55,21 @@ export function useUserRole() {
       try {
         const userDocRef = doc(db, 'user_roles', user.uid);
         const userDoc = await getDoc(userDocRef);
+        const userRole = userDoc.exists() ? userDoc.data()?.role : null;
+        
+        setRole(userRole);
 
-        if (userDoc.exists()) {
-          setRole(userDoc.data()?.role || null);
+        if (userRole) {
+          const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes(userRole));
+          setMenuItems(accessibleItems);
         } else {
-          setRole(null);
+          setMenuItems([]);
         }
+
       } catch (error) {
-        console.error('Error fetching user role:', error);
         setRole(null);
+        setMenuItems([]);
+        return;
       } finally {
         setLoading(false);
       }
@@ -47,6 +89,7 @@ export function useUserRole() {
     isAdmin,
     isGestor,
     isProfessor,
-    isAluno
+    isAluno,
+    menuItems
   };
 }
