@@ -1,0 +1,8 @@
+nome,matricula,data_nascimento,status,endereco,bairro,cidade,estado,telefone,mae_nome,mae_contato,mae_email,pai_nome,pai_contato,pai_email,largura_farda,altura_farda,pasta,prateleira,turma_id,turma_nome,ano
+João Silva,2024001,2008-05-15,Ativo,Rua das Flores 123,Centro,São Paulo,SP,11987654321,Maria Silva,11987654322,maria@email.com,José Silva,11987654323,jose@email.com,M,1.50,A1,01,1º Ano A,2024
+,2024002,2009-03-20,Ativo,Av. Brasil 456,Jardim,Belo Horizonte,MG,31987654324,Carla Santos,31987654325,carla@email.com,Carlos Santos,31987654326,carlos@email.com,G,1.45,A1,02,1º Ano B,2024
+Ana Santos,,2009-03-20,Ativo,Av. Brasil 456,Jardim,Belo Horizonte,MG,31987654324,Carla Santos,31987654325,carla@email.com,Carlos Santos,31987654326,carlos@email.com,G,1.45,A1,02,1º Ano B,2024
+Pedro Oliveira,2024003,15/11/2007,Ativo,Rua Verde 789,Vila,Rio de Janeiro,RJ,21987654327,Sandra Oliveira,21987654328,sandra@email.com,Paulo Oliveira,21987654329,paulo@email.com,P,1.55,A2,03,2º Ano A,2024
+Maria Santos,2024004,2008-13-45,Ativo,Rua Azul 100,Centro,Brasília,DF,61987654330,Laura Santos,61987654331,laura@email.com,Marcos Santos,61987654332,marcos@email.com,M,1.48,B1,04,1º Ano C,2024
+Carlos Lima,2024005,2009-06-30,Ativo,Rua Amarela 200,Norte,Salvador,BA,71987654333,Fátima Lima,71987654334,fatima@email.com,Roberto Lima,71987654335,roberto@email.com,G,1.52,C1,05,2º Ano B,1999
+José Santos,ABC123@#,2008-05-20,Ativo,Rua Vermelha 300,Sul,Porto Alegre,RS,51987654336,Ana Santos,51987654337,ana@email.com,João Santos,51987654338,joao@email.com,P,1.60,D1,06,3º Ano A,2024

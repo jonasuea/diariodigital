@@ -1,0 +1,547 @@
+import { useEffect, useState } from 'react';
+import { AppLayout } from '@/components/layout/AppLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Calendar } from '@/components/ui/calendar';
+import { Plus, Calendar as CalendarIcon, Clock, MapPin, Pencil, Trash2 } from 'lucide-react';
+import { db } from '@/lib/firebase';
+import { collection, query, orderBy, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { toast } from 'sonner';
+import { format, isSameDay, isSameMonth, parseISO, startOfMonth, endOfMonth } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+interface Evento {
+  id: string;
+  titulo: string;
+  descricao: string | null;
+  data: string;
+  tipo: string;
+  hora_inicio: string | null;
+  hora_fim: string | null;
+  local: string | null;
+}
+
+export default function Calendario() {
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [eventoToDelete, setEventoToDelete] = useState<Evento | null>(null);
+  const [eventoToEdit, setEventoToEdit] = useState<Evento | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const [formData, setFormData] = useState({
+    titulo: '',
+    data: format(new Date(), 'yyyy-MM-dd'),
+    hora_inicio: '08:00',
+    hora_fim: '09:00',
+    local: '',
+  });
+
+  useEffect(() => {
+    fetchEventos();
+  }, []);
+
+  async function fetchEventos() {
+    setLoading(true);
+    try {
+      const q = query(collection(db, 'eventos'), orderBy('data', 'asc'));
+      const querySnapshot = await getDocs(q);
+      const eventosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Evento));
+      setEventos(eventosData);
+    } catch (error) {
+      toast.error('Erro ao carregar eventos');
+      console.error(error);
+    }
+    setLoading(false);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    
+    const payload = {
+      titulo: formData.titulo,
+      data: formData.data,
+      tipo: 'Evento',
+      hora_inicio: formData.hora_inicio,
+      hora_fim: formData.hora_fim,
+      local: formData.local || null,
+    };
+
+    try {
+      await addDoc(collection(db, 'eventos'), payload);
+      toast.success('Evento adicionado com sucesso!');
+      setIsOpen(false);
+      resetForm();
+      fetchEventos();
+    } catch (error) {
+      toast.error('Erro ao cadastrar evento');
+      console.error(error);
+    }
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!eventoToEdit) return;
+    
+    const payload = {
+      titulo: formData.titulo,
+      data: formData.data,
+      hora_inicio: formData.hora_inicio,
+      hora_fim: formData.hora_fim,
+      local: formData.local || null,
+    };
+
+    try {
+      const docRef = doc(db, 'eventos', eventoToEdit.id);
+      await updateDoc(docRef, payload);
+      toast.success('Evento atualizado com sucesso!');
+      setIsEditOpen(false);
+      setEventoToEdit(null);
+      resetForm();
+      fetchEventos();
+    } catch (error) {
+      toast.error('Erro ao atualizar evento');
+      console.error(error);
+    }
+  }
+
+  async function handleDelete() {
+    if (!eventoToDelete) return;
+
+    try {
+      const docRef = doc(db, 'eventos', eventoToDelete.id);
+      await deleteDoc(docRef);
+      toast.success('Evento excluído com sucesso!');
+      setDeleteDialogOpen(false);
+      setEventoToDelete(null);
+      fetchEventos();
+    } catch (error) {
+      toast.error('Erro ao excluir evento');
+      console.error(error);
+    }
+  }
+
+  function resetForm() {
+    setFormData({
+      titulo: '',
+      data: format(selectedDate, 'yyyy-MM-dd'),
+      hora_inicio: '08:00',
+      hora_fim: '09:00',
+      local: '',
+    });
+  }
+
+  function handleDateSelect(date: Date | undefined) {
+    if (date) {
+      setSelectedDate(date);
+      setFormData(prev => ({ ...prev, data: format(date, 'yyyy-MM-dd') }));
+    }
+  }
+
+  function openAddDialog() {
+    setFormData({
+      titulo: '',
+      data: format(selectedDate, 'yyyy-MM-dd'),
+      hora_inicio: '08:00',
+      hora_fim: '09:00',
+      local: '',
+    });
+    setIsOpen(true);
+  }
+
+  function openEditDialog(evento: Evento) {
+    setEventoToEdit(evento);
+    setFormData({
+      titulo: evento.titulo,
+      data: evento.data,
+      hora_inicio: evento.hora_inicio || '08:00',
+      hora_fim: evento.hora_fim || '09:00',
+      local: evento.local || '',
+    });
+    setIsEditOpen(true);
+  }
+
+  function openDeleteDialog(evento: Evento) {
+    setEventoToDelete(evento);
+    setDeleteDialogOpen(true);
+  }
+
+  const eventosNaDataSelecionada = eventos.filter(e => 
+    isSameDay(parseISO(e.data), selectedDate)
+  );
+
+  const eventosDoMes = eventos.filter(e => 
+    isSameMonth(parseISO(e.data), currentMonth)
+  );
+
+  const eventDates = eventos.map(e => parseISO(e.data));
+
+  return (
+    <AppLayout title="Calendário">
+      <div className="space-y-6 animate-fade-in">
+        <p className="text-muted-foreground -mt-2">Gerencie eventos e datas importantes</p>
+        
+        <div className="flex justify-end">
+          <Button onClick={openAddDialog}>
+            <Plus className="h-4 w-4 mr-2" />
+            Adicionar Evento
+          </Button>
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Calendário */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Calendário</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex justify-center py-12">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                </div>
+              ) : (
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={handleDateSelect}
+                  onMonthChange={setCurrentMonth}
+                  locale={ptBR}
+                  className="rounded-md pointer-events-auto"
+                  modifiers={{
+                    hasEvent: eventDates,
+                  }}
+                  modifiersStyles={{
+                    hasEvent: {
+                      fontWeight: 'bold',
+                      backgroundColor: 'hsl(var(--primary) / 0.1)',
+                      color: 'hsl(var(--primary))',
+                    }
+                  }}
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Eventos do dia */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">
+                Eventos - {format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {eventosNaDataSelecionada.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-muted-foreground mb-4">Não há eventos para esta data.</p>
+                  <Button variant="outline" onClick={openAddDialog}>
+                    Adicionar um evento
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {eventosNaDataSelecionada.map((evento) => (
+                    <div 
+                      key={evento.id} 
+                      className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <h4 className="font-medium text-foreground">{evento.titulo}</h4>
+                          {(evento.hora_inicio || evento.hora_fim) && (
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                              <Clock className="h-3.5 w-3.5" />
+                              <span>
+                                {evento.hora_inicio && evento.hora_fim 
+                                  ? `${evento.hora_inicio} - ${evento.hora_fim}`
+                                  : evento.hora_inicio || evento.hora_fim}
+                              </span>
+                            </div>
+                          )}
+                          {evento.local && (
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span>{evento.local}</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex gap-1 ml-2">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(evento)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Todos os eventos do mês */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-lg">
+              Todos os eventos de {format(currentMonth, "MMMM 'de' yyyy", { locale: ptBR })}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {eventosDoMes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">Nenhum evento cadastrado para este mês.</p>
+              </div>
+            ) : (
+              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {eventosDoMes.map((evento) => (
+                  <div 
+                    key={evento.id} 
+                    className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-foreground truncate">{evento.titulo}</h4>
+                        <div className="flex items-center gap-1 text-sm text-primary mt-1">
+                          <CalendarIcon className="h-3.5 w-3.5" />
+                          <span>{format(parseISO(evento.data), "d 'de' MMMM", { locale: ptBR })}</span>
+                        </div>
+                        {(evento.hora_inicio || evento.hora_fim) && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                            <Clock className="h-3.5 w-3.5" />
+                            <span>
+                              {evento.hora_inicio && evento.hora_fim 
+                                ? `${evento.hora_inicio} - ${evento.hora_fim}`
+                                : evento.hora_inicio || evento.hora_fim}
+                            </span>
+                          </div>
+                        )}
+                        {evento.local && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
+                            <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="truncate">{evento.local}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex gap-1 ml-2 flex-shrink-0">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(evento)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Dialog para adicionar evento */}
+        <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Adicionar Novo Evento</DialogTitle>
+              <DialogDescription>
+                Preencha os detalhes do evento para adicioná-lo ao calendário.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="titulo">Nome do Evento</Label>
+                <Input
+                  id="titulo"
+                  placeholder="Ex: Reunião de pais"
+                  value={formData.titulo}
+                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="data">Data</Label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="data"
+                    type="date"
+                    className="pl-10"
+                    value={formData.data}
+                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hora_inicio" className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    Hora de Início
+                  </Label>
+                  <Input
+                    id="hora_inicio"
+                    type="time"
+                    value={formData.hora_inicio}
+                    onChange={(e) => setFormData({ ...formData, hora_inicio: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="hora_fim" className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    Hora de Término
+                  </Label>
+                  <Input
+                    id="hora_fim"
+                    type="time"
+                    value={formData.hora_fim}
+                    onChange={(e) => setFormData({ ...formData, hora_fim: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="local" className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Local
+                </Label>
+                <Input
+                  id="local"
+                  placeholder="Ex: Auditório da escola"
+                  value={formData.local}
+                  onChange={(e) => setFormData({ ...formData, local: e.target.value })}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  Adicionar Evento
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog para editar evento */}
+        <Dialog open={isEditOpen} onOpenChange={(open) => { setIsEditOpen(open); if (!open) { setEventoToEdit(null); resetForm(); } }}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Editar Evento</DialogTitle>
+              <DialogDescription>
+                Atualize os detalhes do evento.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleUpdate} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-titulo">Nome do Evento</Label>
+                <Input
+                  id="edit-titulo"
+                  placeholder="Ex: Reunião de pais"
+                  value={formData.titulo}
+                  onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-data">Data</Label>
+                <div className="relative">
+                  <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="edit-data"
+                    type="date"
+                    className="pl-10"
+                    value={formData.data}
+                    onChange={(e) => setFormData({ ...formData, data: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-hora_inicio" className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    Hora de Início
+                  </Label>
+                  <Input
+                    id="edit-hora_inicio"
+                    type="time"
+                    value={formData.hora_inicio}
+                    onChange={(e) => setFormData({ ...formData, hora_inicio: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="edit-hora_fim" className="flex items-center gap-1">
+                    <Clock className="h-3.5 w-3.5" />
+                    Hora de Término
+                  </Label>
+                  <Input
+                    id="edit-hora_fim"
+                    type="time"
+                    value={formData.hora_fim}
+                    onChange={(e) => setFormData({ ...formData, hora_fim: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-local" className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" />
+                  Local
+                </Label>
+                <Input
+                  id="edit-local"
+                  placeholder="Ex: Auditório da escola"
+                  value={formData.local}
+                  onChange={(e) => setFormData({ ...formData, local: e.target.value })}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => { setIsEditOpen(false); setEventoToEdit(null); resetForm(); }}>
+                  Cancelar
+                </Button>
+                <Button type="submit">
+                  Salvar Alterações
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog de confirmação de exclusão */}
+        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Evento</AlertDialogTitle>
+              <AlertDialogDescription>
+                Tem certeza que deseja excluir o evento "{eventoToDelete?.titulo}"? Esta ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setEventoToDelete(null)}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </AppLayout>
+  );
+}
