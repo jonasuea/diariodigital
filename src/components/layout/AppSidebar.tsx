@@ -35,10 +35,10 @@ const menuItems = [
 
 export function AppSidebar() {
   const { signOut } = useAuth();
-  const { open, setOpen, isMobile, toggleSidebar } = useSidebar();
+  const { open, setOpen, isMobile, toggleSidebar, openMobile } = useSidebar();
   const [hovered, setHovered] = useState(false);
 
-  const isExpanded = !isMobile || open;
+  const isExpanded = isMobile ? openMobile : open;
 
   const handleMouseEnter = () => {
     if (isMobile) {
