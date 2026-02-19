@@ -32,7 +32,7 @@ export function AppSidebar() {
 
   return (
     <div
-      className={`relative transition-all duration-300 ${isExpanded ? 'w-64' : 'w-16'}`}
+      className="relative w-0 transition-all duration-300"
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >

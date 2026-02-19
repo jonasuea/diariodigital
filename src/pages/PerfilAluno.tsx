@@ -296,18 +296,18 @@ export default function PerfilAluno() {
         </p>
 
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <Button variant="outline" onClick={() => navigate('/alunos')} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar para Lista de Alunos
+          <Button variant="outline" onClick={() => navigate('/alunos')}>
+            <ArrowLeft className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Voltar para Lista de Alunos</span>
           </Button>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2" onClick={() => setTransferenciaDialogOpen(true)}>
-              <Edit className="h-4 w-4" />
-              Editar Transferência
+            <Button variant="outline" onClick={() => setTransferenciaDialogOpen(true)}>
+              <Edit className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Editar Transferência</span>
             </Button>
-            <Button variant="default" className="gap-2" onClick={handleGerarTransferencia}>
-              <Download className="h-4 w-4" />
-              Gerar Transferência
+            <Button variant="default" onClick={handleGerarTransferencia}>
+              <Download className="h-4 w-4 md:mr-2" />
+              <span className="hidden md:inline">Gerar Transferência</span>
             </Button>
           </div>
         </div>
@@ -537,13 +537,13 @@ export default function PerfilAluno() {
                   </div>
 
                   <div className="flex justify-end mt-4 gap-2">
-                    <Button variant="outline" className="gap-2" onClick={() => setBoletimDialogOpen(true)}>
-                      <Edit className="h-4 w-4" />
-                      Editar Modelo
+                    <Button variant="outline" onClick={() => setBoletimDialogOpen(true)}>
+                      <Edit className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">Editar Modelo</span>
                     </Button>
-                    <Button variant="outline" className="gap-2" onClick={handleGerarBoletim}>
-                      <FileText className="h-4 w-4" />
-                      Gerar Boletim
+                    <Button variant="outline" onClick={handleGerarBoletim}>
+                      <FileText className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">Gerar Boletim</span>
                     </Button>
                   </div>
                 </div>

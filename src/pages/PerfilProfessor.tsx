@@ -105,13 +105,13 @@ export default function PerfilProfessor() {
         </p>
 
         <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate('/professores')} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Voltar para Lista de Professores
+          <Button variant="outline" onClick={() => navigate('/professores')}>
+            <ArrowLeft className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Voltar para Lista de Professores</span>
           </Button>
           <Button onClick={() => navigate(`/professores/${id}/editar`)}>
-            <Pencil className="h-4 w-4 mr-2" />
-            Editar Professor
+            <Pencil className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Editar Professor</span>
           </Button>
         </div>
 

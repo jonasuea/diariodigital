@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Search, Pencil, ClipboardList, Calendar, FileText, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, collectionGroup,getCountFromServer } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, collectionGroup, getCountFromServer, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 interface Turma {
@@ -238,8 +238,8 @@ export default function Turmas() {
           <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Turma
+                <Plus className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">Nova Turma</span>
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -366,24 +366,24 @@ export default function Turmas() {
                     <td className="p-4">
                       <div className="flex justify-end gap-2">
                         <Button variant="outline" size="sm" onClick={() => openEdit(turma)}>
-                          <Pencil className="h-4 w-4 mr-1" />
-                          Editar
+                          <Pencil className="h-4 w-4 md:mr-1" />
+                          <span className="hidden md:inline">Editar</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/notas`)}>
-                          <ClipboardList className="h-4 w-4 mr-1" />
-                          Notas
+                          <ClipboardList className="h-4 w-4 md:mr-1" />
+                          <span className="hidden md:inline">Notas</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/frequencia`)}>
-                          <Calendar className="h-4 w-4 mr-1" />
-                          Frequência
+                          <Calendar className="h-4 w-4 md:mr-1" />
+                          <span className="hidden md:inline">Frequência</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/ata-final`)}>
-                          <FileText className="h-4 w-4 mr-1" />
-                          Ata Final
+                          <FileText className="h-4 w-4 md:mr-1" />
+                          <span className="hidden md:inline">Ata Final</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => openDeleteDialog(turma)} className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Apagar
+                          <Trash2 className="h-4 w-4 md:mr-1" />
+                          <span className="hidden md:inline">Apagar</span>
                         </Button>
                       </div>
                     </td>

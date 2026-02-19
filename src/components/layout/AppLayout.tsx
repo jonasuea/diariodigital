@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { AppSidebar } from './AppSidebar';
 import { AppHeader } from './AppHeader';
 
@@ -8,17 +8,26 @@ interface AppLayoutProps {
   title?: string;
 }
 
+function MainContent({ children, title }: AppLayoutProps) {
+  const { open, isMobile } = useSidebar();
+  const paddingClass = isMobile ? 'pl-0' : open ? 'pl-64' : 'pl-16';
+
+  return (
+    <div className={`flex-1 flex flex-col transition-all duration-300 ${paddingClass}`}>
+      <AppHeader title={title} />
+      <main className="flex-1 p-6 overflow-auto">
+        {children}
+      </main>
+    </div>
+  );
+}
+
 export function AppLayout({ children, title }: AppLayoutProps) {
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
-          <AppHeader title={title} />
-          <main className="flex-1 p-6 overflow-auto">
-            {children}
-          </main>
-        </div>
+        <MainContent title={title}>{children}</MainContent>
       </div>
     </SidebarProvider>
   );
