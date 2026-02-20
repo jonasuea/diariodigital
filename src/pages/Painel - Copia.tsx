@@ -279,85 +279,18 @@ export default function Painel() {
   return (
     <AppLayout title="Dashboard">
       <div className="space-y-6 animate-fade-in">
-        <p className="text-muted-foreground -mt-2">Bem-vindo à Secretaria Digital</p>
+        <p className="text-muted-foreground -mt-2">Bem-vindo à secretaria digital</p>
 
         {/* Stats Grid */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalAlunos}</div>
-              <p className="text-xs text-muted-foreground">+5,2% este mês</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Turmas</CardTitle>
-              <School className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalTurmas}</div>
-              <p className="text-xs text-muted-foreground">ativas</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Eventos</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalEventos}</div>
-              <p className="text-xs text-muted-foreground">+2,1% próximos 30 dias</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Média de Notas</CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.mediaNotas ?? '-'}</div>
-              <p className="text-xs text-muted-foreground">+0,8% último bimestre</p>
-            </CardContent>
-          </Card>
+          {/* Cards */}
         </div>
 
         {/* Charts and Events Row */}
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Frequência */}
           <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg font-semibold">Estatísticas de Frequência</CardTitle>
-              <Select value={periodoFrequencia} onValueChange={setPeriodoFrequencia}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mes">Este mês</SelectItem>
-                  <SelectItem value="semana">Esta semana</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardHeader>
-            <CardContent className="h-[300px] pt-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={frequenciaData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                  <XAxis dataKey="dia" tickLine={false} axisLine={false} tickMargin={10} />
-                  <YAxis tickLine={false} axisLine={false} tickMargin={10} allowDecimals={false} />
-                  <Tooltip
-                    cursor={{ fill: 'hsl(var(--muted))' }}
-                    contentStyle={{
-                      background: 'hsl(var(--background))',
-                      borderRadius: 'var(--radius)',
-                      border: '1px solid hsl(var(--border))',
-                    }}
-                  />
-                  <Bar dataKey="presencas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
+            {/* ... */}
           </Card>
 
           {/* Próximos Eventos */}
@@ -371,9 +304,9 @@ export default function Painel() {
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                 </div>
               ) : proximosEventos.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  <p>Nenhum evento futuro</p>
-                </div>
+                <p className="text-center text-muted-foreground py-8">
+                  Nenhum evento futuro
+                </p>
               ) : (
                 <div className="space-y-3 max-h-64 overflow-y-auto">
                   {proximosEventos.map((evento) => (
@@ -398,32 +331,7 @@ export default function Painel() {
         {/* Atividades Recentes */}
         {canViewRecentActivities && (
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-semibold">Atividades Recentes</CardTitle>
-              <Button variant="link" size="sm" className="h-auto p-0" onClick={fetchAtividadesRecentes}>
-                Atualizar
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {atividadesRecentes.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Nenhuma atividade recente.</p>
-              ) : (
-                <div className="space-y-4">
-                  {atividadesRecentes.map((atividade) => (
-                    <div key={atividade.id} className="flex items-start gap-3">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${getAtividadeColor(atividade.tipo)}`}>
-                        {getAtividadeIcon(atividade.tipo)}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm text-foreground">{atividade.descricao}</p>
-                        <p className="text-xs text-muted-foreground">{atividade.tempo}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
+            {/* ... */}
           </Card>
         )}
       </div>

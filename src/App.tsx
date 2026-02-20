@@ -28,6 +28,7 @@ import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
 import NotFound from "./pages/NotFound";
+import Manutencao from "./pages/Manutencao";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Auth />} />
             <Route path="/auth" element={<Auth />} />
+            <Route path="/manutencao" element={<Manutencao />} />
 
             <Route path="/painel" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Painel /></ProtectedRoute>} />
 
@@ -52,7 +54,7 @@ const App = () => (
             <Route path="/professores" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><Professores /></ProtectedRoute>} />
             <Route path="/professores/novo" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute>} />
             <Route path="/professores/:id" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilProfessor /></ProtectedRoute>} />
-            <Route path="/professores/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilProfessor /></ProtectedRoute>} />
+            <Route path="/professores/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute>} />
 
             <Route path="/turmas" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Turmas /></ProtectedRoute>} />
             <Route path="/turmas/:turmaId/notas" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Notas /></ProtectedRoute>} />

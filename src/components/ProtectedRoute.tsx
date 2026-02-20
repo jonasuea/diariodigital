@@ -3,17 +3,46 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
+import { useEffect, useState } from 'react';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: string[];
 }
 
+interface MaintenanceConfig {
+  preferencias?: {
+    modoManutencao?: boolean;
+  };
+}
+
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, loading: authLoading, signOut } = useAuth();
   const { role, loading: roleLoading } = useUserRole();
+  const [maintenanceConfig, setMaintenanceConfig] = useState<MaintenanceConfig | null>(null);
+  const [loadingMaintenance, setLoadingMaintenance] = useState(true);
 
-  const loading = authLoading || roleLoading;
+  useEffect(() => {
+    const fetchMaintenanceStatus = async () => {
+      try {
+        const docRef = doc(db, 'configuracoes', 'escola');
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          setMaintenanceConfig(docSnap.data() as MaintenanceConfig);
+        }
+      } catch (error) {
+        console.error("Failed to fetch maintenance status:", error);
+      } finally {
+        setLoadingMaintenance(false);
+      }
+    };
+
+    fetchMaintenanceStatus();
+  }, []);
+
+  const loading = authLoading || roleLoading || loadingMaintenance;
 
   if (loading) {
     return (
@@ -21,6 +50,10 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (maintenanceConfig?.preferencias?.modoManutencao && role !== 'admin') {
+    return <Navigate to="/manutencao" />;
   }
 
   if (!user) {

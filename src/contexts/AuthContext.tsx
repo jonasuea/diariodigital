@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, updateProfile, signOut as firebaseSignOut } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
 import { db } from '@/lib/firebase';
 
@@ -29,7 +29,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const loggedInUser = userCredential.user;
+
+      const maintenanceDocRef = doc(db, 'configuracoes', 'escola');
+      const roleDocRef = doc(db, 'user_roles', loggedInUser.uid);
+
+      const [maintenanceDoc, roleDoc] = await Promise.all([
+        getDoc(maintenanceDocRef),
+        getDoc(roleDocRef)
+      ]);
+
+      const maintenanceData = maintenanceDoc.data();
+      const roleData = roleDoc.data();
+      
+      const isInMaintenance = maintenanceData?.preferencias?.modoManutencao || false;
+      const userRole = roleData?.role || null;
+
+      if (isInMaintenance && userRole !== 'admin') {
+        await firebaseSignOut(auth);
+        const maintenanceError = new Error("O sistema está em modo de manutenção. Apenas administradores podem fazer login.");
+        maintenanceError.name = 'MaintenanceMode';
+        return { error: maintenanceError };
+      }
+      
       return { error: null };
     } catch (error) {
       return { error: error as Error };

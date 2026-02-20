@@ -204,12 +204,17 @@ export default function NovoAluno() {
     e.preventDefault();
     setLoading(true);
 
+    const finalFormData = {
+      ...formData,
+      nome_lower: formData.nome.toLowerCase()
+    };
+
     try {
       if (isEditing && id) {
-        await updateDoc(doc(db, 'alunos', id), formData);
+        await updateDoc(doc(db, 'alunos', id), finalFormData);
         toast.success('Aluno atualizado com sucesso!');
       } else {
-        await addDoc(collection(db, 'alunos'), formData);
+        await addDoc(collection(db, 'alunos'), finalFormData);
         toast.success('Aluno cadastrado com sucesso!');
       }
       navigate('/alunos');

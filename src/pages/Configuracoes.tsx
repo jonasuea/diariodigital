@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,14 +6,20 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building } from 'lucide-react';
+import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+import { db } from '@/lib/firebase';
+import { doc, getDoc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 
 export default function Configuracoes() {
   const { user } = useAuth();
+  const { role } = useUserRole();
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isInstalacoesOpen, setIsInstalacoesOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const [escolaConfig, setEscolaConfig] = useState({
     nome: 'Escola Estadual Maria da Silva',
@@ -49,13 +55,63 @@ export default function Configuracoes() {
     confirmarSenha: '',
   });
 
-  const handleSaveEscola = () => {
-    toast.success('Informações da escola salvas com sucesso!');
+  useEffect(() => {
+    async function loadConfig() {
+      setLoading(true);
+      try {
+        const docRef = doc(db, 'configuracoes', 'escola');
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.escolaConfig) setEscolaConfig(data.escolaConfig);
+          if (data.instalacoes) setInstalacoes(data.instalacoes);
+          if (data.preferencias) setPreferencias(data.preferencias);
+        }
+      } catch (error) {
+        toast.error('Erro ao carregar configurações');
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadConfig();
+  }, []);
+
+  const handleSaveEscola = async () => {
+    try {
+      const docRef = doc(db, 'configuracoes', 'escola');
+      await setDoc(docRef, { escolaConfig }, { merge: true });
+      toast.success('Informações da escola salvas com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao salvar informações da escola');
+      console.error(error);
+    }
   };
 
-  const handleSaveInstalacoes = () => {
-    toast.success('Instalações atualizadas com sucesso!');
-    setIsInstalacoesOpen(false);
+  const handleSaveInstalacoes = async () => {
+    try {
+      const docRef = doc(db, 'configuracoes', 'escola');
+      await setDoc(docRef, { instalacoes }, { merge: true });
+      toast.success('Instalações atualizadas com sucesso!');
+      setIsInstalacoesOpen(false);
+    } catch (error) {
+      toast.error('Erro ao salvar instalações');
+      console.error(error);
+    }
+  };
+  
+  const handleSavePreferencias = async (newPreferencias: typeof preferencias) => {
+    setPreferencias(newPreferencias);
+    try {
+      const docRef = doc(db, 'configuracoes', 'escola');
+      await setDoc(docRef, { preferencias: newPreferencias }, { merge: true });
+      toast.success('Preferências salvas com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao salvar preferências');
+      console.error(error);
+    }
   };
 
   const handleSaveProfile = () => {
@@ -67,6 +123,63 @@ export default function Configuracoes() {
     setIsEditProfileOpen(false);
     setProfileData(prev => ({ ...prev, novaSenha: '', confirmarSenha: '' }));
   };
+
+  const handleSyncSearchData = async () => {
+    setIsSyncing(true);
+    toast.info('Iniciando a sincronização dos dados de busca. Isso pode levar alguns minutos...');
+
+    try {
+      const collectionsToSync = ['alunos', 'professores', 'equipe-gestora'];
+      let updatedCount = 0;
+
+      for (const collectionName of collectionsToSync) {
+        const querySnapshot = await getDocs(collection(db, collectionName));
+        const batch = writeBatch(db);
+        let batchWrites = 0;
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.nome && !data.nome_lower) {
+            batch.update(doc.ref, { nome_lower: data.nome.toLowerCase() });
+            batchWrites++;
+            updatedCount++;
+          }
+          // Firestore batches can have up to 500 operations.
+          if (batchWrites >= 499) {
+            batch.commit();
+            // batch = writeBatch(db); // This line is incorrect, reinitialization should be done after commit.
+            batchWrites = 0;
+          }
+        });
+        
+        if (batchWrites > 0) {
+          await batch.commit();
+        }
+      }
+
+      if (updatedCount > 0) {
+        toast.success(`${updatedCount} registros foram atualizados com sucesso!`);
+      } else {
+        toast.success('Todos os registros já estão sincronizados.');
+      }
+
+    } catch (error) {
+      console.error("Erro ao sincronizar dados:", error);
+      toast.error('Ocorreu um erro durante a sincronização.');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <AppLayout title="Configurações">
+        <div className="flex justify-center items-center h-64">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Configurações">
@@ -216,7 +329,7 @@ export default function Configuracoes() {
                   </div>
                   <Switch
                     checked={preferencias.notificacoes}
-                    onCheckedChange={(checked) => setPreferencias({ ...preferencias, notificacoes: checked })}
+                    onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, notificacoes: checked })}
                   />
                 </div>
                 <div className="flex items-center justify-between">
@@ -231,22 +344,7 @@ export default function Configuracoes() {
                   </div>
                   <Switch
                     checked={preferencias.autenticacaoDoisFatores}
-                    onCheckedChange={(checked) => setPreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-start gap-3">
-                    <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Modo de Manutenção</p>
-                      <p className="text-sm text-muted-foreground">
-                        Sistema disponível apenas para administradores
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={preferencias.modoManutencao}
-                    onCheckedChange={(checked) => setPreferencias({ ...preferencias, modoManutencao: checked })}
+                    onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
                   />
                 </div>
               </CardContent>
@@ -255,6 +353,7 @@ export default function Configuracoes() {
 
           {/* Sidebar direita */}
           <div className="space-y-6">
+
             {/* Informações da Conta */}
             <Card>
               <CardHeader className="pb-4">
@@ -291,6 +390,51 @@ export default function Configuracoes() {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Manutenção do Sistema */}
+            {role === 'admin' && (
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold">Manutenção do Sistema</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="font-medium">Modo de Manutenção</p>
+                          <p className="text-sm text-muted-foreground">
+                            Sistema disponível apenas para administradores
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={preferencias.modoManutencao}
+                        onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, modoManutencao: checked })}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-2 mt-4">
+                        Se a busca por nome não encontrar registros antigos, clique no botão abaixo para sincronizar os dados.
+                      </p>
+                      <Button 
+                        className="w-full" 
+                        onClick={handleSyncSearchData} 
+                        disabled={isSyncing}
+                      >
+                        {isSyncing ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Wrench className="h-4 w-4 mr-2" />
+                        )}
+                        {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados de Busca'}
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
 

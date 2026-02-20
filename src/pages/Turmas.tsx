@@ -216,7 +216,7 @@ export default function Turmas() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {[2023, 2024, 2025].map((ano) => (
+                {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map((ano) => (
                   <SelectItem key={ano} value={ano.toString()}>{ano}</SelectItem>
                 ))}
               </SelectContent>

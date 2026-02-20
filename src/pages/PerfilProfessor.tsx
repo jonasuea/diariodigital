@@ -28,7 +28,7 @@ interface Professor {
   data_lotacao: string | null;
   disciplinas: string[] | null;
   series: string[] | null;
-  formacoes: { titulo: string; instituicao: string; ano: string }[] | null;
+  formacoes: { curso: string; nivel: string; ano_conclusao: string }[] | null;
   ativo: boolean;
 }
 
@@ -249,10 +249,15 @@ export default function PerfilProfessor() {
                   </h4>
                   <div className="space-y-3">
                     {professor.formacoes.map((formacao, i) => (
-                      <div key={i} className="border rounded-lg p-3">
-                        <p className="font-medium">{formacao.titulo}</p>
-                        <p className="text-sm text-muted-foreground">{formacao.instituicao}</p>
-                        <p className="text-sm text-muted-foreground">{formacao.ano}</p>
+                      <div key={i} className="flex items-start gap-4 p-3 border rounded-lg">
+                        <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
+                          <GraduationCap className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-base">{formacao.curso}</p>
+                          <p className="text-sm text-muted-foreground">{formacao.nivel}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Concluído em {formacao.ano_conclusao}</p>
+                        </div>
                       </div>
                     ))}
                   </div>

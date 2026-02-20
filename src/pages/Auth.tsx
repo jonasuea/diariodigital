@@ -35,7 +35,12 @@ export default function Auth() {
       if (isLogin) {
         const { error } = await signIn(email, password);
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
+          if (error.name === 'MaintenanceMode') {
+            toast.warning('Sistema em Manutenção', {
+              description: 'Apenas administradores podem fazer login no momento.',
+              duration: 6000,
+            });
+          } else if (error.message.includes('Invalid login credentials')) {
             toast.error('Email ou senha incorretos');
           } else {
             toast.error('Erro ao fazer login: ' + error.message);

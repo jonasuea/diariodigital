@@ -214,6 +214,7 @@ export default function NovoProfessor() {
 
     const payload = {
       ...formData,
+      nome_lower: formData.nome.toLowerCase(),
       formacoes: formacoes.filter(f => f.curso),
       disciplina: formData.disciplinas[0] || formData.disciplina || 'Geral',
     };

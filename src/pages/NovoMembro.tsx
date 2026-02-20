@@ -175,6 +175,7 @@ export default function NovoMembro() {
 
     const payload = {
       ...formData,
+      nome_lower: formData.nome.toLowerCase(),
       formacoes: formacoes.filter(f => f.curso),
     };
 
