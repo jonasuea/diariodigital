@@ -28,8 +28,8 @@ export default function Configuracoes() {
   const photoInputRef = useRef<HTMLInputElement>(null);
   
   const [escolaConfig, setEscolaConfig] = useState({
-    nome: 'Escola Estadual Maria da Silva',
-    email: 'contato@escolamaria.edu.br',
+    nome: 'Escola Municipal Nome da Escola',
+    email: 'contato@escolanome.edu.br',
     telefone: '(11) 3456-7890',
     endereco: 'Rua das Flores, 123 - São Paulo',
     horarioFuncionamento: 'Segunda a Sexta, 7h às 18h',
@@ -54,8 +54,8 @@ export default function Configuracoes() {
   });
 
   const [profileData, setProfileData] = useState({
-    nome: 'Admin',
-    email: user?.email || 'admin@escola.com',
+    nome: 'Administrador',
+    email: user?.email || 'admin@escola.edu.br',
     telefone: '(11) 98765-4321',
     cargo: 'Administrador',
     foto_url: '',
@@ -91,17 +91,35 @@ export default function Configuracoes() {
     async function loadConfig() {
       setLoading(true);
       try {
-        const docRef = doc(db, 'configuracoes', 'escola');
-        const docSnap = await getDoc(docRef);
+        // Carregar configurações da escola
+        const configDocRef = doc(db, 'configuracoes', 'escola');
+        const configDocSnap = await getDoc(configDocRef);
 
-        if (docSnap.exists()) {
-          const data = docSnap.data();
+        if (configDocSnap.exists()) {
+          const data = configDocSnap.data();
           if (data.escolaConfig) setEscolaConfig(data.escolaConfig);
           if (data.instalacoes) setInstalacoes(data.instalacoes);
           if (data.preferencias) {
             setPreferencias(data.preferencias);
             // Sincronizar com o localStorage ao carregar
             localStorage.setItem('telaCheiaPadrao', JSON.stringify(data.preferencias.telaCheiaPadrao || false));
+          }
+        }
+
+        // Carregar perfil do usuário
+        if (user) {
+          const profileDocRef = doc(db, 'profiles', user.uid);
+          const profileDocSnap = await getDoc(profileDocRef);
+          if (profileDocSnap.exists()) {
+            const profile = profileDocSnap.data();
+            setProfileData(prev => ({
+              ...prev,
+              nome: profile.nome || prev.nome,
+              email: user.email || prev.email,
+              telefone: profile.telefone || '',
+              cargo: profile.cargo || role || prev.cargo,
+              foto_url: profile.foto_url || '',
+            }));
           }
         }
       } catch (error) {
@@ -113,7 +131,7 @@ export default function Configuracoes() {
     }
 
     loadConfig();
-  }, []);
+  }, [user, role]);
 
   const handleSaveEscola = async () => {
     try {
@@ -160,17 +178,37 @@ export default function Configuracoes() {
       toast.error('As senhas não coincidem');
       return;
     }
-    
-    // Aqui você salvaria no Firestore na coleção de usuários
-    await logActivity('atualizou as informações do seu perfil.');
-    toast.success('Perfil atualizado com sucesso!');
-    setIsEditProfileOpen(false);
-    setProfileData(prev => ({ ...prev, novaSenha: '', confirmarSenha: '' }));
+
+    if (!user) {
+      toast.error('Usuário não autenticado.');
+      return;
+    }
+
+    try {
+      // TODO: Implementar atualização de senha usando a função do AuthContext
+      // if (profileData.novaSenha) { ... }
+
+      const profileDocRef = doc(db, 'profiles', user.uid);
+      const dataToUpdate = {
+        nome: profileData.nome,
+        telefone: profileData.telefone,
+        cargo: profileData.cargo,
+      };
+      await setDoc(profileDocRef, dataToUpdate, { merge: true });
+
+      await logActivity('atualizou as informações do seu perfil.');
+      toast.success('Perfil atualizado com sucesso!');
+      setIsEditProfileOpen(false);
+      setProfileData(prev => ({ ...prev, novaSenha: '', confirmarSenha: '' }));
+    } catch (error) {
+      toast.error('Erro ao atualizar o perfil.');
+      console.error(error);
+    }
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
 
     if (!file.type.startsWith('image/')) {
       toast.error('Por favor, selecione uma imagem');
@@ -186,9 +224,13 @@ export default function Configuracoes() {
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
 
+      // Atualiza o estado local e salva a URL no Firestore
       setProfileData(prev => ({ ...prev, foto_url: photoURL }));
+      const profileDocRef = doc(db, 'profiles', user.uid);
+      await setDoc(profileDocRef, { foto_url: photoURL }, { merge: true });
+
       await logActivity('atualizou sua foto de perfil.');
-      toast.success('Foto de perfil carregada!');
+      toast.success('Foto de perfil atualizada!');
     } catch (error) {
       toast.error('Erro ao fazer upload da foto');
       console.error(error);

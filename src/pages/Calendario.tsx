@@ -320,6 +320,7 @@ export default function Calendario() {
                 <Calendar
                   mode="single"
                   selected={selectedDate}
+                  month={currentMonth}
                   onSelect={handleDateSelect}
                   onMonthChange={setCurrentMonth}
                   locale={ptBR}

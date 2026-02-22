@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp } from 'firebase/firestore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
 import { format, formatDistanceToNow, startOfWeek, endOfWeek, startOfMonth, getDay, parseISO } from 'date-fns';
@@ -39,6 +41,11 @@ interface FrequenciaData {
   presencas: number;
 }
 
+interface NotasBimestraisData {
+  bimestre: string;
+  media: number;
+}
+
 const DIAS_SEMANA_CHART = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 function StatCard({ title, value, icon: Icon, onClick }: { title: string, value: string | number, icon: React.ElementType, onClick?: () => void }) {
@@ -67,7 +74,9 @@ export default function Painel() {
   const [proximosEventos, setProximosEventos] = useState<Evento[]>([]);
   const [frequenciaData, setFrequenciaData] = useState<FrequenciaData[]>([]);
   const [atividadesRecentes, setAtividadesRecentes] = useState<ActivityLog[]>([]);
+  const [notasBimestraisData, setNotasBimestraisData] = useState<NotasBimestraisData[]>([]);
   const [periodoFrequencia, setPeriodoFrequencia] = useState('semana');
+  const [activeChartTab, setActiveChartTab] = useState('frequencia');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -77,7 +86,8 @@ export default function Painel() {
         await Promise.all([
           fetchStatsAndEvents(),
           fetchFrequenciaData(periodoFrequencia),
-          fetchAtividadesRecentes()
+          fetchAtividadesRecentes(),
+          fetchNotasBimestraisData()
         ]);
       } catch (error) {
         console.error("Erro ao carregar dados do painel:", error);
@@ -129,10 +139,30 @@ export default function Painel() {
       let mediaNotas: number | null = null;
       const notasData = notasRes.docs.map(doc => doc.data());
       if (notasData.length > 0) {
-        const notasValidas = notasData.filter(n => n.media_anual != null && typeof n.media_anual === 'number');
-        if (notasValidas.length > 0) {
-          const soma = notasValidas.reduce((acc, n) => acc + (n.media_anual || 0), 0);
-          mediaNotas = Math.round((soma / notasValidas.length) * 10) / 10;
+        let somaTotal = 0;
+        let contadorTotal = 0;
+
+        notasData.forEach(nota => {
+          if (nota.bimestre_1 != null && typeof nota.bimestre_1 === 'number') {
+            somaTotal += nota.bimestre_1;
+            contadorTotal++;
+          }
+          if (nota.bimestre_2 != null && typeof nota.bimestre_2 === 'number') {
+            somaTotal += nota.bimestre_2;
+            contadorTotal++;
+          }
+          if (nota.bimestre_3 != null && typeof nota.bimestre_3 === 'number') {
+            somaTotal += nota.bimestre_3;
+            contadorTotal++;
+          }
+          if (nota.bimestre_4 != null && typeof nota.bimestre_4 === 'number') {
+            somaTotal += nota.bimestre_4;
+            contadorTotal++;
+          }
+        });
+
+        if (contadorTotal > 0) {
+          mediaNotas = Math.round((somaTotal / contadorTotal) * 10) / 10;
         }
       }
 
@@ -193,9 +223,52 @@ export default function Painel() {
     }
   }
 
+  async function fetchNotasBimestraisData() {
+    try {
+      const notasSnapshot = await getDocs(collection(db, 'notas'));
+      const notasData = notasSnapshot.docs.map(doc => doc.data());
+
+      const bimestres: { [key: string]: { soma: number; count: number } } = {
+        '1º Bim': { soma: 0, count: 0 },
+        '2º Bim': { soma: 0, count: 0 },
+        '3º Bim': { soma: 0, count: 0 },
+        '4º Bim': { soma: 0, count: 0 },
+      };
+
+      notasData.forEach(nota => {
+        if (nota.bimestre_1 != null && typeof nota.bimestre_1 === 'number') {
+          bimestres['1º Bim'].soma += nota.bimestre_1;
+          bimestres['1º Bim'].count++;
+        }
+        if (nota.bimestre_2 != null && typeof nota.bimestre_2 === 'number') {
+          bimestres['2º Bim'].soma += nota.bimestre_2;
+          bimestres['2º Bim'].count++;
+        }
+        if (nota.bimestre_3 != null && typeof nota.bimestre_3 === 'number') {
+          bimestres['3º Bim'].soma += nota.bimestre_3;
+          bimestres['3º Bim'].count++;
+        }
+        if (nota.bimestre_4 != null && typeof nota.bimestre_4 === 'number') {
+          bimestres['4º Bim'].soma += nota.bimestre_4;
+          bimestres['4º Bim'].count++;
+        }
+      });
+
+      const dadosGrafico: NotasBimestraisData[] = Object.entries(bimestres).map(([key, value]) => ({
+        bimestre: key,
+        media: value.count > 0 ? Math.round((value.soma / value.count) * 10) / 10 : 0,
+      }));
+
+      setNotasBimestraisData(dadosGrafico);
+    } catch (error) {
+      console.error('Error fetching bimester grades data:', error);
+      toast.error("Erro ao carregar dados de notas bimestrais.");
+    }
+  }
+
   async function fetchAtividadesRecentes() {
     try {
-      const q = query(collection(db, 'activity_log'), orderBy('created_at', 'desc'), limit(10));
+      const q = query(collection(db, 'activity_log'), orderBy('created_at', 'desc'), limit(4));
       const querySnapshot = await getDocs(q);
       const activitiesData = querySnapshot.docs.map(doc => ({
         id: doc.id,
@@ -221,11 +294,6 @@ export default function Painel() {
   return (
     <AppLayout title="Painel">
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <h1 className="text-3xl font-bold">Painel</h1>
-          <p className="text-muted-foreground">Visão geral do sistema escolar.</p>
-        </div>
-
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard title="Total de Estudantes" value={loading ? '...' : stats.totalEstudantes} icon={Users} onClick={() => navigate('/estudantes')} />
           <StatCard title="Total de Professores" value={loading ? '...' : stats.totalProfessores} icon={Users} onClick={() => navigate('/professores')} />
@@ -235,37 +303,61 @@ export default function Painel() {
 
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Frequência Geral</CardTitle>
-                <CardDescription>Total de presenças por dia.</CardDescription>
+            <Tabs defaultValue="frequencia" onValueChange={setActiveChartTab}>
+              <div className="flex flex-row items-center justify-between px-6 pt-6 pb-4">
+                <TabsList>
+                  <TabsTrigger value="frequencia">Frequência Geral</TabsTrigger>
+                  <TabsTrigger value="notas">Notas Bimestrais</TabsTrigger>
+                </TabsList>
+                {activeChartTab === 'frequencia' && (
+                  <Select value={periodoFrequencia} onValueChange={setPeriodoFrequencia}>
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="semana">Esta Semana</SelectItem>
+                      <SelectItem value="mes">Este Mês</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
-              <Select value={periodoFrequencia} onValueChange={setPeriodoFrequencia}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="semana">Esta Semana</SelectItem>
-                  <SelectItem value="mes">Este Mês</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardHeader>
-            <CardContent className="h-[300px] pr-0">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={frequenciaData}>
-                  <XAxis dataKey="dia" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <RechartsTooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      borderColor: 'hsl(var(--border))',
-                      borderRadius: 'var(--radius)',
-                    }}
-                  />
-                  <Bar dataKey="presencas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
+              <TabsContent value="frequencia">
+                <CardContent className="h-[300px] pr-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={frequenciaData}>
+                      <XAxis dataKey="dia" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          borderColor: 'hsl(var(--border))',
+                          borderRadius: 'var(--radius)',
+                        }}
+                      />
+                      <Bar dataKey="presencas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </TabsContent>
+              <TabsContent value="notas">
+                <CardContent className="h-[300px] pr-0">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={notasBimestraisData}>
+                      <XAxis dataKey="bimestre" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} domain={[0, 10]} />
+                      <RechartsTooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          borderColor: 'hsl(var(--border))',
+                          borderRadius: 'var(--radius)',
+                        }}
+                      />
+                      <Bar dataKey="media" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </TabsContent>
+            </Tabs>
           </Card>
 
           <Card>
@@ -278,17 +370,17 @@ export default function Painel() {
                 Os próximos 5 eventos no calendário escolar.
               </CardDescription>
             </CardHeader>
-            <CardContent className="h-[300px] overflow-y-auto pr-4">
+            <CardContent className="h-[300px] overflow-y-auto pr-2">
               {loading ? (
                 <p className="text-sm text-muted-foreground text-center py-4">Carregando eventos...</p>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {proximosEventos.length > 0 ? (
                     proximosEventos.map(evento => (
-                      <div key={evento.id} className="flex items-start gap-4">
-                        <div className="flex-shrink-0 text-center font-semibold bg-muted p-2 rounded-md w-14">
-                          <div className="text-xs uppercase text-red-600">{format(evento.data.toDate(), 'MMM', { locale: ptBR })}</div>
-                          <div className="text-xl">{format(evento.data.toDate(), 'dd')}</div>
+                      <div key={evento.id} className="flex items-start gap-2">
+                        <div className="flex-shrink-0 text-center font-semibold bg-muted p-1.0 rounded-md w-5">
+                          <div className="text-xs uppercase text-red-500">{format(evento.data.toDate(), 'MMM', { locale: ptBR })}</div>
+                          <div className="text-lg">{format(evento.data.toDate(), 'dd')}</div>
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold leading-tight">{evento.titulo}</p>
@@ -308,14 +400,19 @@ export default function Painel() {
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <List className="h-5 w-5" />
-              Atividades Recentes
-            </CardTitle>
-            <CardDescription>
-              Log das últimas interações no sistema.
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <List className="h-5 w-5" />
+                Atividades Recentes
+              </CardTitle>
+              <CardDescription>
+                Log das últimas interações no sistema.
+              </CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/logs')}>
+              Visualizar Todos
+            </Button>
           </CardHeader>
           <CardContent>
             {loading ? (

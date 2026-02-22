@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 
@@ -28,58 +28,64 @@ import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
 import Usuarios from "./pages/Usuarios";
 import NotFound from "./pages/NotFound";
+import Logs from "./pages/Logs";
 import Perfil from "./pages/Perfil";
 import Manutencao from "./pages/Manutencao";
 
 const queryClient = new QueryClient();
+
+const router = createBrowserRouter([
+  { path: "/", element: <Auth /> },
+  { path: "/auth", element: <Auth /> },
+  { path: "/manutencao", element: <Manutencao /> },
+
+  { path: "/painel", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Painel /></ProtectedRoute> },
+
+  { path: "/estudantes", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Estudantes /></ProtectedRoute> },
+  { path: "/estudantes/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoEstudante /></ProtectedRoute> },
+  { path: "/estudantes/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilEstudante /></ProtectedRoute> },
+  { path: "/estudantes/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoEstudante /></ProtectedRoute> },
+
+  { path: "/professores", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Professores /></ProtectedRoute> },
+  { path: "/professores/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute> },
+  { path: "/professores/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilProfessor /></ProtectedRoute> },
+  { path: "/professores/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute> },
+
+  { path: "/turmas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Turmas /></ProtectedRoute> },
+  { path: "/turmas/:turmaId/notas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Notas /></ProtectedRoute> },
+  { path: "/turmas/:turmaId/frequencia", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Frequencia /></ProtectedRoute> },
+  { path: "/turmas/:turmaId/ata-final", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><AtaFinal /></ProtectedRoute> },
+
+  { path: "/equipe-gestora", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><EquipeGestora /></ProtectedRoute> },
+  { path: "/equipe-gestora/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoMembro /></ProtectedRoute> },
+  { path: "/equipe-gestora/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilMembro /></ProtectedRoute> },
+  { path: "/equipe-gestora/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoMembro /></ProtectedRoute> },
+
+  { path: "/horario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Horario /></ProtectedRoute> },
+  { path: "/calendario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor', 'estudante']}><Calendario /></ProtectedRoute> },
+  { path: "/diario-digital", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><DiarioDigital /></ProtectedRoute> },
+  { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Relatorios /></ProtectedRoute> },
+  { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin']}><Configuracoes /></ProtectedRoute> },
+  { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin']}><Usuarios /></ProtectedRoute> },
+  { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Logs /></ProtectedRoute> },
+
+  { path: "/perfil", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Perfil /></ProtectedRoute> },
+
+  { path: "*", element: <NotFound /> },
+], {
+  future: {
+    v7_startTransition: true,
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            <Route path="/" element={<Auth />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/manutencao" element={<Manutencao />} />
-
-            <Route path="/painel" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Painel /></ProtectedRoute>} />
-
-            <Route path="/estudantes" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><Estudantes /></ProtectedRoute>} />
-            <Route path="/estudantes/novo" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoEstudante /></ProtectedRoute>} />
-            <Route path="/estudantes/:id" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilEstudante /></ProtectedRoute>} />
-            <Route path="/estudantes/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoEstudante /></ProtectedRoute>} />
-
-            <Route path="/professores" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><Professores /></ProtectedRoute>} />
-            <Route path="/professores/novo" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute>} />
-            <Route path="/professores/:id" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilProfessor /></ProtectedRoute>} />
-            <Route path="/professores/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute>} />
-
-            <Route path="/turmas" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Turmas /></ProtectedRoute>} />
-            <Route path="/turmas/:turmaId/notas" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Notas /></ProtectedRoute>} />
-            <Route path="/turmas/:turmaId/frequencia" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Frequencia /></ProtectedRoute>} />
-            <Route path="/turmas/:turmaId/ata-final" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><AtaFinal /></ProtectedRoute>} />
-
-            <Route path="/equipe-gestora" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><EquipeGestora /></ProtectedRoute>} />
-            <Route path="/equipe-gestora/novo" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoMembro /></ProtectedRoute>} />
-            <Route path="/equipe-gestora/:id" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilMembro /></ProtectedRoute>} />
-            <Route path="/equipe-gestora/:id/editar" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoMembro /></ProtectedRoute>} />
-
-            <Route path="/horario" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Horario /></ProtectedRoute>} />
-            <Route path="/calendario" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor', 'estudante']}><Calendario /></ProtectedRoute>} />
-            <Route path="/diario-digital" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><DiarioDigital /></ProtectedRoute>} />
-            <Route path="/relatorios" element={<ProtectedRoute allowedRoles={['admin', 'gestor']}><Relatorios /></ProtectedRoute>} />
-            <Route path="/configuracoes" element={<ProtectedRoute allowedRoles={['admin']}><Configuracoes /></ProtectedRoute>} />
-            <Route path="/usuarios" element={<ProtectedRoute allowedRoles={['admin']}><Usuarios /></ProtectedRoute>} />
-
-            <Route path="/perfil" element={<ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Perfil /></ProtectedRoute>} />
-
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );
