@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, User, Plus, Trash2, Upload, FileText, X } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
 import { collection, doc, getDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 
@@ -23,10 +24,20 @@ interface Formacao {
 }
 
 const DISCIPLINAS = [
-  'Português', 'Matemática', 'Ciências',
-  'História', 'Geografia', 'Inglês',
-  'Educação Física', 'Artes', 'Física',
-  'Química', 'Biologia'
+  'Língua Portuguesa',
+  'Matemática',
+  'Ciências',
+  'História',
+  'Geografia',
+  'Arte',
+  'Educação Física',
+  'Inglês',
+  'Ensino Religioso',
+  'Física',
+  'Química',
+  'Biologia',
+  'Filosofia',
+  'Sociologia',
 ];
 
 const SERIES = [
@@ -224,9 +235,11 @@ export default function NovoProfessor() {
         if (!id) return;
         const docRef = doc(db, 'professores', id);
         await updateDoc(docRef, payload);
+        await logActivity(`atualizou o cadastro do professor(a) "${formData.nome}".`);
         toast.success('Professor atualizado com sucesso!');
       } else {
         await addDoc(collection(db, 'professores'), payload);
+        await logActivity(`cadastrou o novo professor(a) "${formData.nome}".`);
         toast.success('Professor cadastrado com sucesso!');
       }
       navigate('/professores');

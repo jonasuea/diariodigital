@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Plus, Search, Eye, Pencil, Trash2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Plus, Search, Eye, Pencil, Trash2, Upload, Download } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { useUserRole } from '@/hooks/useUserRole';
+import Papa from 'papaparse';
 
 interface Membro {
   id: string;
@@ -20,15 +23,20 @@ interface Membro {
   email: string;
   telefone: string | null;
   status: string;
+  link_lattes: string | null;
+  formacoes: unknown[];
 }
 
 export default function EquipeGestora() {
   const navigate = useNavigate();
+  const { isAdmin } = useUserRole();
   const [membros, setMembros] = useState<Membro[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [membroToDelete, setMembroToDelete] = useState<Membro | null>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     fetchMembros();
@@ -73,6 +81,153 @@ export default function EquipeGestora() {
     } finally {
       setDeleteDialogOpen(false);
       setMembroToDelete(null);
+    }
+  }
+
+  async function handleImportCSV(file: File) {
+    setImporting(true);
+    try {
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.onerror = (error) => reject(error);
+        reader.readAsText(file, 'UTF-8');
+      });
+
+      let result = Papa.parse(text, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => header.trim().toLowerCase(),
+        delimiter: ';',
+      });
+
+      if (result.errors.length > 0) {
+        result = Papa.parse(text, {
+          header: true,
+          skipEmptyLines: true,
+          transformHeader: (header: string) => header.trim().toLowerCase(),
+          delimiter: ',',
+        });
+      }
+
+      if (result.errors.length > 0) {
+        toast.error('Erro ao fazer o parsing do CSV. Verifique o formato e o separador.');
+        return;
+      }
+
+      const requiredColumns = ['nome', 'email', 'cargo'];
+      const fileColumns = result.meta.fields?.map(f => f.toLowerCase().trim()) || [];
+      const missingColumns = requiredColumns.filter(col => !fileColumns.includes(col));
+
+      if (missingColumns.length > 0) {
+        toast.error(`Colunas obrigatórias em falta no CSV: ${missingColumns.join(', ')}`);
+        return;
+      }
+
+      const membrosData = result.data as any[];
+      let successCount = 0;
+      let errorCount = 0;
+      let skippedCount = 0;
+
+      // Otimização: Carregar matrículas existentes
+      const matriculasSnapshot = await getDocs(query(collection(db, 'equipe_gestora'), where('matricula', '!=', '')));
+      const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
+      const matriculasInCsv = new Set();
+
+      for (const row of membrosData) {
+        try {
+          if (!row.nome || !row.email || !row.cargo) {
+            errorCount++;
+            continue;
+          }
+
+          const matricula = row.matricula?.trim();
+          if (matricula) {
+            if (existingMatriculas.has(matricula) || matriculasInCsv.has(matricula)) {
+              skippedCount++;
+              continue; // Pula o registro
+            }
+            matriculasInCsv.add(matricula);
+          }
+
+          let formacoes = [];
+          if (row.formacoes) {
+            try {
+              formacoes = JSON.parse(row.formacoes);
+              if (!Array.isArray(formacoes)) formacoes = [];
+            } catch (e) {
+              formacoes = [];
+            }
+          }
+
+          const membroData = {
+            nome: row.nome.trim(),
+            email: row.email.trim(),
+            matricula: matricula || '',
+            rg: row.rg?.trim() || '',
+            cpf: row.cpf?.trim() || '',
+            telefone: row.telefone?.trim() || '',
+            cargo: row.cargo.trim(),
+            status: row.status?.trim() || 'Lotado',
+            data_lotacao: row.data_lotacao?.trim() || '',
+            biografia: row.biografia?.trim() || '',
+            link_lattes: row.link_lattes?.trim() || '',
+            formacoes,
+          };
+          await addDoc(collection(db, 'equipe_gestora'), membroData);
+          successCount++;
+        } catch (error) {
+          errorCount++;
+        }
+      }
+
+      if (successCount > 0) toast.success(`${successCount} membros importados com sucesso!`);
+      if (skippedCount > 0) toast.info(`${skippedCount} membros foram ignorados por já terem uma matrícula existente.`);
+      if (errorCount > 0) toast.warning(`${errorCount} linhas não puderam ser importadas.`);
+      
+      fetchMembros();
+    } catch (error) {
+      toast.error('Ocorreu um erro ao importar o arquivo.');
+    } finally {
+      setImporting(false);
+      setImportDialogOpen(false);
+    }
+  }
+
+  async function handleExportCSV() {
+    try {
+      const membrosQuery = query(collection(db, 'equipe_gestora'), orderBy('nome'));
+      const querySnapshot = await getDocs(membrosQuery);
+      const membrosData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          nome: data.nome,
+          matricula: data.matricula,
+          rg: data.rg,
+          cpf: data.cpf,
+          email: data.email,
+          telefone: data.telefone,
+          cargo: data.cargo,
+          status: data.status,
+          data_lotacao: data.data_lotacao,
+          biografia: data.biografia,
+          link_lattes: data.link_lattes,
+          formacoes: JSON.stringify(data.formacoes || []),
+        };
+      });
+
+      const csv = Papa.unparse(membrosData, { delimiter: ';' });
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `equipe-gestora_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success('Exportação concluída com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao exportar dados da equipe gestora.');
     }
   }
 
@@ -172,13 +327,66 @@ export default function EquipeGestora() {
             />
           </div>
           
-          <Button onClick={() => navigate('/equipe-gestora/novo')}>
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Membro
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {isAdmin && (
+              <>
+                <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar CSV
+                </Button>
+                <Button variant="outline" onClick={handleExportCSV}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar CSV
+                </Button>
+              </>
+            )}
+            <Button onClick={() => navigate('/equipe-gestora/novo')}>
+              <Plus className="h-4 w-4 mr-2" />
+              Novo Membro
+            </Button>
+          </div>
         </div>
 
         <DataTable columns={columns} data={membros} loading={loading} emptyMessage="Nenhum membro encontrado" />
+
+        {/* Dialog de Importação CSV */}
+        <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Importar Membros via CSV</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800 font-semibold">Instruções Importantes</p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Para garantir que acentos funcionem, salve seu arquivo no Excel como <strong>"CSV UTF-8"</strong>.
+                </p>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Colunas obrigatórias: <strong>nome</strong>, <strong>email</strong>, <strong>cargo</strong>. Use ponto e vírgula (;) como separador.
+              </p>
+              <p className="text-sm">
+                <a href="/exemplo_equipe_gestora.csv" download className="text-primary hover:underline">
+                  Baixar modelo CSV
+                </a>
+              </p>
+              <Input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  if (e.target.files?.[0]) {
+                    handleImportCSV(e.target.files[0]);
+                  }
+                }}
+                disabled={importing}
+              />
+              {importing && <p className="text-sm">Importando...</p>}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setImportDialogOpen(false)}>Cancelar</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog de Confirmação de Exclusão */}
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

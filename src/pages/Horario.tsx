@@ -5,11 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Pencil, Trash2, Clock } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { logActivity } from '@/lib/logger';
 import { cn } from '@/lib/utils';
 
 interface Turma {
@@ -19,7 +21,7 @@ interface Turma {
 
 interface Horario {
   id: string;
-  turma_id: string;
+  turma_ids: string[];
   dia: string;
   inicio: string;
   fim: string;
@@ -34,6 +36,23 @@ const DIAS = [
   { value: 'sexta', label: 'Sexta' },
 ];
 
+const DISCIPLINAS = [
+  'Língua Portuguesa',
+  'Matemática',
+  'Ciências',
+  'História',
+  'Geografia',
+  'Arte',
+  'Educação Física',
+  'Inglês',
+  'Ensino Religioso',
+  'Física',
+  'Química',
+  'Biologia',
+  'Filosofia',
+  'Sociologia',
+];
+
 export default function Horario() {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
@@ -46,6 +65,7 @@ export default function Horario() {
     inicio: '07:00',
     fim: '08:00',
     disciplina: '',
+    turma_ids: [] as string[],
   });
 
   useEffect(() => {
@@ -57,6 +77,12 @@ export default function Horario() {
       fetchHorarios(selectedTurma.id);
     }
   }, [selectedTurma]);
+
+  useEffect(() => {
+    if (isOpen && !editingHorario && selectedTurma) {
+      setFormData(prev => ({ ...prev, turma_ids: [selectedTurma.id] }));
+    }
+  }, [isOpen, editingHorario, selectedTurma]);
 
   async function fetchTurmas() {
     try {
@@ -77,7 +103,7 @@ export default function Horario() {
   async function fetchHorarios(turmaId: string) {
     setLoading(true);
     try {
-      const q = query(collection(db, 'horarios'), where('turma_id', '==', turmaId), orderBy('inicio'));
+      const q = query(collection(db, 'horarios'), where('turma_ids', 'array-contains', turmaId), orderBy('inicio'));
       const querySnapshot = await getDocs(q);
       const horariosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Horario));
       setHorarios(horariosData);
@@ -90,10 +116,13 @@ export default function Horario() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedTurma) return;
-    
+    if (formData.turma_ids.length === 0) {
+      toast.error('Por favor, selecione ao menos uma turma.');
+      return;
+    }
+
     const payload = {
-      turma_id: selectedTurma.id,
+      turma_ids: formData.turma_ids,
       dia: formData.dia,
       inicio: formData.inicio,
       fim: formData.fim,
@@ -104,14 +133,18 @@ export default function Horario() {
       if (editingHorario) {
         const docRef = doc(db, 'horarios', editingHorario.id);
         await updateDoc(docRef, payload);
+        await logActivity(`atualizou o horário de ${payload.disciplina} para as turmas selecionadas.`);
         toast.success('Horário atualizado com sucesso!');
       } else {
         await addDoc(collection(db, 'horarios'), payload);
+        await logActivity(`cadastrou um novo horário de ${payload.disciplina} para as turmas selecionadas.`);
         toast.success('Horário cadastrado com sucesso!');
       }
       setIsOpen(false);
       resetForm();
-      fetchHorarios(selectedTurma.id);
+      if (selectedTurma) {
+        fetchHorarios(selectedTurma.id);
+      }
     } catch (error) {
       toast.error(editingHorario ? 'Erro ao atualizar horário' : 'Erro ao cadastrar horário');
       console.error(error);
@@ -124,6 +157,7 @@ export default function Horario() {
     try {
       const docRef = doc(db, 'horarios', horario.id);
       await deleteDoc(docRef);
+      await logActivity(`excluiu o horário de ${horario.disciplina} de ${horario.inicio} às ${horario.fim}.`);
       toast.success('Horário excluído com sucesso!');
       if (selectedTurma) fetchHorarios(selectedTurma.id);
     } catch (error) {
@@ -138,6 +172,7 @@ export default function Horario() {
       inicio: '07:00',
       fim: '08:00',
       disciplina: '',
+      turma_ids: [],
     });
     setEditingHorario(null);
   }
@@ -149,11 +184,12 @@ export default function Horario() {
       inicio: horario.inicio,
       fim: horario.fim,
       disciplina: horario.disciplina,
+      turma_ids: horario.turma_ids || [],
     });
     setIsOpen(true);
   }
 
-  const getHorariosByDia = (dia: string) => horarios.filter(h => h.dia === dia);
+  const getHorariosByDia = (dia: string) => horarios.filter(h => h.dia === dia).sort((a, b) => a.inicio.localeCompare(b.inicio));
 
   return (
     <AppLayout title="Horário">
@@ -209,6 +245,28 @@ export default function Horario() {
                     </DialogHeader>
                     <form onSubmit={handleSubmit} className="space-y-4">
                       <div className="space-y-2">
+                        <Label>Turmas</Label>
+                        <div className="max-h-32 overflow-y-auto space-y-2 rounded-md border p-2 bg-muted/50">
+                          {turmas.map(turma => (
+                            <div key={turma.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`turma-dialog-${turma.id}`}
+                                checked={formData.turma_ids.includes(turma.id)}
+                                onCheckedChange={(checked) => {
+                                  const newTurmaIds = checked
+                                    ? [...formData.turma_ids, turma.id]
+                                    : formData.turma_ids.filter(id => id !== turma.id);
+                                  setFormData({ ...formData, turma_ids: newTurmaIds });
+                                }}
+                              />
+                              <Label htmlFor={`turma-dialog-${turma.id}`} className="font-normal cursor-pointer">
+                                {turma.nome}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="space-y-2">
                         <Label htmlFor="dia">Dia da Semana</Label>
                         <Select value={formData.dia} onValueChange={(value) => setFormData({ ...formData, dia: value })}>
                           <SelectTrigger>
@@ -225,12 +283,18 @@ export default function Horario() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="disciplina">Disciplina</Label>
-                        <Input
-                          id="disciplina"
-                          value={formData.disciplina}
-                          onChange={(e) => setFormData({ ...formData, disciplina: e.target.value })}
-                          required
-                        />
+                        <Select value={formData.disciplina} onValueChange={(value) => setFormData({ ...formData, disciplina: value })}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione a disciplina" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {DISCIPLINAS.map((disc) => (
+                              <SelectItem key={disc} value={disc}>
+                                {disc}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">

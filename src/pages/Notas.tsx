@@ -9,12 +9,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Search, Users, FileText, Save, Edit } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, getDoc, orderBy } from 'firebase/firestore';
+import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface Aluno {
+interface Estudante {
   id: string;
   nome: string;
   matricula: string;
@@ -22,7 +23,7 @@ interface Aluno {
 
 interface Nota {
   id?: string;
-  aluno_id: string;
+  estudante_id: string;
   turma_id: string;
   disciplina: string;
   bimestre_1: number | null;
@@ -60,8 +61,8 @@ const DEFAULT_BOLETIM_TEMPLATE = `BOLETIM ESCOLAR
 Escola Municipal Dom Paulo McHugh
 Ano Letivo: {ANO}
 
-DADOS DO ALUNO:
-Nome: {NOME_ALUNO}
+DADOS DO ESTUDANTE:
+Nome: {NOME_ESTUDANTE}
 Matrícula: {MATRICULA}
 Turma: {TURMA}
 
@@ -83,7 +84,8 @@ export default function Notas() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
   const [turma, setTurma] = useState<Turma | null>(null);
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [estudantes, setEstudantes] = useState<Estudante[]>([]);
+  // Correção do tipo do estado para suportar a estrutura aninhada: estudante -> disciplina -> nota
   const [notas, setNotas] = useState<Record<string, Record<string, Nota>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -110,35 +112,29 @@ export default function Notas() {
         setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
       }
 
-      // Load alunos da turma
-      const alunosQuery = query(collection(db, 'alunos'), where('turma_id', '==', turmaId), where('status', 'in', ['Ativo', 'Frequentando']), orderBy('nome'));
-      const alunosSnapshot = await getDocs(alunosQuery);
-      const alunosData = alunosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Aluno));
-      setAlunos(alunosData);
+      // Load Estudantes da turma
+      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', turmaId), where('status', 'in', ['Ativo', 'Frequentando']), orderBy('nome'));
+      const estudantesSnapshot = await getDocs(estudantesQuery);
+      const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
+      setEstudantes(estudantesData.sort((a, b) => a.nome.localeCompare(b.nome)));
 
-      // Load notas
+      // Carregar notas
       const notasQuery = query(collection(db, 'notas'), where('turma_id', '==', turmaId));
       const notasSnapshot = await getDocs(notasQuery);
-      const notasData = notasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Nota));
-
-      const notasMap: Record<string, Record<string, Nota>> = {};
-      alunosData.forEach(aluno => {
-        notasMap[aluno.id] = {};
-        DISCIPLINAS.forEach(disc => {
-          const existingNota = notasData?.find(n => n.aluno_id === aluno.id && n.disciplina === disc);
-          notasMap[aluno.id][disc] = existingNota || {
-            aluno_id: aluno.id,
-            turma_id: turmaId,
-            disciplina: disc,
-            bimestre_1: null,
-            bimestre_2: null,
-            bimestre_3: null,
-            bimestre_4: null,
-          };
-        });
+      const notasData: Record<string, Record<string, Nota>> = {};
+      
+      notasSnapshot.forEach(doc => {
+        const data = doc.data();
+        const estudanteId = data.estudante_id;
+        
+        if (!notasData[estudanteId]) {
+          notasData[estudanteId] = {};
+        }
+        
+        notasData[estudanteId][data.disciplina] = { id: doc.id, ...data } as Nota;
       });
-      setNotas(notasMap);
-
+      
+      setNotas(notasData);
     } catch (error) {
       toast.error('Erro ao carregar dados');
       console.error(error);
@@ -147,17 +143,30 @@ export default function Notas() {
     setLoading(false);
   }
 
-  function updateNota(alunoId: string, disc: string, field: keyof Nota, value: number | null) {
-    setNotas(prev => ({
-      ...prev,
-      [alunoId]: {
-        ...prev[alunoId],
-        [disc]: {
-          ...prev[alunoId][disc],
-          [field]: value
+  function updateNota(estudanteId: string, disc: string, field: keyof Nota, value: number | null) {
+    setNotas(prev => {
+      const estudanteNotas = prev[estudanteId] || {};
+      const disciplinaNota = estudanteNotas[disc] || {
+        estudante_id: estudanteId,
+        turma_id: turmaId!,
+        disciplina: disc,
+        bimestre_1: null,
+        bimestre_2: null,
+        bimestre_3: null,
+        bimestre_4: null,
+      };
+
+      return {
+        ...prev,
+        [estudanteId]: {
+          ...estudanteNotas,
+          [disc]: {
+            ...disciplinaNota,
+            [field]: value
+          }
         }
-      }
-    }));
+      };
+    });
   }
 
   function calcularMedia(nota: Nota | undefined): number | null {
@@ -197,10 +206,14 @@ export default function Notas() {
 
     setSaving(true);
     try {
-      for (const alunoId of Object.keys(notas)) {
-        const nota = notas[alunoId][disciplina];
+      // Iterar sobre todos os estudantes para salvar as notas da disciplina selecionada
+      for (const estudanteId of Object.keys(notas)) {
+        const nota = notas[estudanteId]?.[disciplina];
         if (nota) {
           const { id, ...notaData } = nota;
+          // Apenas salvar se houver alguma nota lançada ou se já existir um ID (edição)
+          const temNotaLancada = nota.bimestre_1 != null || nota.bimestre_2 != null || nota.bimestre_3 != null || nota.bimestre_4 != null;
+          
           if (id) {
             const notaDocRef = doc(db, 'notas', id);
             await updateDoc(notaDocRef, {
@@ -209,11 +222,18 @@ export default function Notas() {
               bimestre_3: nota.bimestre_3,
               bimestre_4: nota.bimestre_4,
             });
-          } else if (nota.bimestre_1 != null || nota.bimestre_2 != null || nota.bimestre_3 != null || nota.bimestre_4 != null) {
-            await addDoc(collection(db, 'notas'), notaData);
+          } else if (temNotaLancada) {
+            // Se for um novo registro, garantir que todos os campos obrigatórios estejam presentes
+            await addDoc(collection(db, 'notas'), {
+              ...notaData,
+              estudante_id: estudanteId,
+              turma_id: turmaId!,
+              disciplina: disciplina,
+            });
           }
         }
       }
+      await logActivity(`salvou as notas de "${disciplina}" para a turma "${turma?.nome}".`);
       toast.success('Notas salvas com sucesso!');
       loadData();
     } catch (error) {
@@ -225,24 +245,24 @@ export default function Notas() {
   }
 
   async function handleGerarBoletins() {
-    if (alunos.length === 0) {
-      toast.error('Nenhum aluno encontrado');
+    if (Estudantes.length === 0) {
+      toast.error('Nenhum estudante encontrado');
       return;
     }
 
     const doc = new jsPDF();
     const ano = new Date().getFullYear();
 
-    alunos.forEach((aluno, index) => {
+    Estudantes.forEach((estudante, index) => {
       if (index > 0) doc.addPage();
 
-      const alunoNotas = notas[aluno.id] || {};
+      const estudanteNotas = notas[estudante.id] || {};
       let notasTexto = '';
       let totalMedia = 0;
       let countMedia = 0;
 
       DISCIPLINAS.forEach(disc => {
-        const nota = alunoNotas[disc];
+        const nota = estudanteNotas[disc];
         const media = calcularMedia(nota);
         if (nota && (nota.bimestre_1 != null || nota.bimestre_2 != null || nota.bimestre_3 != null || nota.bimestre_4 != null)) {
           notasTexto += `${disc}: 1º Bim: ${nota.bimestre_1?.toFixed(1) || '-'} | 2º Bim: ${nota.bimestre_2?.toFixed(1) || '-'} | 3º Bim: ${nota.bimestre_3?.toFixed(1) || '-'} | 4º Bim: ${nota.bimestre_4?.toFixed(1) || '-'} | Média: ${media?.toFixed(1) || '-'}\n`;
@@ -258,8 +278,8 @@ export default function Notas() {
 
       let conteudo = boletimTemplate
         .replace('{ANO}', ano.toString())
-        .replace('{NOME_ALUNO}', aluno.nome)
-        .replace('{MATRICULA}', aluno.matricula)
+        .replace('{NOME_ESTUDANTE}', estudante.nome)
+        .replace('{MATRICULA}', estudante.matricula)
         .replace('{TURMA}', turma?.nome || '')
         .replace('{NOTAS}', notasTexto || 'Nenhuma nota registrada')
         .replace('{MEDIA_GERAL}', mediaGeral)
@@ -275,14 +295,14 @@ export default function Notas() {
     toast.success('Boletins gerados com sucesso!');
   }
 
-  const filteredAlunos = alunos.filter(a => 
+  const filteredEstudantes = estudantes.filter(a => 
     a.nome.toLowerCase().includes(search.toLowerCase())
   );
 
   const isInputDisabled = disciplina === 'todos';
 
   return (
-    <AppLayout title={`Notas - ${turma?.nome || ''}`}>
+    <AppLayout title={`Notas da Turma ${turma?.nome || ''}`}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <p className="text-muted-foreground">Lançamento e gerenciamento de notas bimestrais</p>
@@ -297,7 +317,7 @@ export default function Notas() {
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar alunos..."
+              placeholder="Buscar Estudantes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -350,82 +370,77 @@ export default function Notas() {
               <table className="w-full">
                 <thead className="bg-muted/50">
                   <tr>
-                    <th className="text-left p-4 font-medium text-muted-foreground">Nome do Aluno</th>
-                    {disciplina !== 'todos' && (
+                    <th className="p-3 text-left font-medium min-w-[200px]">Estudante</th>
+                    {disciplina === 'todos' ? (
                       <>
-                        <th className="text-center p-4 font-medium text-muted-foreground">1º Bimestre</th>
-                        <th className="text-center p-4 font-medium text-muted-foreground">2º Bimestre</th>
-                        <th className="text-center p-4 font-medium text-muted-foreground">3º Bimestre</th>
-                        <th className="text-center p-4 font-medium text-muted-foreground">4º Bimestre</th>
-                        <th className="text-center p-4 font-medium text-muted-foreground">Média Anual</th>
-                        <th className="text-center p-4 font-medium text-muted-foreground">Situação</th>
+                        <th className="p-3 text-center font-medium" colSpan={4}>Resumo Geral</th>
+                        <th className="p-3 text-center font-medium w-28">Média Geral</th>
+                        <th className="p-3 text-center font-medium w-28">Situação Final</th>
                       </>
-                    )}
-                    {disciplina === 'todos' && (
+                    ) : (
                       <>
-                        <th className="text-center p-4 font-medium text-muted-foreground">Disciplinas com Notas</th>
-                        <th className="text-center p-4 font-medium text-muted-foreground">Média Geral</th>
-                        <th className="text-center p-4 font-medium text-muted-foreground">Situação</th>
+                        <th className="p-3 text-center font-medium w-24">1º Bimestre</th>
+                        <th className="p-3 text-center font-medium w-24">2º Bimestre</th>
+                        <th className="p-3 text-center font-medium w-24">3º Bimestre</th>
+                        <th className="p-3 text-center font-medium w-24">4º Bimestre</th>
+                        <th className="p-3 text-center font-medium w-28">Média Anual</th>
+                        <th className="p-3 text-center font-medium w-28">Situação</th>
                       </>
                     )}
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAlunos.map((aluno) => {
-                    if (disciplina !== 'todos') {
-                      const nota = notas[aluno.id]?.[disciplina];
+                  {filteredEstudantes.map((estudante) => {
+                    if (disciplina === 'todos') {
+                      const estudanteNotas = notas[estudante.id] || {};
+                      const mediasDasDisciplinas = Object.values(estudanteNotas)
+                        .map(nota => calcularMedia(nota))
+                        .filter((media): media is number => media !== null);
+                      
+                      const mediaGeral = mediasDasDisciplinas.length > 0
+                        ? mediasDasDisciplinas.reduce((acc, curr) => acc + curr, 0) / mediasDasDisciplinas.length
+                        : null;
+                      
+                      const situacaoGeral = calcularSituacao(mediaGeral);
+
+                      return (
+                        <tr key={estudante.id} className="border-t">
+                          <td className="p-3">
+                            <div className="font-medium">{estudante.nome}</div>
+                            <div className="text-xs text-muted-foreground">{estudante.matricula}</div>
+                          </td>
+                          <td colSpan={4} className="p-4 text-center text-muted-foreground text-sm">-</td>
+                          <td className="p-4">
+                            <div className={`w-20 py-2 rounded text-center mx-auto font-semibold ${getMediaColor(mediaGeral)}`}>
+                              {mediaGeral !== null ? mediaGeral.toFixed(1) : '-'}
+                            </div>
+                          </td>
+                          <td className={`p-4 text-center font-medium ${getSituacaoColor(situacaoGeral)}`}>
+                            {situacaoGeral}
+                          </td>
+                        </tr>
+                      );
+                    } else {
+                      const nota = notas[estudante.id]?.[disciplina] || {};
                       const media = calcularMedia(nota);
                       const situacao = calcularSituacao(media);
                       return (
-                        <tr key={aluno.id} className="border-t">
-                          <td className="p-4 font-medium">{aluno.nome}</td>
-                          <td className="p-4">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="10"
-                              step="0.1"
-                              value={nota?.bimestre_1 ?? ''}
-                              onChange={(e) => updateNota(aluno.id, disciplina, 'bimestre_1', e.target.value ? parseFloat(e.target.value) : null)}
-                              className="w-20 text-center mx-auto"
-                              disabled={isInputDisabled}
-                            />
+                        <tr key={estudante.id} className="border-t">
+                          <td className="p-3">
+                            <div className="font-medium">{estudante.nome}</div>
+                            <div className="text-xs text-muted-foreground">{estudante.matricula}</div>
                           </td>
                           <td className="p-4">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="10"
-                              step="0.1"
-                              value={nota?.bimestre_2 ?? ''}
-                              onChange={(e) => updateNota(aluno.id, disciplina, 'bimestre_2', e.target.value ? parseFloat(e.target.value) : null)}
-                              className="w-20 text-center mx-auto"
-                              disabled={isInputDisabled}
-                            />
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_1 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_1', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
                           </td>
                           <td className="p-4">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="10"
-                              step="0.1"
-                              value={nota?.bimestre_3 ?? ''}
-                              onChange={(e) => updateNota(aluno.id, disciplina, 'bimestre_3', e.target.value ? parseFloat(e.target.value) : null)}
-                              className="w-20 text-center mx-auto"
-                              disabled={isInputDisabled}
-                            />
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_2 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_2', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
                           </td>
                           <td className="p-4">
-                            <Input
-                              type="number"
-                              min="0"
-                              max="10"
-                              step="0.1"
-                              value={nota?.bimestre_4 ?? ''}
-                              onChange={(e) => updateNota(aluno.id, disciplina, 'bimestre_4', e.target.value ? parseFloat(e.target.value) : null)}
-                              className="w-20 text-center mx-auto"
-                              disabled={isInputDisabled}
-                            />
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_3 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_3', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                          </td>
+                          <td className="p-4">
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_4 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_4', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
                           </td>
                           <td className="p-4">
                             <div className={`w-20 py-2 rounded text-center mx-auto font-semibold ${getMediaColor(media)}`}>
@@ -437,49 +452,13 @@ export default function Notas() {
                           </td>
                         </tr>
                       );
-                    } else {
-                      // Visualização de todos os componentes
-                      const alunoNotas = notas[aluno.id] || {};
-                      let disciplinasComNotas = 0;
-                      let somaMedias = 0;
-                      let countMedias = 0;
-
-                      DISCIPLINAS.forEach(disc => {
-                        const nota = alunoNotas[disc];
-                        if (nota && (nota.bimestre_1 != null || nota.bimestre_2 != null || nota.bimestre_3 != null || nota.bimestre_4 != null)) {
-                          disciplinasComNotas++;
-                          const media = calcularMedia(nota);
-                          if (media != null) {
-                            somaMedias += media;
-                            countMedias++;
-                          }
-                        }
-                      });
-
-                      const mediaGeral = countMedias > 0 ? somaMedias / countMedias : null;
-                      const situacaoGeral = calcularSituacao(mediaGeral);
-
-                      return (
-                        <tr key={aluno.id} className="border-t">
-                          <td className="p-4 font-medium">{aluno.nome}</td>
-                          <td className="p-4 text-center">{disciplinasComNotas} de {DISCIPLINAS.length}</td>
-                          <td className="p-4">
-                            <div className={`w-20 py-2 rounded text-center mx-auto font-semibold ${getMediaColor(mediaGeral)}`}>
-                              {mediaGeral !== null ? mediaGeral.toFixed(1) : '-'}
-                            </div>
-                          </td>
-                          <td className={`p-4 text-center font-medium ${getSituacaoColor(situacaoGeral)}`}>
-                            {situacaoGeral}
-                          </td>
-                        </tr>
-                      );
                     }
                   })}
                 </tbody>
               </table>
             </div>
             <div className="border-t p-4 bg-muted/30 flex justify-end gap-8 text-sm">
-              <span>Total de alunos: {filteredAlunos.length}</span>
+              <span>Total de Estudantes: {filteredEstudantes.length}</span>
             </div>
           </div>
         )}
@@ -493,7 +472,7 @@ export default function Notas() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Variáveis disponíveis: {'{ANO}'}, {'{NOME_ALUNO}'}, {'{MATRICULA}'}, {'{TURMA}'}, {'{NOTAS}'}, {'{MEDIA_GERAL}'}, {'{SITUACAO}'}, {'{DATA_EMISSAO}'}
+              Variáveis disponíveis: {'{ANO}'}, {'{NOME_ESTUDANTE}'}, {'{MATRICULA}'}, {'{TURMA}'}, {'{NOTAS}'}, {'{MEDIA_GERAL}'}, {'{SITUACAO}'}, {'{DATA_EMISSAO}'}
             </div>
             <Textarea
               value={boletimTemplate}

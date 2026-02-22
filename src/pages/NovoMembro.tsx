@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, User, Plus, Trash2, Upload, FileText, X } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
 import { collection, doc, getDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 
@@ -47,6 +48,7 @@ export default function NovoMembro() {
     data_lotacao: '',
     arquivo_url: '',
     biografia: '',
+    link_lattes: '',
   });
 
   const [formacoes, setFormacoes] = useState<Formacao[]>([
@@ -139,6 +141,7 @@ export default function NovoMembro() {
           data_lotacao: data.data_lotacao || '',
           arquivo_url: data.arquivo_url || '',
           biografia: data.biografia || '',
+          link_lattes: data.link_lattes || '',
         });
         if (data.formacoes && Array.isArray(data.formacoes)) {
           setFormacoes(data.formacoes as Formacao[]);
@@ -184,9 +187,11 @@ export default function NovoMembro() {
         if (!id) return;
         const docRef = doc(db, 'equipe_gestora', id);
         await updateDoc(docRef, payload);
+        await logActivity(`atualizou o cadastro do membro da equipe "${formData.nome}".`);
         toast.success('Membro atualizado com sucesso!');
       } else {
         await addDoc(collection(db, 'equipe_gestora'), payload);
+        await logActivity(`cadastrou o novo membro da equipe "${formData.nome}".`);
         toast.success('Membro cadastrado com sucesso!');
       }
       navigate('/equipe-gestora');
@@ -487,6 +492,15 @@ export default function NovoMembro() {
                     rows={4}
                     value={formData.biografia}
                     onChange={(e) => setFormData({ ...formData, biografia: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="link_lattes">Currículo Lattes</Label>
+                  <Input
+                    id="link_lattes"
+                    placeholder="Link para o currículo Lattes"
+                    value={formData.link_lattes}
+                    onChange={(e) => setFormData({ ...formData, link_lattes: e.target.value })}
                   />
                 </div>
               </div>

@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { formatInTimeZone } from 'date-fns-tz';
 
 interface DashboardStats {
-  totalAlunos: number;
+  totalestudantes: number;
   totalTurmas: number;
   totalEventos: number;
   mediaNotas: number | null;
@@ -35,7 +35,7 @@ interface FrequenciaData {
 
 interface AtividadeRecente {
   id: string;
-  tipo: 'presenca' | 'nota' | 'evento' | 'aluno' | 'professor' | 'turma';
+  tipo: 'presenca' | 'nota' | 'evento' | 'estudante' | 'professor' | 'turma';
   descricao: string;
   tempo: string;
   created_at: string;
@@ -48,7 +48,7 @@ export default function Painel() {
   const { user } = useAuth();
   const { role } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
-    totalAlunos: 0,
+    totalestudantes: 0,
     totalTurmas: 0,
     totalEventos: 0,
     mediaNotas: null,
@@ -79,8 +79,8 @@ export default function Painel() {
       const hoje = new Date().toISOString().split('T')[0];
       
       // Fetch stats (remains the same)
-      const [alunosSnap, turmasSnap, notasRes] = await Promise.all([
-        getCountFromServer(collection(db, 'alunos')),
+      const [estudantesSnap, turmasSnap, notasRes] = await Promise.all([
+        getCountFromServer(collection(db, 'estudantes')),
         getCountFromServer(collection(db, 'turmas')),
         getDocs(collection(db, 'notas')),
       ]);
@@ -109,7 +109,7 @@ export default function Painel() {
       }
 
       setStats({
-        totalAlunos: alunosSnap.data().count,
+        totalestudantes: estudantesSnap.data().count,
         totalTurmas: turmasSnap.data().count,
         totalEventos: eventosFiltrados.length,
         mediaNotas,
@@ -129,7 +129,7 @@ export default function Painel() {
       const atividades: AtividadeRecente[] = [];
       const now = new Date();
 
-      const collectionsToFetch = ['frequencia', 'notas', 'eventos', 'alunos'];
+      const collectionsToFetch = ['frequencia', 'notas', 'eventos', 'Estudantes'];
       
       const promises = collectionsToFetch.map(async (coll) => {
         const q = query(collection(db, coll), orderBy('created_at', 'desc'), limit(5));
@@ -182,9 +182,9 @@ export default function Painel() {
         const data = doc.data();
         if (data.created_at) {
           atividades.push({
-            id: `aluno-${doc.id}`,
-            tipo: 'aluno',
-            descricao: `Aluno ${data.nome} foi cadastrado`,
+            id: `estudante-${doc.id}`,
+            tipo: 'estudante',
+            descricao: `Estudante ${data.nome} foi cadastrado`,
             tempo: formatDistanceToNow(data.created_at.toDate(), { addSuffix: true, locale: ptBR }),
             created_at: data.created_at.toDate().toISOString(),
           });
@@ -257,7 +257,7 @@ export default function Painel() {
       case 'presenca': return <UserCircle className="h-5 w-5" />;
       case 'nota': return <FileText className="h-5 w-5" />;
       case 'evento': return <Calendar className="h-5 w-5" />;
-      case 'aluno': return <Users className="h-5 w-5" />;
+      case 'estudante': return <Users className="h-5 w-5" />;
       case 'professor': return <BookOpen className="h-5 w-5" />;
       case 'turma': return <School className="h-5 w-5" />;
       default: return <FileText className="h-5 w-5" />;
@@ -269,7 +269,7 @@ export default function Painel() {
       case 'presenca': return 'bg-blue-100 text-blue-600';
       case 'nota': return 'bg-purple-100 text-purple-600';
       case 'evento': return 'bg-amber-100 text-amber-600';
-      case 'aluno': return 'bg-green-100 text-green-600';
+      case 'estudante': return 'bg-green-100 text-green-600';
       case 'professor': return 'bg-indigo-100 text-indigo-600';
       case 'turma': return 'bg-pink-100 text-pink-600';
       default: return 'bg-gray-100 text-gray-600';

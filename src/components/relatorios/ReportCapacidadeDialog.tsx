@@ -32,9 +32,9 @@ export function ReportCapacidadeDialog({ open, onOpenChange }: ReportCapacidadeD
       const turmasSnapshot = await getDocs(turmasQuery);
       const turmas = turmasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-      const alunosQuery = query(collection(db, 'alunos'), where('ano', '==', parseInt(selectedAno)), where('status', '==', 'Ativo'));
-      const alunosSnapshot = await getDocs(alunosQuery);
-      const alunos = alunosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('ano', '==', parseInt(selectedAno)), where('status', '==', 'Ativo'));
+      const estudantesSnapshot = await getDocs(estudantesQuery);
+      const Estudantes = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       const doc = new jsPDF();
       
@@ -47,24 +47,24 @@ export function ReportCapacidadeDialog({ open, onOpenChange }: ReportCapacidadeD
 
       if (turmas && turmas.length > 0) {
         const tableData = turmas.map(turma => {
-          const alunosTurma = alunos?.filter(a => a.turma_id === turma.id).length || 0;
+          const estudantesTurma = Estudantes?.filter(a => a.turma_id === turma.id).length || 0;
           const capacidade = turma.capacidade || 30;
-          const vagas = capacidade - alunosTurma;
-          const ocupacao = ((alunosTurma / capacidade) * 100).toFixed(0);
+          const vagas = capacidade - estudantesTurma;
+          const ocupacao = ((estudantesTurma / capacidade) * 100).toFixed(0);
           
-          return [turma.nome, turma.serie, turma.turno, alunosTurma.toString(), capacidade.toString(), vagas.toString(), `${ocupacao}%`];
+          return [turma.nome, turma.serie, turma.turno, estudantesTurma.toString(), capacidade.toString(), vagas.toString(), `${ocupacao}%`];
         });
 
-        const totalAlunos = alunos?.length || 0;
+        const totalestudantes = Estudantes?.length || 0;
         const totalCapacidade = turmas.reduce((acc, t) => acc + (t.capacidade || 30), 0);
-        const totalVagas = totalCapacidade - totalAlunos;
-        const ocupacaoGeral = totalCapacidade > 0 ? ((totalAlunos / totalCapacidade) * 100).toFixed(0) : '0';
+        const totalVagas = totalCapacidade - totalestudantes;
+        const ocupacaoGeral = totalCapacidade > 0 ? ((totalestudantes / totalCapacidade) * 100).toFixed(0) : '0';
 
-        tableData.push(['TOTAL', '-', '-', totalAlunos.toString(), totalCapacidade.toString(), totalVagas.toString(), `${ocupacaoGeral}%`]);
+        tableData.push(['TOTAL', '-', '-', totalestudantes.toString(), totalCapacidade.toString(), totalVagas.toString(), `${ocupacaoGeral}%`]);
 
         autoTable(doc, {
           startY: 55,
-          head: [['Turma', 'Série', 'Turno', 'Alunos', 'Capacidade', 'Vagas', 'Ocupação']],
+          head: [['Turma', 'Série', 'Turno', 'Estudantes', 'Capacidade', 'Vagas', 'Ocupação']],
           body: tableData,
           theme: 'grid',
           headStyles: { fillColor: [59, 130, 246] },
@@ -106,7 +106,7 @@ export function ReportCapacidadeDialog({ open, onOpenChange }: ReportCapacidadeD
           </div>
 
           <p className="text-sm text-muted-foreground">
-            O relatório mostrará a ocupação de cada sala de aula, incluindo capacidade total, alunos matriculados e vagas disponíveis.
+            O relatório mostrará a ocupação de cada sala de aula, incluindo capacidade total, Estudantes matriculados e vagas disponíveis.
           </p>
         </div>
 

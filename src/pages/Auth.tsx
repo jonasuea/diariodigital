@@ -173,7 +173,7 @@ export default function Auth() {
             Sistema de Gestão Escolar
           </h2>
           <p className="text-lg opacity-90">
-            Gerencie alunos, professores, turmas e muito mais de forma simples e eficiente.
+            Gerencie Estudantes, professores, turmas e muito mais de forma simples e eficiente.
           </p>
         </div>
       </div>

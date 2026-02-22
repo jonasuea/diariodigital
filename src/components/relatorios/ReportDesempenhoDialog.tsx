@@ -53,9 +53,9 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
     try {
       const turma = turmas.find(t => t.id === selectedTurma);
       
-      const alunosQuery = query(collection(db, 'alunos'), where('turma_id', '==', selectedTurma));
-      const alunosSnapshot = await getDocs(alunosQuery);
-      const alunos = alunosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', selectedTurma));
+      const estudantesSnapshot = await getDocs(estudantesQuery);
+      const Estudantes = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       const notasQuery = query(collection(db, 'notas'), where('turma_id', '==', selectedTurma), where('ano', '==', parseInt(selectedAno)));
       const notasSnapshot = await getDocs(notasQuery);
@@ -86,21 +86,21 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
       doc.text(`3º Bimestre: ${mediaBim3}`, 30, 89);
       doc.text(`4º Bimestre: ${mediaBim4}`, 30, 96);
 
-      if (alunos && alunos.length > 0) {
-        const tableData = alunos.map(aluno => {
-          const alunoNotas = notas?.filter(n => n.aluno_id === aluno.id) || [];
-          const b1 = alunoNotas.length ? (alunoNotas.reduce((acc, n) => acc + (n.bimestre_1 || 0), 0) / alunoNotas.length).toFixed(1) : '-';
-          const b2 = alunoNotas.length ? (alunoNotas.reduce((acc, n) => acc + (n.bimestre_2 || 0), 0) / alunoNotas.length).toFixed(1) : '-';
-          const b3 = alunoNotas.length ? (alunoNotas.reduce((acc, n) => acc + (n.bimestre_3 || 0), 0) / alunoNotas.length).toFixed(1) : '-';
-          const b4 = alunoNotas.length ? (alunoNotas.reduce((acc, n) => acc + (n.bimestre_4 || 0), 0) / alunoNotas.length).toFixed(1) : '-';
-          const media = alunoNotas.length ? (alunoNotas.reduce((acc, n) => acc + (n.media_anual || 0), 0) / alunoNotas.length).toFixed(1) : '-';
+      if (Estudantes && Estudantes.length > 0) {
+        const tableData = Estudantes.map(estudante => {
+          const estudanteNotas = notas?.filter(n => n.estudante_id === estudante.id) || [];
+          const b1 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_1 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
+          const b2 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_2 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
+          const b3 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_3 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
+          const b4 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_4 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
+          const media = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.media_anual || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
           
-          return [aluno.nome, b1, b2, b3, b4, media];
+          return [estudante.nome, b1, b2, b3, b4, media];
         });
 
         autoTable(doc, {
           startY: 110,
-          head: [['Aluno', '1º Bim', '2º Bim', '3º Bim', '4º Bim', 'Média']],
+          head: [['Estudante', '1º Bim', '2º Bim', '3º Bim', '4º Bim', 'Média']],
           body: tableData,
           theme: 'grid',
           headStyles: { fillColor: [59, 130, 246] },
@@ -155,7 +155,7 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
           </div>
 
           <p className="text-sm text-muted-foreground">
-            O relatório incluirá um gráfico de linhas mostrando o desempenho dos alunos por bimestre.
+            O relatório incluirá um gráfico de linhas mostrando o desempenho dos Estudantes por bimestre.
           </p>
         </div>
 

@@ -7,9 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, User, Save, X, Upload } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ArrowLeft, User, Save, X, Upload, Plus, Trash2 } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
-import { collection, getDocs, addDoc, getDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, getDoc, doc, updateDoc, query, where } from 'firebase/firestore';
+import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 
@@ -30,7 +33,70 @@ interface Turma {
   serie: string;
 }
 
-export default function NovoAluno() {
+const initialState = {
+  // Status e Informações Básicas
+  status: 'Frequentando',
+  matricula: '',
+  nome: '',
+  foto_url: '',
+  // Informações Pessoais
+  sexo: '',
+  raca_cor: '',
+  // Movimentação
+  tipo_movimentacao: '',
+  data_movimentacao: '',
+  de_onde_veio: '',
+  para_onde_vai: '',
+  // Documentos e Dados Pessoais
+  data_nascimento: '',
+  nacionalidade: 'Brasileira',
+  naturalidade: '',
+  uf: '',
+  rg: '',
+  cpf: '',
+  // Programas Sociais
+  bolsa_familia: false,
+  // Censo e SUS
+  censo_escola: false,
+  id_censo: '',
+  cartao_sus: '',
+  vacinado_covid: 'Não',
+  // Saúde
+  estudante_pcd: false,
+  estudante_aee: false,
+  dieta_restritiva: false,
+  // Informações Escolares
+  largura_farda: '',
+  altura_farda: '',
+  pasta: '',
+  prateleira: '',
+  transporte_escolar: false,
+  // Informações da Mãe
+  mae_nome: '',
+  mae_email: '',
+  mae_contato: '',
+  mae_rg: '',
+  mae_cpf: '',
+  // Informações do Pai
+  pai_nome: '',
+  pai_email: '',
+  pai_contato: '',
+  pai_rg: '',
+  pai_cpf: '',
+  // Endereço
+  endereco: '',
+  endereco_numero: '',
+  bairro: '',
+  cidade: '',
+  estado: '',
+  cep: '',
+  // Outros
+  ano: new Date().getFullYear(),
+  turma_id: null as string | null,
+  historico_academico: [] as HistoricoAnual[],
+};
+
+export default function NovoEstudante() {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditing = !!id;
@@ -39,105 +105,54 @@ export default function NovoAluno() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [formData, setFormData] = useState({
-    // Status e Informações Básicas
-    status: 'Frequentando',
-    matricula: '',
-    nome: '',
-    foto_url: '',
-    // Informações Pessoais
-    sexo: '',
-    raca_cor: '',
-    // Movimentação
-    tipo_movimentacao: '',
-    data_movimentacao: '',
-    de_onde_veio: '',
-    para_onde_vai: '',
-    // Documentos e Dados Pessoais
-    data_nascimento: '',
-    nacionalidade: 'Brasileira',
-    naturalidade: '',
-    uf: '',
-    rg: '',
-    cpf: '',
-    // Programas Sociais
-    bolsa_familia: false,
-    // Censo e SUS
-    censo_escola: false,
-    id_censo: '',
-    cartao_sus: '',
-    vacinado_covid: 'Não',
-    // Saúde
-    aluno_pcd: false,
-    aluno_aee: false,
-    dieta_restritiva: false,
-    // Informações Escolares
-    largura_farda: '',
-    altura_farda: '',
-    pasta: '',
-    prateleira: '',
-    transporte_escolar: false,
-    // Informações da Mãe
-    mae_nome: '',
-    mae_email: '',
-    mae_contato: '',
-    mae_rg: '',
-    mae_cpf: '',
-    // Informações do Pai
-    pai_nome: '',
-    pai_email: '',
-    pai_contato: '',
-    pai_rg: '',
-    pai_cpf: '',
-    // Endereço
-    endereco: '',
-    endereco_numero: '',
-    bairro: '',
-    cidade: '',
-    estado: '',
-    cep: '',
-    // Outros
-    ano: new Date().getFullYear(),
-    turma_id: null as string | null,
-  });
+  const [turmasCarregadas, setTurmasCarregadas] = useState(false);
+  const [formData, setFormData] = useState(initialState);
 
   useEffect(() => {
-    fetchTurmas();
-  }, []);
-
-  useEffect(() => {
-    if (isEditing && id) {
-      fetchAluno(id);
-    }
-  }, [id, isEditing]);
-
-  async function fetchTurmas() {
-    try {
+    async function carregarDependencias() {
+      try {
         const querySnapshot = await getDocs(collection(db, 'turmas'));
         const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
         setTurmas(turmasData.sort((a,b) => a.nome.localeCompare(b.nome)));
-    } catch(error) {
-        console.error("Error fetching turmas: ", error)
+      } catch(error) {
+          console.error("Error fetching turmas: ", error);
+          toast.error("Erro ao carregar a lista de turmas.");
+      } finally {
+        setTurmasCarregadas(true);
+      }
     }
-  }
+    carregarDependencias();
+  }, []);
 
-  async function fetchAluno(alunoId: string) {
+  useEffect(() => {
+    // Garante que os dados do estudante só são carregados depois de as turmas estarem disponíveis
+    if (isEditing && id && turmasCarregadas) {
+      fetchEstudante(id);
+    }
+    // Garante que o formulário é resetado se navegar de uma página de edição para uma de criação
+    if (!isEditing) {
+      setFormData(initialState);
+    }
+  }, [id, isEditing, turmasCarregadas]);
+
+  async function fetchEstudante(estudanteId: string) {
     try {
       setLoading(true);
-      const alunoDoc = await getDoc(doc(db, 'alunos', alunoId));
-      if (alunoDoc.exists()) {
-        const alunoData = alunoDoc.data();
-        // Merge com os valores padrão para garantir que todos os campos existam
-        setFormData(prev => ({
-          ...prev,
-          ...alunoData
-        }));
+      const estudanteDoc = await getDoc(doc(db, 'estudantes', estudanteId));
+      if (estudanteDoc.exists()) {
+        const estudanteData = estudanteDoc.data();
+        // Combina o estado inicial com os dados carregados para garantir que todos os campos existam
+        setFormData({
+          ...initialState,
+          ...estudanteData,
+          turma_id: estudanteData.turma_id || null, // Garante que o turma_id seja carregado corretamente
+        });
       } else {
-        toast.error('Aluno não encontrado');
-        navigate('/alunos');
+        toast.error('Estudante não encontrado');
+        navigate('/estudantes');
       }
     } catch (error) {
-      toast.error('Erro ao carregar dados do aluno');
+      toast.error('Erro ao carregar dados do estudante');
       console.error(error);
     } finally {
       setLoading(false);
@@ -156,8 +171,8 @@ export default function NovoAluno() {
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `aluno-${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `alunos/${fileName}`);
+      const fileName = `estudante-${Date.now()}.${fileExt}`;
+      const storageRef = ref(storage, `Estudantes/${fileName}`);
       
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
@@ -165,7 +180,7 @@ export default function NovoAluno() {
       setFormData(prev => ({ ...prev, foto_url: photoURL }));
       toast.success('Foto carregada com sucesso!');
     } catch (error) {
-      toast.error('Erro ao fazer upload da foto');
+      toast.error('Erro ao fazer upload da foto!');
       console.error(error)
     } finally {
       setUploading(false);
@@ -173,7 +188,92 @@ export default function NovoAluno() {
   }
 
   const handleChange = (field: string, value: string | boolean | number | null) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData(prevFormData => {
+      const newFormData = { ...prevFormData, [field]: value };
+      console.log(`Campo '${field}' atualizado para:`, value);
+      return newFormData;
+    });
+  };
+
+  // Funções para gerenciar o Histórico Acadêmico
+  const addAnoHistorico = () => {
+    const novoAno: HistoricoAnual = {
+      id: `ano_${Date.now()}`,
+      ano_letivo: new Date().getFullYear().toString(),
+      serie: '',
+      escola: '',
+      concluido: false,
+      disciplinas: [{
+        id: `disciplina_${Date.now()}`,
+        nome: '', nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: ''
+      }]
+    };
+    setFormData(prev => ({ ...prev, historico_academico: [...prev.historico_academico, novoAno] }));
+  };
+
+  const removeAnoHistorico = (anoId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      historico_academico: prev.historico_academico.filter(ano => ano.id !== anoId)
+    }));
+  };
+
+  const handleHistoricoChange = (anoId: string, field: keyof Omit<HistoricoAnual, 'id' | 'disciplinas' | 'concluido'>, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      historico_academico: prev.historico_academico.map(ano =>
+        ano.id === anoId ? { ...ano, [field]: value } : ano
+      )
+    }));
+  };
+  
+  const handleHistoricoSwitchChange = (anoId: string, field: 'concluido', value: boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      historico_academico: prev.historico_academico.map(ano =>
+        ano.id === anoId ? { ...ano, [field]: value } : ano
+      )
+    }));
+  };
+  
+  const addDisciplinaHistorico = (anoId: string) => {
+    const novaDisciplina: HistoricoDisciplina = {
+      id: `disciplina_${Date.now()}`,
+      nome: '', nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: ''
+    };
+    setFormData(prev => ({
+      ...prev,
+      historico_academico: prev.historico_academico.map(ano =>
+        ano.id === anoId ? { ...ano, disciplinas: [...ano.disciplinas, novaDisciplina] } : ano
+      )
+    }));
+  };
+
+  const removeDisciplinaHistorico = (anoId: string, disciplinaId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      historico_academico: prev.historico_academico.map(ano =>
+        ano.id === anoId
+          ? { ...ano, disciplinas: ano.disciplinas.filter(d => d.id !== disciplinaId) }
+          : ano
+      )
+    }));
+  };
+
+  const handleDisciplinaChange = (anoId: string, disciplinaId: string, field: keyof Omit<HistoricoDisciplina, 'id'>, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      historico_academico: prev.historico_academico.map(ano =>
+        ano.id === anoId
+          ? {
+              ...ano,
+              disciplinas: ano.disciplinas.map(d =>
+                d.id === disciplinaId ? { ...d, [field]: value } : d
+              )
+            }
+          : ano
+      )
+    }));
   };
 
   const calculateAge = (birthDate: string) => {
@@ -202,29 +302,58 @@ export default function NovoAluno() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formData.matricula || !formData.nome) {
+      toast.error('Os campos Nome e Matrícula são obrigatórios.');
+      return;
+    }
+
     setLoading(true);
 
-    const finalFormData = {
-      ...formData,
-      nome_lower: formData.nome.toLowerCase()
-    };
-
     try {
-      if (isEditing && id) {
-        await updateDoc(doc(db, 'alunos', id), finalFormData);
-        toast.success('Aluno atualizado com sucesso!');
-      } else {
-        await addDoc(collection(db, 'alunos'), finalFormData);
-        toast.success('Aluno cadastrado com sucesso!');
+      // Verificar a unicidade da matrícula
+      const q = query(collection(db, 'estudantes'), where('matricula', '==', formData.matricula));
+      const querySnapshot = await getDocs(q);
+
+      let isDuplicate = false;
+      if (!querySnapshot.empty) {
+        if (isEditing) {
+          // No modo de edição, permitir que a matrícula seja a mesma do estudante atual
+          if (querySnapshot.docs.some(doc => doc.id !== id)) {
+            isDuplicate = true;
+          }
+        } else {
+          // No modo de criação, qualquer resultado é um duplicado
+          isDuplicate = true;
+        }
       }
-      navigate('/alunos');
+
+      if (isDuplicate) {
+        toast.error('O número de matrícula já está em uso por outro estudante.');
+        setLoading(false);
+        return;
+      }
+
+      const finalFormData = {
+        ...formData,
+        nome_lower: formData.nome.toLowerCase()
+      };
+
+      if (isEditing && id) {
+        await updateDoc(doc(db, 'estudantes', id), finalFormData);
+        await logActivity(`atualizou o cadastro do estudante "${formData.nome}".`);
+        toast.success('Estudante atualizado com sucesso!');
+      } else {
+        await addDoc(collection(db, 'estudantes'), finalFormData);
+        await logActivity(`cadastrou o novo estudante "${formData.nome}".`);
+        toast.success('Estudante cadastrado com sucesso!');
+      }
+      navigate('/estudantes');
     } catch (error: any) {
         if (error.code === 'permission-denied') {
             toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
-        } else if (error.message.includes('matricula')) { // Simple check for a unique constraint violation
-            toast.error('Matrícula já cadastrada');
         } else {
-            toast.error(`Erro ao ${isEditing ? 'atualizar' : 'cadastrar'} aluno`);
+            toast.error(`Erro ao ${isEditing ? 'atualizar' : 'cadastrar'} estudante`);
         }
         console.error(error);
     } finally {
@@ -233,33 +362,33 @@ export default function NovoAluno() {
   };
 
   return (
-    <AppLayout title={isEditing ? "Editar Aluno" : "Novo Aluno"}>
+    <AppLayout title={isEditing ? "Editar Estudante" : "Novo Estudante"}>
       <div className="space-y-6 animate-fade-in">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
             <p className="text-muted-foreground">
-              {isEditing ? "Edite as informações do aluno" : "Cadastre um novo aluno no sistema"}
+              {isEditing ? "Edite as informações do estudante" : "Cadastre um novo estudante no sistema"}
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/alunos')}>
+          <Button variant="outline" onClick={() => navigate('/estudantes')}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para Lista de Alunos
+            Voltar para Lista de Estudantes
           </Button>
         </div>
 
         <form onSubmit={handleSubmit}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{isEditing ? "Editar Aluno" : "Novo Aluno"}</CardTitle>
+              <CardTitle>{isEditing ? "Editar Estudante" : "Novo Estudante"}</CardTitle>
               <span className="rounded-full px-3 py-1 text-sm font-medium bg-success/10 text-success">
                 {formData.status}
               </span>
             </CardHeader>
             <CardContent className="space-y-8">
-              {/* Foto do Aluno */}
+              {/* Foto do Estudante */}
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground">Foto do Aluno</h3>
+                <h3 className="text-sm font-semibold text-muted-foreground">Foto do Estudante</h3>
                 <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed rounded-lg">
                   <div className="flex h-24 w-24 items-center justify-center rounded-full bg-muted mb-4 overflow-hidden">
                     {formData.foto_url ? (
@@ -293,7 +422,7 @@ export default function NovoAluno() {
                 <h3 className="text-sm font-semibold text-muted-foreground">Status e Informações Básicas</h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <Label>Status do Aluno</Label>
+                    <Label>Status do Estudante</Label>
                     <Select value={formData.status} onValueChange={(v) => handleChange('status', v)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -307,7 +436,7 @@ export default function NovoAluno() {
                   </div>
                   <div className="space-y-2">
                     <Label>Nome Completo</Label>
-                    <Input placeholder="Nome do aluno" value={formData.nome} onChange={(e) => handleChange('nome', e.target.value)} required />
+                    <Input placeholder="Nome do estudante" value={formData.nome} onChange={(e) => handleChange('nome', e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label>Turma</Label>
@@ -416,11 +545,11 @@ export default function NovoAluno() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>RG</Label>
-                    <Input placeholder="RG do aluno" value={formData.rg} onChange={(e) => handleChange('rg', e.target.value)} />
+                    <Input placeholder="RG do estudante" value={formData.rg} onChange={(e) => handleChange('rg', e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label>CPF</Label>
-                    <Input placeholder="CPF do aluno" value={formData.cpf} onChange={(e) => handleChange('cpf', e.target.value)} />
+                    <Input placeholder="CPF do estudante" value={formData.cpf} onChange={(e) => handleChange('cpf', e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -470,21 +599,21 @@ export default function NovoAluno() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
-                      <Label htmlFor="aluno_pcd">Aluno PCD?</Label>
+                      <Label htmlFor="estudante_pcd">Estudante PCD?</Label>
                       <p className="text-xs text-muted-foreground">Pessoa com Deficiência</p>
                     </div>
-                    <Switch id="aluno_pcd" checked={formData.aluno_pcd} onCheckedChange={(v) => handleChange('aluno_pcd', v)} />
+                    <Switch id="estudante_pcd" checked={formData.estudante_pcd} onCheckedChange={(v) => handleChange('estudante_pcd', v)} />
                   </div>
                   <div className="flex items-center justify-between p-4 border rounded-lg">
                     <div>
-                      <Label htmlFor="aluno_aee">Aluno AEE?</Label>
+                      <Label htmlFor="estudante_aee">Estudante AEE?</Label>
                       <p className="text-xs text-muted-foreground">Atendimento Educacional Especializado</p>
                     </div>
-                    <Switch id="aluno_aee" checked={formData.aluno_aee} onCheckedChange={(v) => handleChange('aluno_aee', v)} />
+                    <Switch id="estudante_aee" checked={formData.estudante_aee} onCheckedChange={(v) => handleChange('estudante_aee', v)} />
                   </div>
                 </div>
                 <div className="flex items-center justify-between p-4 border rounded-lg md:w-1/2">
-                  <Label htmlFor="dieta_restritiva">O aluno tem dieta restritiva?</Label>
+                  <Label htmlFor="dieta_restritiva">O estudante tem dieta restritiva?</Label>
                   <Switch id="dieta_restritiva" checked={formData.dieta_restritiva} onCheckedChange={(v) => handleChange('dieta_restritiva', v)} />
                 </div>
               </div>
@@ -506,7 +635,7 @@ export default function NovoAluno() {
                   <div className="space-y-2">
                     <Label>Pasta</Label>
                     <Input placeholder="Número da pasta" value={formData.pasta} onChange={(e) => handleChange('pasta', e.target.value)} />
-                    <p className="text-xs text-muted-foreground">Localização da pasta física do aluno</p>
+                    <p className="text-xs text-muted-foreground">Localização da pasta física do estudante</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Prateleira</Label>
@@ -616,9 +745,91 @@ export default function NovoAluno() {
                 </div>
               </div>
 
+              {/* Histórico Acadêmico */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-muted-foreground">Histórico Acadêmico</h3>
+                  <Button type="button" variant="outline" size="sm" onClick={addAnoHistorico}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Adicionar Ano Letivo
+                  </Button>
+                </div>
+                
+                <Accordion type="multiple" className="w-full">
+                  {formData.historico_academico.map((ano, index) => (
+                    <AccordionItem value={ano.id} key={ano.id}>
+                      <AccordionTrigger>
+                        <div className="flex justify-between w-full pr-4">
+                          <span>{ano.serie || `Ano Letivo ${index + 1}`} ({ano.ano_letivo})</span>
+                          <span className="text-sm text-muted-foreground">{ano.escola}</span>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="p-4 border rounded-lg space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <Label>Ano Letivo</Label>
+                              <Input value={ano.ano_letivo} onChange={(e) => handleHistoricoChange(ano.id, 'ano_letivo', e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Série</Label>
+                              <Input placeholder="Ex: 1º Ano Fundamental" value={ano.serie} onChange={(e) => handleHistoricoChange(ano.id, 'serie', e.target.value)} />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Escola</Label>
+                              <Input placeholder="Nome da escola" value={ano.escola} onChange={(e) => handleHistoricoChange(ano.id, 'escola', e.target.value)} />
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2 pt-2">
+                            <Switch
+                              id={`concluido-${ano.id}`}
+                              checked={ano.concluido}
+                              onCheckedChange={(checked) => handleHistoricoSwitchChange(ano.id, 'concluido', checked)}
+                            />
+                            <Label htmlFor={`concluido-${ano.id}`}>Ano Concluído</Label>
+                          </div>
+
+                          <div className="space-y-2 pt-4 border-t">
+                            <h4 className="font-semibold text-sm">Componentes Curriculares</h4>
+                            {ano.disciplinas.map((disciplina) => (
+                              <div key={disciplina.id} className="grid grid-cols-12 gap-2 items-center">
+                                <Input placeholder="Disciplina" value={disciplina.nome} className="col-span-3" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nome', e.target.value)} />
+                                <Input placeholder="B1" value={disciplina.nota_b1} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b1', e.target.value)} />
+                                <Input placeholder="B2" value={disciplina.nota_b2} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b2', e.target.value)} />
+                                <Input placeholder="B3" value={disciplina.nota_b3} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b3', e.target.value)} />
+                                <Input placeholder="B4" value={disciplina.nota_b4} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b4', e.target.value)} />
+                                <Input placeholder="Média" value={disciplina.media_final} className="col-span-2" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'media_final', e.target.value)} />
+                                <div className="col-span-3 flex justify-end">
+                                  {ano.disciplinas.length > 1 && (
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDisciplinaHistorico(ano.id, disciplina.id)}>
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => addDisciplinaHistorico(ano.id)}>
+                              <Plus className="h-4 w-4 mr-2" />
+                              Adicionar Disciplina
+                            </Button>
+                          </div>
+                          <div className="flex justify-end pt-4">
+                            <Button type="button" variant="destructive" size="sm" onClick={() => removeAnoHistorico(ano.id)}>
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Remover Ano Letivo
+                            </Button>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </div>
+
               {/* Botões */}
               <div className="flex justify-end gap-3 pt-6 border-t">
-                <Button type="button" variant="outline" onClick={() => navigate('/alunos')}>
+                <Button type="button" variant="outline" onClick={() => navigate('/estudantes')}>
                   <X className="h-4 w-4 mr-2" />
                   Cancelar
                 </Button>

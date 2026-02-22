@@ -19,7 +19,7 @@ interface AppHeaderProps {
 interface SearchResult {
   id: string;
   nome: string;
-  tipo: 'aluno' | 'professor' | 'gestor';
+  tipo: 'estudante' | 'professor' | 'gestor';
   foto_url?: string;
   matricula?: string;
   email?: string;
@@ -49,14 +49,14 @@ export function AppHeader({ title }: AppHeaderProps) {
       const searchLower = debouncedSearchQuery.toLowerCase();
       
       try {
-        const [alunosSnap, profsSnap, gestoresSnap] = await Promise.all([
-          getDocs(query(collection(db, 'alunos'), where('nome_lower', '>=', searchLower), where('nome_lower', '<=', searchLower + '\uf8ff'), limit(5))),
+        const [estudantesSnap, profsSnap, gestoresSnap] = await Promise.all([
+          getDocs(query(collection(db, 'estudantes'), where('nome_lower', '>=', searchLower), where('nome_lower', '<=', searchLower + '\uf8ff'), limit(5))),
           getDocs(query(collection(db, 'professores'), where('nome_lower', '>=', searchLower), where('nome_lower', '<=', searchLower + '\uf8ff'), limit(5))),
           getDocs(query(collection(db, 'equipe-gestora'), where('nome_lower', '>=', searchLower), where('nome_lower', '<=', searchLower + '\uf8ff'), limit(5)))
         ]);
 
         const results: SearchResult[] = [];
-        alunosSnap.forEach(doc => results.push({ id: doc.id, ...doc.data(), tipo: 'aluno' } as SearchResult));
+        estudantesSnap.forEach(doc => results.push({ id: doc.id, ...doc.data(), tipo: 'estudante' } as SearchResult));
         profsSnap.forEach(doc => results.push({ id: doc.id, ...doc.data(), tipo: 'professor' } as SearchResult));
         gestoresSnap.forEach(doc => results.push({ id: doc.id, ...doc.data(), tipo: 'gestor' } as SearchResult));
 
@@ -89,8 +89,8 @@ export function AppHeader({ title }: AppHeaderProps) {
     setIsPopoverOpen(false);
 
     switch (result.tipo) {
-      case 'aluno':
-        navigate(`/alunos/${result.id}`);
+      case 'estudante':
+        navigate(`/Estudantes/${result.id}`);
         break;
       case 'professor':
         navigate(`/professores/${result.id}`);
@@ -103,7 +103,7 @@ export function AppHeader({ title }: AppHeaderProps) {
 
   const getTipoIcon = (tipo: SearchResult['tipo']) => {
     switch (tipo) {
-      case 'aluno': return <User className="h-4 w-4 text-muted-foreground" />;
+      case 'estudante': return <User className="h-4 w-4 text-muted-foreground" />;
       case 'professor': return <School className="h-4 w-4 text-muted-foreground" />;
       case 'gestor': return <Briefcase className="h-4 w-4 text-muted-foreground" />;
       default: return null;

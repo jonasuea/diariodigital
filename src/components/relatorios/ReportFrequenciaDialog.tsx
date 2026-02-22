@@ -73,9 +73,9 @@ export function ReportFrequenciaDialog({ open, onOpenChange }: ReportFrequenciaD
       const startDate = `${selectedAno}-${selectedMes.padStart(2, '0')}-01`;
       const endDate = `${selectedAno}-${selectedMes.padStart(2, '0')}-31`;
 
-      const alunosQuery = query(collection(db, 'alunos'), where('turma_id', '==', selectedTurma), orderBy('nome'));
-      const alunosSnapshot = await getDocs(alunosQuery);
-      const alunos = alunosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', selectedTurma), orderBy('nome'));
+      const estudantesSnapshot = await getDocs(estudantesQuery);
+      const Estudantes = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       const frequenciaQuery = query(
         collection(db, 'frequencia'), 
@@ -96,15 +96,15 @@ export function ReportFrequenciaDialog({ open, onOpenChange }: ReportFrequenciaD
       doc.text(`Período: ${mesNome}/${selectedAno}`, 20, 42);
       doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 20, 49);
 
-      if (alunos && alunos.length > 0) {
-        const tableData = alunos.map(aluno => {
-          const alunoFreq = frequencias?.filter(f => f.aluno_id === aluno.id) || [];
-          const presencas = alunoFreq.filter(f => f.status === 'presente').length;
-          const faltas = alunoFreq.filter(f => f.status === 'ausente' || f.status === 'faltou').length;
+      if (Estudantes && Estudantes.length > 0) {
+        const tableData = Estudantes.map(estudante => {
+          const estudanteFreq = frequencias?.filter(f => f.estudante_id === estudante.id) || [];
+          const presencas = estudanteFreq.filter(f => f.status === 'presente').length;
+          const faltas = estudanteFreq.filter(f => f.status === 'ausente' || f.status === 'faltou').length;
           const total = presencas + faltas;
           const percentual = total > 0 ? ((presencas / total) * 100).toFixed(1) : '-';
           
-          return [aluno.matricula, aluno.nome, presencas.toString(), faltas.toString(), `${percentual}%`];
+          return [estudante.matricula, estudante.nome, presencas.toString(), faltas.toString(), `${percentual}%`];
         });
 
         autoTable(doc, {
@@ -115,7 +115,7 @@ export function ReportFrequenciaDialog({ open, onOpenChange }: ReportFrequenciaD
           headStyles: { fillColor: [59, 130, 246] },
         });
       } else {
-        doc.text('Nenhum aluno encontrado nesta turma.', 20, 60);
+        doc.text('Nenhum estudante encontrado nesta turma.', 20, 60);
       }
 
       doc.save(`relatorio-frequencia-${turma?.nome}-${mesNome}-${selectedAno}.pdf`);

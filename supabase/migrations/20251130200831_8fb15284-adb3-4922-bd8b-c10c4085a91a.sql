@@ -1,11 +1,11 @@
 -- Criar enum para papéis de usuário
-CREATE TYPE public.app_role AS ENUM ('admin', 'gestor', 'professor', 'aluno');
+CREATE TYPE public.app_role AS ENUM ('admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante', 'pending');
 
 -- Tabela de papéis de usuários (separada do profiles para segurança)
 CREATE TABLE public.user_roles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-    role app_role NOT NULL DEFAULT 'aluno',
+    role app_role NOT NULL DEFAULT 'pending',
     UNIQUE (user_id, role)
 );
 
@@ -13,6 +13,7 @@ CREATE TABLE public.user_roles (
 CREATE TABLE public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     nome TEXT NOT NULL,
+    email TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -39,8 +40,8 @@ CREATE TABLE public.turmas (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tabela de alunos
-CREATE TABLE public.alunos (
+-- Tabela de Estudantes
+CREATE TABLE public.Estudantes (
     id SERIAL PRIMARY KEY,
     nome TEXT NOT NULL,
     matricula TEXT UNIQUE NOT NULL,
@@ -97,7 +98,7 @@ CREATE TABLE public.usuarios (
     id SERIAL PRIMARY KEY,
     nome TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    papel TEXT NOT NULL DEFAULT 'aluno',
+    papel TEXT NOT NULL DEFAULT 'estudante',
     ativo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -107,7 +108,7 @@ ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.professores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.turmas ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.alunos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.Estudantes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.equipe_gestora ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.eventos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.anotacoes ENABLE ROW LEVEL SECURITY;
@@ -137,11 +138,12 @@ LANGUAGE plpgsql
 SECURITY DEFINER SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (id, nome)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data ->> 'nome', NEW.email));
+  INSERT INTO public.profiles (id, nome, email)
+  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data ->> 'nome', NEW.email), NEW.email);
   
-  INSERT INTO public.user_roles (user_id, role)
-  VALUES (NEW.id, 'admin');
+  -- Insere o usuário na tabela de papéis. O papel padrão 'pending' será aplicado,
+  -- aguardando aprovação de um administrador.
+  INSERT INTO public.user_roles (user_id) VALUES (NEW.id);
   
   RETURN NEW;
 END;
@@ -199,20 +201,20 @@ CREATE POLICY "Authenticated users can delete turmas"
 ON public.turmas FOR DELETE TO authenticated
 USING (true);
 
-CREATE POLICY "Authenticated users can view alunos"
-ON public.alunos FOR SELECT TO authenticated
+CREATE POLICY "Authenticated users can view Estudantes"
+ON public.Estudantes FOR SELECT TO authenticated
 USING (true);
 
-CREATE POLICY "Authenticated users can insert alunos"
-ON public.alunos FOR INSERT TO authenticated
+CREATE POLICY "Authenticated users can insert Estudantes"
+ON public.Estudantes FOR INSERT TO authenticated
 WITH CHECK (true);
 
-CREATE POLICY "Authenticated users can update alunos"
-ON public.alunos FOR UPDATE TO authenticated
+CREATE POLICY "Authenticated users can update Estudantes"
+ON public.Estudantes FOR UPDATE TO authenticated
 USING (true);
 
-CREATE POLICY "Authenticated users can delete alunos"
-ON public.alunos FOR DELETE TO authenticated
+CREATE POLICY "Authenticated users can delete Estudantes"
+ON public.Estudantes FOR DELETE TO authenticated
 USING (true);
 
 CREATE POLICY "Authenticated users can view equipe_gestora"

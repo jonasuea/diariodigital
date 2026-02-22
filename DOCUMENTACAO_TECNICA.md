@@ -15,7 +15,7 @@
 
 ## 1.2. Resumo
 
-O EducaFácil é um sistema web completo para gestão escolar, desenvolvido para atender às necessidades de instituições de ensino fundamental. O sistema centraliza todas as operações acadêmicas e administrativas em uma única plataforma, permitindo o gerenciamento eficiente de alunos, professores, turmas, frequência, notas e equipe gestora.
+O EducaFácil é um sistema web completo para gestão escolar, desenvolvido para atender às necessidades de instituições de ensino fundamental. O sistema centraliza todas as operações acadêmicas e administrativas em uma única plataforma, permitindo o gerenciamento eficiente de Estudantes, professores, turmas, frequência, notas e equipe gestora.
 
 A aplicação foi construída utilizando tecnologias modernas de desenvolvimento web, com foco em usabilidade, responsividade e performance. O backend é totalmente gerenciado pela plataforma Lovable Cloud (baseada em Supabase), oferecendo autenticação segura, banco de dados PostgreSQL e APIs REST automáticas.
 
@@ -26,20 +26,20 @@ O sistema implementa controle de acesso baseado em autenticação, garantindo qu
 - **Coordenação Pedagógica:** Gestão geral do sistema, visualização de relatórios e indicadores.
 - **Equipe Gestora:** Diretores, vice-diretores, coordenadores e secretários escolares.
 - **Professores:** Lançamento de frequência, notas e acompanhamento de turmas.
-- **Secretaria Escolar:** Cadastro de alunos, matrícula e documentação.
+- **Secretaria Escolar:** Cadastro de Estudantes, matrícula e documentação.
 
 ## 1.4. Principais Módulos/Funcionalidades
 
 | Módulo | Descrição |
 |--------|-----------|
 | **Painel (Dashboard)** | Visão geral com estatísticas, gráficos e indicadores do sistema |
-| **Alunos** | Cadastro completo de alunos com dados pessoais, familiares e administrativos |
+| **Estudantes** | Cadastro completo de Estudantes com dados pessoais, familiares e administrativos |
 | **Professores** | Gestão de professores com formações, disciplinas e status funcional |
 | **Turmas** | Organização de turmas por ano, série e turno |
 | **Diário Digital** | Módulo integrado para frequência, notas, objetos de conhecimento e avaliações |
 | **Frequência** | Registro de presença com estados: presente, faltou, justificado |
 | **Notas** | Lançamento de notas bimestrais com cálculo automático de média |
-| **Ata Final** | Geração de atas finais com situação dos alunos |
+| **Ata Final** | Geração de atas finais com situação dos Estudantes |
 | **Equipe Gestora** | Cadastro de membros da equipe administrativa |
 | **Calendário** | Gestão de eventos escolares |
 | **Horário** | Configuração de grades horárias por turma |
@@ -251,7 +251,7 @@ O sistema utiliza autenticação via email/senha com as seguintes configuraçõe
 
 ```
 ┌─────────────┐       ┌─────────────┐       ┌─────────────┐
-│   alunos    │──────▶│   turmas    │◀──────│ professores │
+│   Estudantes    │──────▶│   turmas    │◀──────│ professores │
 └─────────────┘       └─────────────┘       └─────────────┘
       │                     │
       │                     │
@@ -267,20 +267,20 @@ O sistema utiliza autenticação via email/senha com as seguintes configuraçõe
 
 ## 5.2. Descrição das Tabelas
 
-### 5.2.1. Tabela: `alunos`
+### 5.2.1. Tabela: `Estudantes`
 
-Armazena informações completas dos alunos matriculados.
+Armazena informações completas dos Estudantes matriculados.
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
 | `id` | integer (PK) | Sim | Identificador único (auto-incremento) |
-| `nome` | text | Sim | Nome completo do aluno |
+| `nome` | text | Sim | Nome completo do estudante |
 | `matricula` | text | Sim | Número de matrícula |
 | `ano` | integer | Sim | Ano escolar (1-9) |
 | `turma_id` | integer (FK) | Não | Referência à turma |
 | `status` | text | Não | Status: 'Ativo', 'Inativo', 'Transferido' (default: 'Ativo') |
 | `data_nascimento` | date | Não | Data de nascimento |
-| `sexo` | text | Não | Sexo do aluno |
+| `sexo` | text | Não | Sexo do estudante |
 | `raca_cor` | text | Não | Raça/cor autodeclarada |
 | `nacionalidade` | text | Não | Nacionalidade (default: 'Brasileira') |
 | `naturalidade` | text | Não | Cidade de nascimento |
@@ -307,15 +307,15 @@ Armazena informações completas dos alunos matriculados.
 | `cep` | text | Não | CEP |
 | `bolsa_familia` | boolean | Não | Beneficiário Bolsa Família (default: false) |
 | `censo_escola` | boolean | Não | Incluído no Censo Escolar (default: false) |
-| `aluno_pcd` | boolean | Não | Pessoa com deficiência (default: false) |
-| `aluno_aee` | boolean | Não | Atendimento Educacional Especializado (default: false) |
+| `estudante_pcd` | boolean | Não | Pessoa com deficiência (default: false) |
+| `estudante_aee` | boolean | Não | Atendimento Educacional Especializado (default: false) |
 | `dieta_restritiva` | boolean | Não | Possui dieta restritiva (default: false) |
 | `transporte_escolar` | boolean | Não | Utiliza transporte escolar (default: false) |
 | `largura_farda` | text | Não | Tamanho largura da farda |
 | `altura_farda` | text | Não | Tamanho altura da farda |
 | `pasta` | text | Não | Número da pasta física |
 | `prateleira` | text | Não | Localização na prateleira |
-| `foto_url` | text | Não | URL da foto do aluno |
+| `foto_url` | text | Não | URL da foto do estudante |
 | `tipo_movimentacao` | text | Não | Tipo de movimentação (matrícula, transferência) |
 | `de_onde_veio` | text | Não | Escola de origem (transferência) |
 | `para_onde_vai` | text | Não | Escola de destino (transferência) |
@@ -366,12 +366,12 @@ Organização de turmas por período letivo.
 
 ### 5.2.4. Tabela: `notas`
 
-Registro de notas bimestrais dos alunos.
+Registro de notas bimestrais dos Estudantes.
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
 | `id` | integer (PK) | Sim | Identificador único |
-| `aluno_id` | integer (FK) | Sim | Referência ao aluno |
+| `estudante_id` | integer (FK) | Sim | Referência ao estudante |
 | `turma_id` | integer (FK) | Sim | Referência à turma |
 | `disciplina` | text | Sim | Nome da disciplina |
 | `ano` | integer | Sim | Ano letivo (default: ano atual) |
@@ -385,12 +385,12 @@ Registro de notas bimestrais dos alunos.
 
 ### 5.2.5. Tabela: `frequencia`
 
-Registro de presença/ausência dos alunos.
+Registro de presença/ausência dos Estudantes.
 
 | Campo | Tipo | Obrigatório | Descrição |
 |-------|------|-------------|-----------|
 | `id` | integer (PK) | Sim | Identificador único |
-| `aluno_id` | integer (FK) | Sim | Referência ao aluno |
+| `estudante_id` | integer (FK) | Sim | Referência ao estudante |
 | `turma_id` | integer (FK) | Sim | Referência à turma |
 | `data` | date | Sim | Data do registro |
 | `status` | text | Sim | Status: 'presente', 'faltou', 'justificado' (default: 'presente') |
@@ -478,7 +478,7 @@ Papéis/funções dos usuários no sistema.
 |-------|------|-------------|-----------|
 | `id` | uuid (PK) | Sim | Identificador único |
 | `user_id` | uuid (FK) | Sim | ID do usuário |
-| `role` | app_role (enum) | Sim | Papel: 'admin', 'professor', 'aluno' (default: 'aluno') |
+| `role` | app_role (enum) | Sim | Papel: 'admin', 'professor', 'estudante' (default: 'estudante') |
 
 ### 5.2.12. Tabela: `usuarios` (legado)
 
@@ -489,7 +489,7 @@ Tabela de usuários legada.
 | `id` | integer (PK) | Sim | Identificador único |
 | `nome` | text | Sim | Nome |
 | `email` | text | Sim | Email |
-| `papel` | text | Sim | Papel (default: 'aluno') |
+| `papel` | text | Sim | Papel (default: 'estudante') |
 | `ativo` | boolean | Não | Usuário ativo (default: true) |
 | `created_at` | timestamptz | Não | Data de criação |
 
@@ -497,11 +497,11 @@ Tabela de usuários legada.
 
 | Relacionamento | Tipo | Descrição |
 |----------------|------|-----------|
-| `alunos` → `turmas` | N:1 | Muitos alunos pertencem a uma turma |
+| `Estudantes` → `turmas` | N:1 | Muitos Estudantes pertencem a uma turma |
 | `turmas` → `professores` | N:1 | Uma turma tem um ou dois professores |
-| `frequencia` → `alunos` | N:1 | Registros de frequência por aluno |
+| `frequencia` → `Estudantes` | N:1 | Registros de frequência por estudante |
 | `frequencia` → `turmas` | N:1 | Frequência vinculada à turma |
-| `notas` → `alunos` | N:1 | Notas por aluno |
+| `notas` → `Estudantes` | N:1 | Notas por estudante |
 | `notas` → `turmas` | N:1 | Notas vinculadas à turma |
 | `horarios` → `turmas` | N:1 | Grade horária por turma |
 | `profiles` → `auth.users` | 1:1 | Perfil vinculado ao usuário autenticado |
@@ -551,16 +551,16 @@ export const supabase = createClient<Database>(
 ### 6.2.2. Consultas (SELECT)
 
 ```typescript
-// Buscar todos os alunos ativos
+// Buscar todos os Estudantes ativos
 const { data, error } = await supabase
-  .from('alunos')
+  .from('Estudantes')
   .select('*')
   .eq('status', 'Ativo')
   .order('nome');
 
-// Buscar alunos com turma (join)
+// Buscar Estudantes com turma (join)
 const { data, error } = await supabase
-  .from('alunos')
+  .from('Estudantes')
   .select(`
     *,
     turmas (
@@ -574,7 +574,7 @@ const { data, error } = await supabase
 
 ```typescript
 const { data, error } = await supabase
-  .from('alunos')
+  .from('Estudantes')
   .insert({
     nome: 'João Silva',
     matricula: '2024001',
@@ -588,18 +588,18 @@ const { data, error } = await supabase
 
 ```typescript
 const { error } = await supabase
-  .from('alunos')
+  .from('Estudantes')
   .update({ status: 'Inativo' })
-  .eq('id', alunoId);
+  .eq('id', estudanteId);
 ```
 
 ### 6.2.5. Exclusão (DELETE)
 
 ```typescript
 const { error } = await supabase
-  .from('alunos')
+  .from('Estudantes')
   .delete()
-  .eq('id', alunoId);
+  .eq('id', estudanteId);
 ```
 
 ## 6.3. Políticas de Segurança (RLS)
@@ -608,7 +608,7 @@ Todas as tabelas possuem Row Level Security habilitado. As políticas padrão pe
 
 | Tabela | SELECT | INSERT | UPDATE | DELETE |
 |--------|--------|--------|--------|--------|
-| alunos | ✅ Auth | ✅ Auth | ✅ Auth | ✅ Auth |
+| Estudantes | ✅ Auth | ✅ Auth | ✅ Auth | ✅ Auth |
 | professores | ✅ Auth | ✅ Auth | ✅ Auth | ✅ Auth |
 | turmas | ✅ Auth | ✅ Auth | ✅ Auth | ✅ Auth |
 | notas | ✅ Auth | ✅ Auth | ✅ Auth | ✅ Auth |
@@ -671,8 +671,8 @@ src/
 ├── pages/
 │   ├── Auth.tsx          # Tela de login/cadastro
 │   ├── Painel.tsx        # Dashboard principal
-│   ├── Alunos.tsx        # Lista de alunos
-│   ├── NovoAluno.tsx     # Cadastro/edição de aluno
+│   ├── Estudantes.tsx        # Lista de Estudantes
+│   ├── NovoEstudante.tsx     # Cadastro/edição de estudante
 │   ├── Professores.tsx   # Lista de professores
 │   ├── NovoProfessor.tsx # Cadastro/edição de professor
 │   ├── Turmas.tsx        # Lista de turmas
@@ -707,14 +707,14 @@ src/
 
 ### 7.2.2. Painel/Dashboard (`/painel`)
 
-- Cards com estatísticas principais (total de alunos, professores, turmas)
+- Cards com estatísticas principais (total de Estudantes, professores, turmas)
 - Gráficos de frequência e desempenho
 - Lista de próximos eventos
 - Atividades recentes
 
-### 7.2.3. Alunos (`/alunos`, `/alunos/novo`, `/alunos/:id/editar`)
+### 7.2.3. Estudantes (`/Estudantes`, `/Estudantes/novo`, `/Estudantes/:id/editar`)
 
-- Lista paginada de alunos com busca
+- Lista paginada de Estudantes com busca
 - Filtros por status
 - Formulário completo de cadastro com múltiplas seções:
   - Dados pessoais
@@ -778,13 +778,13 @@ src/
 ├──────────────────────────────────────────────────────────┤
 │                                                          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │
-│  │  /alunos    │  │/professores │  │    /turmas      │  │
+│  │  /Estudantes    │  │/professores │  │    /turmas      │  │
 │  └──────┬──────┘  └──────┬──────┘  └────────┬────────┘  │
 │         │                │                  │            │
 │         ▼                ▼                  ▼            │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐  │
-│  │/alunos/novo │  │/prof/novo   │  │  /turmas/:id/   │  │
-│  │/alunos/:id  │  │/prof/:id    │  │  notas          │  │
+│  │/Estudantes/novo │  │/prof/novo   │  │  /turmas/:id/   │  │
+│  │/Estudantes/:id  │  │/prof/:id    │  │  notas          │  │
 │  │  /editar    │  │  /editar    │  │  frequencia     │  │
 │  └─────────────┘  └─────────────┘  │  ata-final      │  │
 │                                    └─────────────────┘  │
@@ -858,7 +858,7 @@ O sistema possui uma estrutura de papéis baseada na tabela `user_roles`:
 |-------|-----------|
 | `admin` | Acesso total ao sistema |
 | `professor` | Acesso a funcionalidades pedagógicas |
-| `aluno` | Acesso limitado (não implementado no frontend) |
+| `estudante` | Acesso limitado (não implementado no frontend) |
 
 ### 8.2.1. Atribuição Automática de Papel
 

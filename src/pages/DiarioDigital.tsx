@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Users, BookOpen, ClipboardList, GraduationCap } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { toast } from 'sonner';
 
 interface Professor {
   id: string;
@@ -16,40 +17,75 @@ interface Professor {
 interface Turma {
   id: string;
   nome: string;
+  ano: number;
+  professor_id: string | null;
+  professor_id_2: string | null;
+  professores_disciplinas?: { professor_id: string; disciplina: string }[];
 }
 
 export default function DiarioDigital() {
   const navigate = useNavigate();
   const [professores, setProfessores] = useState<Professor[]>([]);
-  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [filteredTurmas, setFilteredTurmas] = useState<Turma[]>([]);
   const [selectedProfessor, setSelectedProfessor] = useState('');
   const [selectedTurma, setSelectedTurma] = useState('');
+  const [loadingTurmas, setLoadingTurmas] = useState(false);
 
   useEffect(() => {
-    fetchData();
+    async function fetchProfessores() {
+      try {
+        const profQuery = query(collection(db, 'professores'), where('ativo', '==', true), orderBy('nome'));
+        const profSnapshot = await getDocs(profQuery);
+        setProfessores(profSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
+      } catch (error) {
+        console.error("Error fetching professors: ", error);
+        toast.error("Erro ao carregar professores.");
+      }
+    }
+    fetchProfessores();
   }, []);
 
-  async function fetchData() {
-    try {
-      const profQuery = query(collection(db, 'professores'), where('ativo', '==', true), orderBy('nome'));
-      const turmasQuery = query(collection(db, 'turmas'), orderBy('nome'));
-      
-      const [profSnapshot, turmasSnapshot] = await Promise.all([
-        getDocs(profQuery),
-        getDocs(turmasQuery),
-      ]);
-
-      setProfessores(profSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
-      setTurmas(turmasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma)));
-    } catch (error) {
-      console.error("Error fetching data: ", error);
+  useEffect(() => {
+    if (!selectedProfessor) {
+      setFilteredTurmas([]);
+      setSelectedTurma('');
+      return;
     }
-  }
+
+    async function fetchAndFilterTurmas() {
+      setLoadingTurmas(true);
+      setSelectedTurma(''); // Reseta a turma selecionada ao trocar de professor
+      try {
+        const turmasQuery = query(collection(db, 'turmas'), where('ano', '==', new Date().getFullYear()));
+        const turmasSnapshot = await getDocs(turmasQuery);
+        const todasAsTurmas = turmasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
+
+        const turmasDoProfessor = todasAsTurmas.filter(turma => {
+          const isMonitor1 = turma.professor_id === selectedProfessor;
+          const isMonitor2 = turma.professor_id_2 === selectedProfessor;
+          const isProfessorDisciplina = turma.professores_disciplinas?.some(
+            pd => pd.professor_id === selectedProfessor
+          );
+          return isMonitor1 || isMonitor2 || isProfessorDisciplina;
+        });
+
+        setFilteredTurmas(turmasDoProfessor.sort((a, b) => a.nome.localeCompare(b.nome)));
+
+      } catch (error) {
+        console.error("Error fetching turmas: ", error);
+        toast.error("Erro ao carregar as turmas do professor.");
+      } finally {
+        setLoadingTurmas(false);
+      }
+    }
+
+    fetchAndFilterTurmas();
+  }, [selectedProfessor]);
 
   const cards = [
     {
       title: 'Frequência',
-      description: 'Lançar frequência dos alunos',
+      description: 'Lançar frequência dos Estudantes',
       icon: Users,
       color: 'text-blue-500',
       bgColor: 'bg-blue-50',
@@ -111,13 +147,13 @@ export default function DiarioDigital() {
 
               <div className="space-y-2">
                 <Label>Turma</Label>
-                <Select value={selectedTurma} onValueChange={setSelectedTurma}>
+                <Select value={selectedTurma} onValueChange={setSelectedTurma} disabled={!selectedProfessor || loadingTurmas}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma turma" />
+                    <SelectValue placeholder={!selectedProfessor ? "Selecione um professor primeiro" : loadingTurmas ? "Carregando turmas..." : "Selecione uma turma"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {turmas.map((turma) => (
-                      <SelectItem key={turma.id} value={turma.id.toString()}>{turma.nome}</SelectItem>
+                    {filteredTurmas.map((turma) => (
+                      <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

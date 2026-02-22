@@ -30,7 +30,7 @@ export default function Relatorios() {
     {
       id: 'frequencia' as const,
       title: 'Relatório de Frequência',
-      description: 'Controle de presença dos alunos',
+      description: 'Controle de presença dos estudantes',
     },
     {
       id: 'desempenho' as const,
@@ -53,7 +53,7 @@ export default function Relatorios() {
     {
       id: 'transferencias' as const,
       title: 'Relatório de Transferências',
-      description: 'Alunos transferidos no período',
+      description: 'Estudantes transferidos no período',
     },
   ];
 
@@ -61,17 +61,17 @@ export default function Relatorios() {
     {
       id: 'declaracaoMatricula' as const,
       title: 'Declaração de Matrícula',
-      description: 'Documento que comprova a matrícula do aluno - Modelos para impressão em papel timbrado',
+      description: 'Documento que comprova a matrícula do estudante - Modelos para impressão em papel timbrado',
     },
     {
       id: 'termoMatricula' as const,
       title: 'Termo de Matrícula',
-      description: 'Termo oficial de matrícula do aluno - Modelos para impressão em papel timbrado',
+      description: 'Termo oficial de matrícula do estudante - Modelos para impressão em papel timbrado',
     },
     {
       id: 'termoCompromisso' as const,
       title: 'Termo de Compromisso',
-      description: 'Termo de compromisso e conduta do aluno - Modelos para impressão em papel timbrado',
+      description: 'Termo de compromisso e conduta do estudante - Modelos para impressão em papel timbrado',
     },
     {
       id: 'autorizacaoSaida' as const,

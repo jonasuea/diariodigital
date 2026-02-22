@@ -8,7 +8,7 @@ import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 
-interface Aluno {
+interface Estudante {
   id: string;
   nome: string;
   matricula: string;
@@ -37,9 +37,9 @@ interface GenerateDocumentDialogProps {
 }
 
 export function GenerateDocumentDialog({ open, onOpenChange, title, template }: GenerateDocumentDialogProps) {
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [Estudantes, setEstudantes] = useState<Estudante[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [selectedAluno, setSelectedAluno] = useState<string>('');
+  const [selectedEstudante, setSelectedEstudante] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -50,15 +50,15 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, template }: 
 
   const fetchData = async () => {
     try {
-      const alunosQuery = query(collection(db, 'alunos'), where('status', '==', 'Ativo'), orderBy('nome'));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('status', '==', 'Ativo'), orderBy('nome'));
       const turmasQuery = query(collection(db, 'turmas'), orderBy('nome'));
 
-      const [alunosSnapshot, turmasSnapshot] = await Promise.all([
-        getDocs(alunosQuery),
+      const [estudantesSnapshot, turmasSnapshot] = await Promise.all([
+        getDocs(estudantesQuery),
         getDocs(turmasQuery),
       ]);
       
-      setAlunos(alunosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Aluno)));
+      setEstudantes(estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante)));
       setTurmas(turmasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma)));
     } catch (error) {
       console.error("Error fetching data: ", error);
@@ -66,26 +66,26 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, template }: 
   };
 
   const generatePDF = async () => {
-    if (!selectedAluno) {
-      toast.error('Selecione um aluno');
+    if (!selectedEstudante) {
+      toast.error('Selecione um estudante');
       return;
     }
 
     setLoading(true);
     try {
-      const aluno = alunos.find(a => a.id === selectedAluno);
-      const turma = turmas.find(t => t.id === aluno?.turma_id);
+      const estudante = Estudantes.find(a => a.id === selectedEstudante);
+      const turma = turmas.find(t => t.id === estudante?.turma_id);
 
-      if (!aluno) {
-        toast.error('Aluno não encontrado');
+      if (!estudante) {
+        toast.error('Estudante não encontrado!');
         setLoading(false);
         return;
       }
 
       let content = template
-        .replace(/\[NOME_ALUNO\]/g, aluno.nome || '')
-        .replace(/\[RG_ALUNO\]/g, aluno.rg || 'Não informado')
-        .replace(/\[CPF_ALUNO\]/g, aluno.cpf || 'Não informado')
+        .replace(/\[NOME_ESTUDANTE\]/g, estudante.nome || '')
+        .replace(/\[RG_ESTUDANTE\]/g, estudante.rg || 'Não informado')
+        .replace(/\[CPF_ESTUDANTE\]/g, estudante.cpf || 'Não informado')
         .replace(/\[TURMA\]/g, turma?.nome || '')
         .replace(/\[ANO_SERIE\]/g, turma?.serie || '')
         .replace(/\[ANO_LETIVO\]/g, turma?.ano?.toString() || new Date().getFullYear().toString())
@@ -93,11 +93,11 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, template }: 
         .replace(/\[DATA\]/g, new Date().toLocaleDateString('pt-BR'))
         .replace(/\[CIDADE\]/g, 'Cidade')
         .replace(/\[NOME_DIRETOR\]/g, 'Diretor(a)')
-        .replace(/\[NOME_RESPONSAVEL\]/g, aluno.mae_nome || aluno.pai_nome || 'Responsável')
-        .replace(/\[DATA_NASCIMENTO\]/g, aluno.data_nascimento ? new Date(aluno.data_nascimento).toLocaleDateString('pt-BR') : '')
-        .replace(/\[NOME_PAI\]/g, aluno.pai_nome || 'Não informado')
-        .replace(/\[NOME_MAE\]/g, aluno.mae_nome || 'Não informado')
-        .replace(/\[NATURALIDADE\]/g, aluno.naturalidade || 'Não informado')
+        .replace(/\[NOME_RESPONSAVEL\]/g, estudante.mae_nome || estudante.pai_nome || 'Responsável')
+        .replace(/\[DATA_NASCIMENTO\]/g, estudante.data_nascimento ? new Date(estudante.data_nascimento).toLocaleDateString('pt-BR') : '')
+        .replace(/\[NOME_PAI\]/g, estudante.pai_nome || 'Não informado')
+        .replace(/\[NOME_MAE\]/g, estudante.mae_nome || 'Não informado')
+        .replace(/\[NATURALIDADE\]/g, estudante.naturalidade || 'Não informado')
         .replace(/\[NIVEL_ENSINO\]/g, 'Fundamental');
 
       const doc = new jsPDF();
@@ -116,7 +116,7 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, template }: 
         y += 7;
       });
 
-      doc.save(`${title.toLowerCase().replace(/ /g, '-')}-${aluno.nome}.pdf`);
+      doc.save(`${title.toLowerCase().replace(/ /g, '-')}-${estudante.nome}.pdf`);
       toast.success('Documento gerado com sucesso!');
       onOpenChange(false);
     } catch (error) {
@@ -135,15 +135,15 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, template }: 
         
         <div className="space-y-4 py-4">
           <div className="flex items-center gap-4">
-            <Label className="w-16">Aluno</Label>
-            <Select value={selectedAluno} onValueChange={setSelectedAluno}>
+            <Label className="w-16">Estudante</Label>
+            <Select value={selectedEstudante} onValueChange={setSelectedEstudante}>
               <SelectTrigger className="flex-1">
-                <SelectValue placeholder="Selecione o aluno" />
+                <SelectValue placeholder="Selecione o estudante" />
               </SelectTrigger>
               <SelectContent>
-                {alunos.map(aluno => (
-                  <SelectItem key={aluno.id} value={aluno.id.toString()}>
-                    {aluno.nome}
+                {Estudantes.map(estudante => (
+                  <SelectItem key={estudante.id} value={estudante.id.toString()}>
+                    {estudante.nome}
                   </SelectItem>
                 ))}
               </SelectContent>

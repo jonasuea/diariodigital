@@ -56,9 +56,9 @@ export function ReportNotasDialog({ open, onOpenChange }: ReportNotasDialogProps
     try {
       const turma = turmas.find(t => t.id === selectedTurma);
       
-      const alunosQuery = query(collection(db, 'alunos'), where('turma_id', '==', selectedTurma), orderBy('nome'));
-      const alunosSnapshot = await getDocs(alunosQuery);
-      const alunos = alunosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', selectedTurma), orderBy('nome'));
+      const estudantesSnapshot = await getDocs(estudantesQuery);
+      const Estudantes = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       const notasQuery = query(collection(db, 'notas'), where('turma_id', '==', selectedTurma), where('ano', '==', parseInt(selectedAno)));
       const notasSnapshot = await getDocs(notasQuery);
@@ -74,16 +74,16 @@ export function ReportNotasDialog({ open, onOpenChange }: ReportNotasDialogProps
       doc.text(`Ano Letivo: ${selectedAno}`, 20, 42);
       doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 20, 49);
 
-      if (alunos && alunos.length > 0) {
-        const tableData = alunos.map(aluno => {
-          const alunoNotas = notas?.filter(n => n.aluno_id === aluno.id) || [];
-          const mediaGeral = alunoNotas.length > 0
-            ? (alunoNotas.reduce((acc, n) => acc + (n.media_anual || 0), 0) / alunoNotas.length).toFixed(1)
+      if (Estudantes && Estudantes.length > 0) {
+        const tableData = Estudantes.map(estudante => {
+          const estudanteNotas = notas?.filter(n => n.estudante_id === estudante.id) || [];
+          const mediaGeral = estudanteNotas.length > 0
+            ? (estudanteNotas.reduce((acc, n) => acc + (n.media_anual || 0), 0) / estudanteNotas.length).toFixed(1)
             : '-';
           
           return [
-            aluno.matricula,
-            aluno.nome,
+            estudante.matricula,
+            estudante.nome,
             mediaGeral,
             incluirAtaFinal ? (parseFloat(mediaGeral as string) >= 6 ? 'Aprovado' : 'Reprovado') : '-'
           ];
@@ -97,7 +97,7 @@ export function ReportNotasDialog({ open, onOpenChange }: ReportNotasDialogProps
           headStyles: { fillColor: [59, 130, 246] },
         });
       } else {
-        doc.text('Nenhum aluno encontrado nesta turma.', 20, 60);
+        doc.text('Nenhum estudante encontrado nesta turma.', 20, 60);
       }
 
       doc.save(`relatorio-notas-${turma?.nome}-${selectedAno}.pdf`);

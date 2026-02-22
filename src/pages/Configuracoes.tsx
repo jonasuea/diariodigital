@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,12 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2, Upload, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
+import { logActivity } from '@/lib/logger';
 import { doc, getDoc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function Configuracoes() {
   const { user } = useAuth();
@@ -20,6 +23,9 @@ export default function Configuracoes() {
   const [isInstalacoesOpen, setIsInstalacoesOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
   
   const [escolaConfig, setEscolaConfig] = useState({
     nome: 'Escola Estadual Maria da Silva',
@@ -44,6 +50,7 @@ export default function Configuracoes() {
     notificacoes: true,
     autenticacaoDoisFatores: false,
     modoManutencao: false,
+    telaCheiaPadrao: false,
   });
 
   const [profileData, setProfileData] = useState({
@@ -51,9 +58,34 @@ export default function Configuracoes() {
     email: user?.email || 'admin@escola.com',
     telefone: '(11) 98765-4321',
     cargo: 'Administrador',
+    foto_url: '',
     novaSenha: '',
     confirmarSenha: '',
   });
+
+  useEffect(() => {
+    // Lógica para entrar ou sair do modo de tela cheia
+    const toggleFullScreen = async () => {
+      if (preferencias.telaCheiaPadrao) {
+        if (document.fullscreenElement === null) {
+          try {
+            await document.documentElement.requestFullscreen();
+          } catch (err) {
+            console.error(`Erro ao tentar ativar a tela cheia: ${err.message}`);
+          }
+        }
+      } else {
+        if (document.fullscreenElement !== null) {
+          try {
+            await document.exitFullscreen();
+          } catch (err) {
+            console.error(`Erro ao tentar desativar a tela cheia: ${err.message}`);
+          }
+        }
+      }
+    };
+    toggleFullScreen();
+  }, [preferencias.telaCheiaPadrao]);
 
   useEffect(() => {
     async function loadConfig() {
@@ -66,7 +98,11 @@ export default function Configuracoes() {
           const data = docSnap.data();
           if (data.escolaConfig) setEscolaConfig(data.escolaConfig);
           if (data.instalacoes) setInstalacoes(data.instalacoes);
-          if (data.preferencias) setPreferencias(data.preferencias);
+          if (data.preferencias) {
+            setPreferencias(data.preferencias);
+            // Sincronizar com o localStorage ao carregar
+            localStorage.setItem('telaCheiaPadrao', JSON.stringify(data.preferencias.telaCheiaPadrao || false));
+          }
         }
       } catch (error) {
         toast.error('Erro ao carregar configurações');
@@ -83,6 +119,7 @@ export default function Configuracoes() {
     try {
       const docRef = doc(db, 'configuracoes', 'escola');
       await setDoc(docRef, { escolaConfig }, { merge: true });
+      await logActivity('atualizou as informações da escola.');
       toast.success('Informações da escola salvas com sucesso!');
     } catch (error) {
       toast.error('Erro ao salvar informações da escola');
@@ -94,6 +131,7 @@ export default function Configuracoes() {
     try {
       const docRef = doc(db, 'configuracoes', 'escola');
       await setDoc(docRef, { instalacoes }, { merge: true });
+      await logActivity('atualizou as informações das instalações da escola.');
       toast.success('Instalações atualizadas com sucesso!');
       setIsInstalacoesOpen(false);
     } catch (error) {
@@ -104,9 +142,12 @@ export default function Configuracoes() {
   
   const handleSavePreferencias = async (newPreferencias: typeof preferencias) => {
     setPreferencias(newPreferencias);
+    // Salvar no localStorage para persistência imediata no navegador
+    localStorage.setItem('telaCheiaPadrao', JSON.stringify(newPreferencias.telaCheiaPadrao));
     try {
       const docRef = doc(db, 'configuracoes', 'escola');
       await setDoc(docRef, { preferencias: newPreferencias }, { merge: true });
+      await logActivity('atualizou as preferências do sistema.');
       toast.success('Preferências salvas com sucesso!');
     } catch (error) {
       toast.error('Erro ao salvar preferências');
@@ -114,14 +155,46 @@ export default function Configuracoes() {
     }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     if (profileData.novaSenha && profileData.novaSenha !== profileData.confirmarSenha) {
       toast.error('As senhas não coincidem');
       return;
     }
+    
+    // Aqui você salvaria no Firestore na coleção de usuários
+    await logActivity('atualizou as informações do seu perfil.');
     toast.success('Perfil atualizado com sucesso!');
     setIsEditProfileOpen(false);
     setProfileData(prev => ({ ...prev, novaSenha: '', confirmarSenha: '' }));
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `user_${user?.uid}_${Date.now()}.${fileExt}`;
+      const storageRef = ref(storage, `usuarios/fotos/${fileName}`);
+      
+      await uploadBytes(storageRef, file);
+      const photoURL = await getDownloadURL(storageRef);
+
+      setProfileData(prev => ({ ...prev, foto_url: photoURL }));
+      await logActivity('atualizou sua foto de perfil.');
+      toast.success('Foto de perfil carregada!');
+    } catch (error) {
+      toast.error('Erro ao fazer upload da foto');
+      console.error(error);
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const handleSyncSearchData = async () => {
@@ -129,7 +202,7 @@ export default function Configuracoes() {
     toast.info('Iniciando a sincronização dos dados de busca. Isso pode levar alguns minutos...');
 
     try {
-      const collectionsToSync = ['alunos', 'professores', 'equipe-gestora'];
+      const collectionsToSync = ['estudantes', 'professores', 'equipe-gestora'];
       let updatedCount = 0;
 
       for (const collectionName of collectionsToSync) {
@@ -168,6 +241,41 @@ export default function Configuracoes() {
       toast.error('Ocorreu um erro durante a sincronização.');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleMigrateData = async () => {
+    setIsMigrating(true);
+    toast.info('Iniciando a migração de dados de "estudantes" para "estudantes". Não feche esta página.');
+
+    try {
+      const estudantesRef = collection(db, 'estudantes');
+      const estudantesSnapshot = await getDocs(estudantesRef);
+
+      if (estudantesSnapshot.empty) {
+        toast.info('A coleção "estudantes" já está vazia. Nenhuma migração é necessária.');
+        return;
+      }
+
+      const batch = writeBatch(db);
+      let count = 0;
+
+      estudantesSnapshot.forEach(docSnapshot => {
+        const data = docSnapshot.data();
+        const newDocRef = doc(db, 'estudantes', docSnapshot.id);
+        batch.set(newDocRef, data);
+        count++;
+      });
+
+      await batch.commit();
+      toast.success(`${count} registros de estudantes foram migrados com sucesso!`);
+      toast.warning('Atenção: A coleção antiga "estudantes" não foi excluída. Por favor, verifique os dados e, se tudo estiver correto, apague-a manualmente no console do Firebase.');
+
+    } catch (error) {
+      console.error("Erro ao migrar dados:", error);
+      toast.error('Ocorreu um erro durante a migração. Verifique o console para mais detalhes.');
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -347,6 +455,21 @@ export default function Configuracoes() {
                     onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
                   />
                 </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-start gap-3">
+                    <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="font-medium">Navegador em Tela Cheia</p>
+                      <p className="text-sm text-muted-foreground">
+                        O sistema sempre iniciará em modo de tela cheia
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={preferencias.telaCheiaPadrao}
+                    onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, telaCheiaPadrao: checked })}
+                  />
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -360,9 +483,29 @@ export default function Configuracoes() {
                 <CardTitle className="text-lg font-semibold">Informações da Conta</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center text-center">
-                <div className="h-24 w-24 rounded-full bg-primary/10 flex items-center justify-center text-primary text-2xl font-bold mb-4">
-                  {profileData.nome.substring(0, 2).toUpperCase()}
+                <div className="relative group mb-4">
+                  <Avatar className="h-24 w-24 border-2 border-primary/20">
+                    <AvatarImage src={profileData.foto_url} alt={profileData.nome} />
+                    <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">
+                      {profileData.nome.substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <button 
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={uploadingPhoto}
+                    className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+                  >
+                    <Camera className="h-6 w-6 text-white" />
+                  </button>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                  />
                 </div>
+                {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">Enviando foto...</p>}
                 <h3 className="font-semibold text-lg">{profileData.nome}</h3>
                 <p className="text-sm text-muted-foreground mb-4">{profileData.email}</p>
                 <Button variant="outline" className="w-full" onClick={() => setIsEditProfileOpen(true)}>
@@ -421,7 +564,7 @@ export default function Configuracoes() {
                       <Button 
                         className="w-full" 
                         onClick={handleSyncSearchData} 
-                        disabled={isSyncing}
+                        disabled={isSyncing || isMigrating}
                       >
                         {isSyncing ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />

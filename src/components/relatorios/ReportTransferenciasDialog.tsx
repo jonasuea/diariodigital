@@ -28,24 +28,24 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
 
     setLoading(true);
     try {
-      const alunosQuery1 = query(
-        collection(db, 'alunos'), 
+      const estudantesQuery1 = query(
+        collection(db, 'estudantes'), 
         where('ano', '==', parseInt(selectedAno)), 
         where('status', '==', 'Transferido')
       );
-      const alunosQuery2 = query(
-        collection(db, 'alunos'), 
+      const estudantesQuery2 = query(
+        collection(db, 'estudantes'), 
         where('ano', '==', parseInt(selectedAno)), 
         where('tipo_movimentacao', '==', 'Transferência')
       );
 
-      const [snapshot1, snapshot2] = await Promise.all([getDocs(alunosQuery1), getDocs(alunosQuery2)]);
+      const [snapshot1, snapshot2] = await Promise.all([getDocs(estudantesQuery1), getDocs(estudantesQuery2)]);
       
-      const alunosMap = new Map();
-      snapshot1.docs.forEach(doc => alunosMap.set(doc.id, { id: doc.id, ...doc.data() }));
-      snapshot2.docs.forEach(doc => alunosMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      const estudantesMap = new Map();
+      snapshot1.docs.forEach(doc => estudantesMap.set(doc.id, { id: doc.id, ...doc.data() }));
+      snapshot2.docs.forEach(doc => estudantesMap.set(doc.id, { id: doc.id, ...doc.data() }));
       
-      const alunos = Array.from(alunosMap.values()).sort((a,b) => b.data_movimentacao.localeCompare(a.data_movimentacao));
+      const Estudantes = Array.from(estudantesMap.values()).sort((a,b) => b.data_movimentacao.localeCompare(a.data_movimentacao));
 
       const doc = new jsPDF();
       
@@ -56,8 +56,8 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
       doc.text(`Ano Letivo: ${selectedAno}`, 20, 35);
       doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 20, 42);
 
-      const transferenciasRecebidas = alunos?.filter(a => a.tipo_movimentacao === 'Transferência') || [];
-      const transferenciasSaidas = alunos?.filter(a => a.status === 'Transferido') || [];
+      const transferenciasRecebidas = Estudantes?.filter(a => a.tipo_movimentacao === 'Transferência') || [];
+      const transferenciasSaidas = Estudantes?.filter(a => a.status === 'Transferido') || [];
 
       doc.setFontSize(14);
       doc.text('Resumo:', 20, 55);
@@ -65,16 +65,16 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
       doc.text(`• Transferências Recebidas: ${transferenciasRecebidas.length}`, 25, 65);
       doc.text(`• Transferências Realizadas: ${transferenciasSaidas.length}`, 25, 72);
 
-      if (alunos && alunos.length > 0) {
-        const tableData = alunos.map(aluno => {
-          const tipo = aluno.status === 'Transferido' ? 'Saída' : 'Entrada';
-          const origem = aluno.de_onde_veio || '-';
-          const destino = aluno.para_onde_vai || '-';
-          const data = aluno.data_movimentacao 
-            ? new Date(aluno.data_movimentacao).toLocaleDateString('pt-BR') 
+      if (Estudantes && Estudantes.length > 0) {
+        const tableData = Estudantes.map(estudante => {
+          const tipo = estudante.status === 'Transferido' ? 'Saída' : 'Entrada';
+          const origem = estudante.de_onde_veio || '-';
+          const destino = estudante.para_onde_vai || '-';
+          const data = estudante.data_movimentacao 
+            ? new Date(estudante.data_movimentacao).toLocaleDateString('pt-BR') 
             : '-';
           
-          return [aluno.matricula, aluno.nome, tipo, origem, destino, data];
+          return [estudante.matricula, estudante.nome, tipo, origem, destino, data];
         });
 
         autoTable(doc, {
@@ -122,7 +122,7 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
           </div>
 
           <p className="text-sm text-muted-foreground">
-            O relatório mostrará todos os alunos transferidos no período, incluindo origem e destino.
+            O relatório mostrará todos os Estudantes transferidos no período, incluindo origem e destino.
           </p>
         </div>
 

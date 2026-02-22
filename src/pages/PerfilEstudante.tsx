@@ -8,7 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Calendar, MapPin, Phone, Mail, FileText, Download, ClipboardList, Edit } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ArrowLeft, Calendar, MapPin, Phone, Mail, FileText, Download, ClipboardList, Edit, BookOpen } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -17,7 +18,7 @@ import { ptBR } from 'date-fns/locale';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-interface Aluno {
+interface Estudante {
   id: string;
   nome: string;
   matricula: string;
@@ -42,6 +43,7 @@ interface Aluno {
   turma_id: string | null;
   ano: number;
   turma_nome?: string;
+  historico_academico?: HistoricoAnual[];
 }
 
 interface Nota {
@@ -55,11 +57,29 @@ interface Nota {
   situacao: string | null;
 }
 
+interface HistoricoDisciplina {
+  id: string;
+  nome: string;
+  nota_b1: string;
+  nota_b2: string;
+  nota_b3: string;
+  nota_b4: string;
+  media_final: string;
+}
+
+interface HistoricoAnual {
+  id: string;
+  ano_letivo: string;
+  serie: string;
+  escola: string;
+  disciplinas: HistoricoDisciplina[];
+}
+
 const DEFAULT_TRANSFERENCIA_TEMPLATE = `DECLARAÇÃO DE TRANSFERÊNCIA
 
-Declaramos, para os devidos fins, que o(a) aluno(a) {NOME_ALUNO}, portador(a) do RG nº __________, inscrito(a) no CPF sob o nº __________, matriculado(a) nesta instituição sob o número {MATRICULA}, cursou regularmente o {SERIE} do Ensino {NIVEL} durante o ano letivo de {ANO}.
+Declaramos, para os devidos fins, que o(a) estudante {NOME_ESTUDANTE}, portador(a) do RG nº __________, inscrito(a) no CPF sob o nº __________, matriculado(a) nesta instituição sob o número {MATRICULA}, cursou regularmente o {SERIE} do Ensino {NIVEL} durante o ano letivo de {ANO}.
 
-O(A) referido(a) aluno(a) está sendo transferido(a) a pedido do responsável, estando quite com todas as obrigações escolares.
+O(A) referido(a) estudante está sendo transferido(a) a pedido do responsável, estando quite com todas as obrigações escolares.
 
 Por ser verdade, firmamos a presente declaração.
 
@@ -76,8 +96,8 @@ const DEFAULT_BOLETIM_TEMPLATE = `BOLETIM ESCOLAR
 Escola Municipal Dom Paulo McHugh
 Ano Letivo: {ANO}
 
-DADOS DO ALUNO:
-Nome: {NOME_ALUNO}
+DADOS DO ESTUDANTE:
+Nome: {NOME_ESTUDANTE}
 Matrícula: {MATRICULA}
 Turma: {TURMA}
 
@@ -95,10 +115,10 @@ Coordenador(a) Pedagógico(a)
 
 Data de emissão: {DATA_EMISSAO}`;
 
-export default function PerfilAluno() {
+export default function PerfilEstudante() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const [aluno, setAluno] = useState<Aluno | null>(null);
+  const [estudante, setEstudante] = useState<Estudante | null>(null);
   const [notas, setNotas] = useState<Nota[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -112,59 +132,59 @@ export default function PerfilAluno() {
 
   useEffect(() => {
     if (id) {
-      loadAluno();
+      loadEstudante();
     }
   }, [id]);
 
   useEffect(() => {
-    if (aluno) {
+    if (estudante) {
       loadNotas();
     }
-  }, [aluno, selectedYear]);
+  }, [estudante, selectedYear]);
 
-  async function loadAluno() {
+  async function loadEstudante() {
     setLoading(true);
     if (!id) return;
     try {
-      const alunoDocRef = doc(db, 'alunos', id);
-      const alunoDoc = await getDoc(alunoDocRef);
+      const estudanteDocRef = doc(db, 'estudantes', id);
+      const estudanteDoc = await getDoc(estudanteDocRef);
 
-      if (alunoDoc.exists()) {
-        const alunoData = alunoDoc.data() as Omit<Aluno, 'id' | 'turma_nome'>;
+      if (estudanteDoc.exists()) {
+        const estudanteData = estudanteDoc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
         let turma_nome: string | undefined = '-';
 
-        if (alunoData.turma_id) {
-          const turmaDocRef = doc(db, 'turmas', alunoData.turma_id);
+        if (estudanteData.turma_id) {
+          const turmaDocRef = doc(db, 'turmas', estudanteData.turma_id);
           const turmaDoc = await getDoc(turmaDocRef);
           if (turmaDoc.exists()) {
             turma_nome = turmaDoc.data().nome;
           }
         }
         
-        setAluno({
-          id: alunoDoc.id,
-          ...alunoData,
+        setEstudante({
+          id: estudanteDoc.id,
+          ...estudanteData,
           turma_nome
         });
       } else {
-        toast.error('Aluno não encontrado');
-        navigate('/alunos');
+        toast.error('Estudante não encontrado');
+        navigate('/estudantes');
       }
     } catch (error) {
-      toast.error('Erro ao carregar dados do aluno');
+      toast.error('Erro ao carregar dados do estudante');
       console.error(error);
-      navigate('/alunos');
+      navigate('/estudantes');
     }
     setLoading(false);
   }
 
   async function loadNotas() {
-    if (!aluno) return;
+    if (!estudante) return;
     
     try {
       const q = query(
         collection(db, 'notas'), 
-        where('aluno_id', '==', aluno.id), 
+        where('estudante_id', '==', estudante.id), 
         where('ano', '==', selectedYear)
       );
       const querySnapshot = await getDocs(q);
@@ -198,18 +218,18 @@ export default function PerfilAluno() {
   };
 
   function handleGerarTransferencia() {
-    if (!aluno) return;
+    if (!estudante) return;
 
     const doc = new jsPDF();
     const ano = new Date().getFullYear();
-    const cidade = aluno.cidade || 'Manaus';
+    const cidade = estudante.cidade || 'Manaus';
     const dataAtual = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
     let conteudo = transferenciaTemplate
-      .replace('{NOME_ALUNO}', aluno.nome)
-      .replace('{MATRICULA}', aluno.matricula)
-      .replace('{SERIE}', aluno.turma_nome || `${aluno.ano}º Ano`)
-      .replace('{NIVEL}', aluno.ano <= 5 ? 'Fundamental I' : 'Fundamental II')
+      .replace('{NOME_ESTUDANTE}', estudante.nome)
+      .replace('{MATRICULA}', estudante.matricula)
+      .replace('{SERIE}', estudante.turma_nome || `${estudante.ano}º Ano`)
+      .replace('{NIVEL}', estudante.ano <= 5 ? 'Fundamental I' : 'Fundamental II')
       .replace('{ANO}', ano.toString())
       .replace('{CIDADE}', cidade)
       .replace('{DATA}', dataAtual);
@@ -217,13 +237,13 @@ export default function PerfilAluno() {
     const lines = doc.splitTextToSize(conteudo, 180);
     doc.setFontSize(12);
     doc.text(lines, 15, 30);
-    doc.save(`transferencia-${aluno.nome.replace(/\s+/g, '-')}.pdf`);
+    doc.save(`transferencia-${estudante.nome.replace(/\s+/g, '-')}.pdf`);
     toast.success('Declaração de transferência gerada!');
     setTransferenciaDialogOpen(false);
   }
 
   function handleGerarBoletim() {
-    if (!aluno) return;
+    if (!estudante) return;
 
     const doc = new jsPDF();
     const ano = selectedYear;
@@ -245,9 +265,9 @@ export default function PerfilAluno() {
 
     let conteudo = boletimTemplate
       .replace('{ANO}', ano.toString())
-      .replace('{NOME_ALUNO}', aluno.nome)
-      .replace('{MATRICULA}', aluno.matricula)
-      .replace('{TURMA}', aluno.turma_nome || `${aluno.ano}º Ano`)
+      .replace('{NOME_ESTUDANTE}', estudante.nome)
+      .replace('{MATRICULA}', estudante.matricula)
+      .replace('{TURMA}', estudante.turma_nome || `${estudante.ano}º Ano`)
       .replace('{NOTAS}', notasTexto || 'Nenhuma nota registrada')
       .replace('{MEDIA_GERAL}', mediaGeral)
       .replace('{SITUACAO}', situacao)
@@ -256,7 +276,7 @@ export default function PerfilAluno() {
     const lines = doc.splitTextToSize(conteudo, 180);
     doc.setFontSize(12);
     doc.text(lines, 15, 20);
-    doc.save(`boletim-${aluno.nome.replace(/\s+/g, '-')}-${ano}.pdf`);
+    doc.save(`boletim-${estudante.nome.replace(/\s+/g, '-')}-${ano}.pdf`);
     toast.success('Boletim gerado com sucesso!');
     setBoletimDialogOpen(false);
   }
@@ -271,34 +291,34 @@ export default function PerfilAluno() {
     );
   }
 
-  if (!aluno) {
+  if (!estudante) {
     return (
-      <AppLayout title="Aluno não encontrado">
+      <AppLayout title="Estudante não encontrado">
         <div className="text-center py-12">
-          <p className="text-muted-foreground">Aluno não encontrado</p>
-          <Button className="mt-4" onClick={() => navigate('/alunos')}>
-            Voltar para Alunos
+          <p className="text-muted-foreground">Estudante não encontrado</p>
+          <Button className="mt-4" onClick={() => navigate('/estudantes')}>
+            Voltar para Estudantes
           </Button>
         </div>
       </AppLayout>
     );
   }
 
-  const endereco = [aluno.endereco, aluno.bairro, aluno.cidade, aluno.estado]
+  const endereco = [estudante.endereco, estudante.bairro, estudante.cidade, estudante.estado]
     .filter(Boolean)
     .join(', ');
 
   return (
-    <AppLayout title="Detalhes do Aluno">
+    <AppLayout title="Detalhes do Estudante">
       <div className="space-y-6 animate-fade-in">
         <p className="text-muted-foreground -mt-2">
-          Visualize informações detalhadas, notas e frequência do aluno
+          Visualize informações detalhadas, notas e frequência do estudante
         </p>
 
         <div className="flex items-center justify-between flex-wrap gap-4">
-          <Button variant="outline" onClick={() => navigate('/alunos')}>
+          <Button variant="outline" onClick={() => navigate('/estudantes')}>
             <ArrowLeft className="h-4 w-4 md:mr-2" />
-            <span className="hidden md:inline">Voltar para Lista de Alunos</span>
+            <span className="hidden md:inline">Voltar para Lista de Estudantes</span>
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => setTransferenciaDialogOpen(true)}>
@@ -320,30 +340,30 @@ export default function PerfilAluno() {
             </CardHeader>
             <CardContent className="flex flex-col items-center text-center">
               <Avatar className="h-24 w-24 mb-4">
-                <AvatarImage src={aluno.foto_url || undefined} />
+                <AvatarImage src={estudante.foto_url || undefined} />
                 <AvatarFallback className="text-2xl bg-primary/10 text-primary">
-                  {aluno.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                  {estudante.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
                 </AvatarFallback>
               </Avatar>
 
-              <h2 className="text-xl font-bold">{aluno.nome}</h2>
-              <p className="text-muted-foreground">Matrícula: {aluno.matricula}</p>
+              <h2 className="text-xl font-bold">{estudante.nome}</h2>
+              <p className="text-muted-foreground">Matrícula: {estudante.matricula}</p>
 
               <div className="flex items-center gap-2 mt-2">
-                <Badge variant="secondary">{aluno.turma_nome || `${aluno.ano}º Ano`}</Badge>
-                <Badge className={getStatusColor(aluno.status)}>
-                  {aluno.status || 'Frequentando'}
+                <Badge variant="secondary">{estudante.turma_nome || `${estudante.ano}º Ano`}</Badge>
+                <Badge className={getStatusColor(estudante.status)}>
+                  {estudante.status || 'Frequentando'}
                 </Badge>
               </div>
 
               <div className="w-full mt-6 space-y-4 text-left">
-                {aluno.data_nascimento && (
+                {estudante.data_nascimento && (
                   <div className="flex items-start gap-3">
                     <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm text-muted-foreground">Data de Nascimento</p>
                       <p className="font-medium">
-                        {format(new Date(aluno.data_nascimento), "dd/MM/yyyy", { locale: ptBR })}
+                        {format(new Date(estudante.data_nascimento), "dd/MM/yyyy", { locale: ptBR })}
                       </p>
                     </div>
                   </div>
@@ -359,32 +379,32 @@ export default function PerfilAluno() {
                   </div>
                 )}
 
-                {(aluno.mae_contato || aluno.pai_contato) && (
+                {(estudante.mae_contato || estudante.pai_contato) && (
                   <div className="flex items-start gap-3">
                     <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm text-muted-foreground">Telefone</p>
-                      <p className="font-medium">{aluno.mae_contato || aluno.pai_contato}</p>
-                      {aluno.mae_contato && aluno.pai_contato && (
+                      <p className="font-medium">{estudante.mae_contato || estudante.pai_contato}</p>
+                      {estudante.mae_contato && estudante.pai_contato && (
                         <>
                           <p className="text-sm text-muted-foreground mt-1">Telefone do Responsável</p>
-                          <p className="font-medium">{aluno.pai_contato}</p>
+                          <p className="font-medium">{estudante.pai_contato}</p>
                         </>
                       )}
                     </div>
                   </div>
                 )}
 
-                {(aluno.mae_email || aluno.pai_email) && (
+                {(estudante.mae_email || estudante.pai_email) && (
                   <div className="flex items-start gap-3">
                     <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-sm text-muted-foreground">Email</p>
-                      <p className="font-medium break-all">{aluno.mae_email || aluno.pai_email}</p>
-                      {aluno.mae_email && aluno.pai_email && (
+                      <p className="font-medium break-all">{estudante.mae_email || estudante.pai_email}</p>
+                      {estudante.mae_email && estudante.pai_email && (
                         <>
                           <p className="text-sm text-muted-foreground mt-1">Email do Responsável</p>
-                          <p className="font-medium break-all">{aluno.pai_email}</p>
+                          <p className="font-medium break-all">{estudante.pai_email}</p>
                         </>
                       )}
                     </div>
@@ -394,36 +414,36 @@ export default function PerfilAluno() {
                 <div className="pt-4 border-t">
                   <h4 className="font-semibold mb-3">Informações Adicionais</h4>
                   
-                  {(aluno.largura_farda || aluno.altura_farda) && (
+                  {(estudante.largura_farda || estudante.altura_farda) && (
                     <div className="flex items-start gap-3 mb-3">
                       <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
                       <div>
                         <p className="text-sm text-muted-foreground">Tamanho da Farda</p>
                         <p className="font-medium">
-                          {aluno.largura_farda && `Largura: ${aluno.largura_farda}`}
-                          {aluno.largura_farda && aluno.altura_farda && ' | '}
-                          {aluno.altura_farda && `Altura: ${aluno.altura_farda}`}
+                          {estudante.largura_farda && `Largura: ${estudante.largura_farda}`}
+                          {estudante.largura_farda && estudante.altura_farda && ' | '}
+                          {estudante.altura_farda && `Altura: ${estudante.altura_farda}`}
                         </p>
                       </div>
                     </div>
                   )}
 
-                  {aluno.pasta && (
+                  {estudante.pasta && (
                     <div className="flex items-start gap-3 mb-3">
                       <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
                       <div>
                         <p className="text-sm text-muted-foreground">Pasta</p>
-                        <p className="font-medium">{aluno.pasta}</p>
+                        <p className="font-medium">{estudante.pasta}</p>
                       </div>
                     </div>
                   )}
 
-                  {aluno.prateleira && (
+                  {estudante.prateleira && (
                     <div className="flex items-start gap-3">
                       <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
                       <div>
                         <p className="text-sm text-muted-foreground">Prateleira</p>
-                        <p className="font-medium">{aluno.prateleira}</p>
+                        <p className="font-medium">{estudante.prateleira}</p>
                       </div>
                     </div>
                   )}
@@ -444,7 +464,7 @@ export default function PerfilAluno() {
                     onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                     className="border rounded px-2 py-1 text-sm"
                   >
-                    {[2023, 2024, 2025].map(y => (
+                    {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
                       <option key={y} value={y}>{y}</option>
                     ))}
                   </select>
@@ -468,7 +488,10 @@ export default function PerfilAluno() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h4 className="font-semibold">Boletim</h4>
+                      <h4 className="font-semibold flex items-center gap-2">
+                        <ClipboardList className="h-5 w-5 text-primary" />
+                        Boletim
+                      </h4>
                       <p className="text-sm text-muted-foreground">Notas por disciplina</p>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
@@ -546,6 +569,58 @@ export default function PerfilAluno() {
                       <span className="hidden md:inline">Gerar Boletim</span>
                     </Button>
                   </div>
+
+                  {/* Histórico Acadêmico */}
+                  <div className="mt-8">
+                    <h4 className="font-semibold mb-4 flex items-center gap-2">
+                      <BookOpen className="h-5 w-5 text-primary" />
+                      Histórico Acadêmico Completo
+                    </h4>
+                    {estudante.historico_academico && estudante.historico_academico.length > 0 ? (
+                      <Accordion type="multiple" className="w-full">
+                        {estudante.historico_academico.map((ano) => (
+                          <AccordionItem value={ano.id} key={ano.id}>
+                            <AccordionTrigger>
+                              <div className="flex justify-between w-full pr-4">
+                                <span>{ano.serie} ({ano.ano_letivo})</span>
+                                <span className="text-sm text-muted-foreground">{ano.escola}</span>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent>
+                              <table className="w-full mt-2">
+                                <thead className="bg-muted/50">
+                                  <tr>
+                                    <th className="text-left p-2 font-medium">Disciplina</th>
+                                    <th className="text-center p-2 font-medium">1º Bim</th>
+                                    <th className="text-center p-2 font-medium">2º Bim</th>
+                                    <th className="text-center p-2 font-medium">3º Bim</th>
+                                    <th className="text-center p-2 font-medium">4º Bim</th>
+                                    <th className="text-center p-2 font-medium">Média</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {ano.disciplinas.map(d => (
+                                    <tr key={d.id} className="border-t">
+                                      <td className="p-2 font-medium">{d.nome}</td>
+                                      <td className="p-2 text-center">{d.nota_b1 || '-'}</td>
+                                      <td className="p-2 text-center">{d.nota_b2 || '-'}</td>
+                                      <td className="p-2 text-center">{d.nota_b3 || '-'}</td>
+                                      <td className="p-2 text-center">{d.nota_b4 || '-'}</td>
+                                      <td className="p-2 text-center font-semibold">{d.media_final || '-'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </AccordionContent>
+                          </AccordionItem>
+                        ))}
+                      </Accordion>
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center py-4">
+                        Nenhum histórico acadêmico registrado.
+                      </p>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -568,7 +643,7 @@ export default function PerfilAluno() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Variáveis disponíveis: {'{NOME_ALUNO}'}, {'{MATRICULA}'}, {'{SERIE}'}, {'{NIVEL}'}, {'{ANO}'}, {'{CIDADE}'}, {'{DATA}'}
+              Variáveis disponíveis: {'{NOME_ESTUDANTE}'}, {'{MATRICULA}'}, {'{SERIE}'}, {'{NIVEL}'}, {'{ANO}'}, {'{CIDADE}'}, {'{DATA}'}
             </div>
             <Textarea
               value={transferenciaTemplate}
@@ -596,7 +671,7 @@ export default function PerfilAluno() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="text-sm text-muted-foreground">
-              Variáveis disponíveis: {'{ANO}'}, {'{NOME_ALUNO}'}, {'{MATRICULA}'}, {'{TURMA}'}, {'{NOTAS}'}, {'{MEDIA_GERAL}'}, {'{SITUACAO}'}, {'{DATA_EMISSAO}'}
+              Variáveis disponíveis: {'{ANO}'}, {'{NOME_ESTUDANTE}'}, {'{MATRICULA}'}, {'{TURMA}'}, {'{NOTAS}'}, {'{MEDIA_GERAL}'}, {'{SITUACAO}'}, {'{DATA_EMISSAO}'}
             </div>
             <Textarea
               value={boletimTemplate}

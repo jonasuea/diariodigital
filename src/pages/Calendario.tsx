@@ -6,19 +6,22 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Plus, Calendar as CalendarIcon, Clock, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, orderBy, getDocs, addDoc, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, addDoc, updateDoc, doc, deleteDoc, Timestamp } from 'firebase/firestore';
+import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { format, isSameDay, isSameMonth, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface Evento {
   id: string;
   titulo: string;
   descricao: string | null;
-  data: string;
+  data: Timestamp;
   tipo: string;
   hora_inicio: string | null;
   hora_fim: string | null;
@@ -26,7 +29,10 @@ interface Evento {
 }
 
 export default function Calendario() {
+  const { role } = useUserRole();
+  const isAdminOrGestor = role === 'admin' || role === 'gestor';
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -38,6 +44,7 @@ export default function Calendario() {
   const [formData, setFormData] = useState({
     titulo: '',
     data: format(new Date(), 'yyyy-MM-dd'),
+    tipo: 'evento escolar',
     hora_inicio: '08:00',
     hora_fim: '09:00',
     local: '',
@@ -45,14 +52,23 @@ export default function Calendario() {
 
   useEffect(() => {
     fetchEventos();
-  }, []);
+    fetchDiasLetivos();
+  }, [currentMonth]);
 
   async function fetchEventos() {
     setLoading(true);
     try {
       const q = query(collection(db, 'eventos'), orderBy('data', 'asc'));
       const querySnapshot = await getDocs(q);
-      const eventosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Evento));
+      const eventosData = querySnapshot.docs.map(doc => {
+        const data = doc.data();
+        // Garante que o campo 'data' seja sempre um Timestamp.
+        // Converte de string para Timestamp se for o formato antigo.
+        if (data.data && typeof data.data === 'string') {
+          data.data = Timestamp.fromDate(parseISO(data.data));
+        }
+        return { id: doc.id, ...data } as Evento;
+      });
       setEventos(eventosData);
     } catch (error) {
       toast.error('Erro ao carregar eventos');
@@ -61,13 +77,80 @@ export default function Calendario() {
     setLoading(false);
   }
 
+  async function fetchDiasLetivos() {
+    try {
+      const start = startOfMonth(currentMonth);
+      const end = endOfMonth(currentMonth);
+      
+      const q = query(
+        collection(db, 'dias_letivos'),
+        orderBy('data', 'asc')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      const dias = new Set<string>();
+      
+      // Filtrar client-side para simplificar, ou ajustar a query
+      querySnapshot.forEach(doc => {
+        dias.add(doc.data().data);
+      });
+      
+      setDiasLetivos(dias);
+    } catch (error) {
+      console.error("Erro ao carregar dias letivos:", error);
+    }
+  }
+
+  async function toggleDiaLetivo(date: Date) {
+    if (!isAdminOrGestor) {
+      toast.error('Apenas gestores e administradores podem alterar dias letivos.');
+      return;
+    }
+
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const isLetivo = diasLetivos.has(dateStr);
+
+    try {
+      if (isLetivo) {
+        // Remover dia letivo
+        const q = query(collection(db, 'dias_letivos'), where('data', '==', dateStr));
+        const snapshot = await getDocs(q);
+        snapshot.forEach(async (doc) => {
+          await deleteDoc(doc.ref);
+        });
+        
+        const newDias = new Set(diasLetivos);
+        newDias.delete(dateStr);
+        setDiasLetivos(newDias);
+        await logActivity(`marcou o dia ${format(date, 'dd/MM/yyyy')} como NÃO letivo.`);
+        toast.success(`Dia ${format(date, 'dd/MM')} marcado como NÃO letivo.`);
+      } else {
+        // Adicionar dia letivo
+        await addDoc(collection(db, 'dias_letivos'), {
+          data: dateStr,
+          criado_em: new Date(),
+          criado_por: 'sistema' // Idealmente o ID do utilizador
+        });
+        
+        const newDias = new Set(diasLetivos);
+        newDias.add(dateStr);
+        setDiasLetivos(newDias);
+        await logActivity(`marcou o dia ${format(date, 'dd/MM/yyyy')} como LETIVO.`);
+        toast.success(`Dia ${format(date, 'dd/MM')} marcado como LETIVO.`);
+      }
+    } catch (error) {
+      console.error("Erro ao alterar dia letivo:", error);
+      toast.error("Erro ao atualizar o calendário escolar.");
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     
     const payload = {
       titulo: formData.titulo,
-      data: formData.data,
-      tipo: 'Evento',
+      data: parseISO(formData.data),
+      tipo: formData.tipo,
       hora_inicio: formData.hora_inicio,
       hora_fim: formData.hora_fim,
       local: formData.local || null,
@@ -75,6 +158,7 @@ export default function Calendario() {
 
     try {
       await addDoc(collection(db, 'eventos'), payload);
+      await logActivity(`adicionou o evento "${payload.titulo}" no calendário.`);
       toast.success('Evento adicionado com sucesso!');
       setIsOpen(false);
       resetForm();
@@ -91,8 +175,9 @@ export default function Calendario() {
     
     const payload = {
       titulo: formData.titulo,
-      data: formData.data,
+      data: parseISO(formData.data),
       hora_inicio: formData.hora_inicio,
+      tipo: formData.tipo,
       hora_fim: formData.hora_fim,
       local: formData.local || null,
     };
@@ -100,6 +185,7 @@ export default function Calendario() {
     try {
       const docRef = doc(db, 'eventos', eventoToEdit.id);
       await updateDoc(docRef, payload);
+      await logActivity(`atualizou o evento "${payload.titulo}" no calendário.`);
       toast.success('Evento atualizado com sucesso!');
       setIsEditOpen(false);
       setEventoToEdit(null);
@@ -117,6 +203,7 @@ export default function Calendario() {
     try {
       const docRef = doc(db, 'eventos', eventoToDelete.id);
       await deleteDoc(docRef);
+      await logActivity(`excluiu o evento "${eventoToDelete.titulo}" do calendário.`);
       toast.success('Evento excluído com sucesso!');
       setDeleteDialogOpen(false);
       setEventoToDelete(null);
@@ -131,6 +218,7 @@ export default function Calendario() {
     setFormData({
       titulo: '',
       data: format(selectedDate, 'yyyy-MM-dd'),
+      tipo: 'evento escolar',
       hora_inicio: '08:00',
       hora_fim: '09:00',
       local: '',
@@ -141,6 +229,10 @@ export default function Calendario() {
     if (date) {
       setSelectedDate(date);
       setFormData(prev => ({ ...prev, data: format(date, 'yyyy-MM-dd') }));
+      
+      // Se for duplo clique ou uma ação explícita, alternar dia letivo
+      // Mas o componente Calendar do shadcn/ui não suporta onDoubleClick facilmente
+      // Vamos adicionar um botão explícito para isso na interface
     }
   }
 
@@ -148,6 +240,7 @@ export default function Calendario() {
     setFormData({
       titulo: '',
       data: format(selectedDate, 'yyyy-MM-dd'),
+      tipo: 'evento escolar',
       hora_inicio: '08:00',
       hora_fim: '09:00',
       local: '',
@@ -159,8 +252,9 @@ export default function Calendario() {
     setEventoToEdit(evento);
     setFormData({
       titulo: evento.titulo,
-      data: evento.data,
+      data: format(evento.data.toDate(), 'yyyy-MM-dd'),
       hora_inicio: evento.hora_inicio || '08:00',
+      tipo: evento.tipo || 'evento escolar',
       hora_fim: evento.hora_fim || '09:00',
       local: evento.local || '',
     });
@@ -173,21 +267,28 @@ export default function Calendario() {
   }
 
   const eventosNaDataSelecionada = eventos.filter(e => 
-    isSameDay(parseISO(e.data), selectedDate)
+    isSameDay(e.data.toDate(), selectedDate)
   );
 
   const eventosDoMes = eventos.filter(e => 
-    isSameMonth(parseISO(e.data), currentMonth)
+    isSameMonth(e.data.toDate(), currentMonth)
   );
 
-  const eventDates = eventos.map(e => parseISO(e.data));
+  const eventDates = eventos.map(e => e.data.toDate());
+  const diasLetivosDates = Array.from(diasLetivos).map(d => parseISO(d));
 
   return (
-    <AppLayout title="Calendário">
+    <AppLayout title="Calendário Escolar">
       <div className="space-y-6 animate-fade-in">
-        <p className="text-muted-foreground -mt-2">Gerencie eventos e datas importantes</p>
+        <p className="text-muted-foreground -mt-2">Gerencie eventos e defina os dias letivos</p>
         
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          {isAdminOrGestor && (
+            <div className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded flex items-center">
+              <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+              Modo de Edição: Selecione uma data e clique em "Alternar Dia Letivo"
+            </div>
+          )}
           <Button onClick={openAddDialog}>
             <Plus className="h-4 w-4 mr-2" />
             Adicionar Evento
@@ -197,8 +298,18 @@ export default function Calendario() {
         <div className="grid gap-6 lg:grid-cols-2">
           {/* Calendário */}
           <Card>
-            <CardHeader className="pb-2">
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-lg">Calendário</CardTitle>
+              <div className="flex gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-100 rounded-full border border-green-300"></div>
+                  <span>Dia Letivo</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-primary/10 rounded-full"></div>
+                  <span>Evento</span>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -215,12 +326,18 @@ export default function Calendario() {
                   className="rounded-md pointer-events-auto"
                   modifiers={{
                     hasEvent: eventDates,
+                    isLetivo: diasLetivosDates
                   }}
                   modifiersStyles={{
                     hasEvent: {
                       fontWeight: 'bold',
-                      backgroundColor: 'hsl(var(--primary) / 0.1)',
-                      color: 'hsl(var(--primary))',
+                      textDecoration: 'underline',
+                      textDecorationColor: 'hsl(var(--primary))',
+                    },
+                    isLetivo: {
+                      backgroundColor: '#dcfce7', // green-100
+                      color: '#166534', // green-800
+                      fontWeight: 'bold'
                     }
                   }}
                 />
@@ -228,14 +345,40 @@ export default function Calendario() {
             </CardContent>
           </Card>
 
-          {/* Eventos do dia */}
+          {/* Detalhes do Dia */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg">
-                Eventos - {format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}
+              <CardTitle className="text-lg flex justify-between items-center">
+                <span>{format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
+                {isAdminOrGestor && (
+                  <Button 
+                    variant={diasLetivos.has(format(selectedDate, 'yyyy-MM-dd')) ? "destructive" : "outline"} 
+                    size="sm"
+                    onClick={() => toggleDiaLetivo(selectedDate)}
+                    className={diasLetivos.has(format(selectedDate, 'yyyy-MM-dd')) ? "" : "border-green-600 text-green-600 hover:bg-green-50"}
+                  >
+                    {diasLetivos.has(format(selectedDate, 'yyyy-MM-dd')) ? "Remover Dia Letivo" : "Marcar como Dia Letivo"}
+                  </Button>
+                )}
               </CardTitle>
             </CardHeader>
             <CardContent>
+              <div className="mb-6">
+                <h4 className="text-sm font-semibold text-muted-foreground mb-2">Status do Dia</h4>
+                {diasLetivos.has(format(selectedDate, 'yyyy-MM-dd')) ? (
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                    <CalendarIcon className="h-4 w-4" />
+                    Dia Letivo
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-3 py-1 bg-gray-100 text-gray-600 rounded-full text-sm font-medium">
+                    <Clock className="h-4 w-4" />
+                    Dia Não Letivo
+                  </div>
+                )}
+              </div>
+
+              <h4 className="text-sm font-semibold text-muted-foreground mb-3">Eventos</h4>
               {eventosNaDataSelecionada.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
                   <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
@@ -313,7 +456,7 @@ export default function Calendario() {
                         <h4 className="font-medium text-foreground truncate">{evento.titulo}</h4>
                         <div className="flex items-center gap-1 text-sm text-primary mt-1">
                           <CalendarIcon className="h-3.5 w-3.5" />
-                          <span>{format(parseISO(evento.data), "d 'de' MMMM", { locale: ptBR })}</span>
+                          <span>{format(evento.data.toDate(), "d 'de' MMMM", { locale: ptBR })}</span>
                         </div>
                         {(evento.hora_inicio || evento.hora_fim) && (
                           <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
@@ -367,6 +510,22 @@ export default function Calendario() {
                   onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="tipo">Tipo de Evento</Label>
+                <Select value={formData.tipo} onValueChange={(value) => setFormData({ ...formData, tipo: value })}>
+                  <SelectTrigger id="tipo">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="evento escolar">Evento Escolar</SelectItem>
+                    <SelectItem value="reuniao">Reunião</SelectItem>
+                    <SelectItem value="prova">Prova</SelectItem>
+                    <SelectItem value="feriado">Feriado</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">
@@ -455,6 +614,22 @@ export default function Calendario() {
                   onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
                   required
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-tipo">Tipo de Evento</Label>
+                <Select value={formData.tipo} onValueChange={(value) => setFormData({ ...formData, tipo: value })}>
+                  <SelectTrigger id="edit-tipo">
+                    <SelectValue placeholder="Selecione o tipo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="evento escolar">Evento Escolar</SelectItem>
+                    <SelectItem value="reuniao">Reunião</SelectItem>
+                    <SelectItem value="prova">Prova</SelectItem>
+                    <SelectItem value="feriado">Feriado</SelectItem>
+                    <SelectItem value="outro">Outro</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-2">

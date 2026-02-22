@@ -8,13 +8,13 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
-interface Aluno {
+interface Estudante {
   id: string;
   nome: string;
 }
 
 interface NotaCompleta {
-  aluno_id: string;
+  estudante_id: string;
   disciplina: string;
   media: number;
   faltas: number;
@@ -38,7 +38,7 @@ export default function AtaFinal() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
   const [turma, setTurma] = useState<Turma | null>(null);
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [Estudantes, setestudantes] = useState<Estudante[]>([]);
   const [notas, setNotas] = useState<Record<string, NotaCompleta>>({});
   const [situacoes, setSituacoes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -60,21 +60,21 @@ export default function AtaFinal() {
         setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
       }
 
-      const alunosQuery = query(collection(db, 'alunos'), where('turma_id', '==', turmaId), where('status', '==', 'Ativo'), orderBy('nome'));
-      const alunosSnapshot = await getDocs(alunosQuery);
-      const alunosData = alunosSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Aluno));
-      setAlunos(alunosData);
+      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', turmaId), where('status', '==', 'Ativo'), orderBy('nome'));
+      const estudantesSnapshot = await getDocs(estudantesQuery);
+      const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
+      setestudantes(estudantesData);
 
       // NOTE: The following data for 'notas' and 'situacoes' is mocked for demonstration.
       // In a real application, you would fetch this data from Firestore.
       const notasMap: Record<string, NotaCompleta> = {};
       const situacoesMap: Record<string, string> = {};
 
-      alunosData.forEach(aluno => {
-        situacoesMap[aluno.id] = 'Aprovado';
+      estudantesData.forEach(estudante => {
+        situacoesMap[estudante.id] = 'Aprovado';
         DISCIPLINAS.forEach(disc => {
-          notasMap[`${aluno.id}-${disc}`] = {
-            aluno_id: aluno.id,
+          notasMap[`${estudante.id}-${disc}`] = {
+            estudante_id: estudante.id,
             disciplina: disc,
             media: Math.round((Math.random() * 4 + 6) * 10) / 10,
             faltas: Math.floor(Math.random() * 10),
@@ -99,7 +99,7 @@ export default function AtaFinal() {
   }
 
   function getCapacidadeStatus() {
-    const total = alunos.length;
+    const total = Estudantes.length;
     const capacidade = turma?.capacidade || 35;
     if (total <= capacidade) {
       return { text: 'Dentro da capacidade', color: 'text-green-600' };
@@ -111,7 +111,7 @@ export default function AtaFinal() {
     <AppLayout title={`Ata Final - ${turma?.nome || ''}`}>
       <div className="space-y-6 animate-fade-in">
         <div>
-          <p className="text-muted-foreground">Resultados finais e frequência dos alunos</p>
+          <p className="text-muted-foreground">Resultados finais e frequência dos Estudantes</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
@@ -148,7 +148,7 @@ export default function AtaFinal() {
                   <p><strong>INEP:</strong> ________________</p>
                   <p><strong>CURSO:</strong> ENSINO FUNDAMENTAL</p>
                   <p><strong>TURMA:</strong> {turma?.nome}</p>
-                  <p><strong>Alunos Ativos:</strong> {alunos.length}</p>
+                  <p><strong>Estudantes Ativos:</strong> {Estudantes.length}</p>
                 </div>
                 <div className="space-y-2">
                   <p><strong>ESTABELECIMENTO DE ENSINO:</strong> ________________</p>
@@ -175,7 +175,7 @@ export default function AtaFinal() {
                 <thead>
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium" rowSpan={2}>Nº</th>
-                    <th className="p-3 text-left font-medium" rowSpan={2}>NOME DO ALUNO(A)</th>
+                    <th className="p-3 text-left font-medium" rowSpan={2}>NOME DO ESTUDANTE(A)</th>
                     {DISCIPLINAS.map((disc) => (
                       <th key={disc} className="p-2 text-center font-medium border-l" colSpan={2}>
                         {disc}
@@ -193,18 +193,18 @@ export default function AtaFinal() {
                   </tr>
                 </thead>
                 <tbody>
-                  {alunos.map((aluno, index) => (
-                    <tr key={aluno.id} className="border-b hover:bg-muted/30">
+                  {Estudantes.map((estudante, index) => (
+                    <tr key={estudante.id} className="border-b hover:bg-muted/30">
                       <td className="p-3 font-medium">{String(index + 1).padStart(2, '0')}</td>
-                      <td className="p-3 font-medium">{aluno.nome}</td>
+                      <td className="p-3 font-medium">{estudante.nome}</td>
                       {DISCIPLINAS.map((disc) => {
-                        const nota = notas[`${aluno.id}-${disc}`];
+                        const nota = notas[`${estudante.id}-${disc}`];
                         return (
                           <>
-                            <td key={`${aluno.id}-${disc}-res`} className={`p-2 text-center border-l ${getMediaColor(nota?.media || 0)}`}>
+                            <td key={`${estudante.id}-${disc}-res`} className={`p-2 text-center border-l ${getMediaColor(nota?.media || 0)}`}>
                               {nota?.media?.toFixed(1) || '-'}
                             </td>
-                            <td key={`${aluno.id}-${disc}-fal`} className="p-2 text-center">
+                            <td key={`${estudante.id}-${disc}-fal`} className="p-2 text-center">
                               {nota?.faltas || 0}
                             </td>
                           </>
@@ -212,8 +212,8 @@ export default function AtaFinal() {
                       })}
                       <td className="p-3 text-center border-l">
                         <Select 
-                          value={situacoes[aluno.id]} 
-                          onValueChange={(v) => setSituacoes(prev => ({ ...prev, [aluno.id]: v }))}
+                          value={situacoes[estudante.id]} 
+                          onValueChange={(v) => setSituacoes(prev => ({ ...prev, [estudante.id]: v }))}
                         >
                           <SelectTrigger className="w-[120px]">
                             <SelectValue />

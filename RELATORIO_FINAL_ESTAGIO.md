@@ -53,7 +53,7 @@ Relatório Final Apresentado como requisito parcial para aprovação na discipli
 
 A disciplina Estágio Curricular Supervisionado em Engenharia de Software tem como propósito fundamental proporcionar ao discente a vivência prática dos conhecimentos teóricos adquiridos ao longo da graduação, permitindo o desenvolvimento de competências técnicas, analíticas e profissionais essenciais para a atuação no mercado de trabalho. Por meio dessa experiência, o estudante tem a oportunidade de aplicar conceitos de desenvolvimento de software, arquitetura de sistemas, engenharia de requisitos, modelagem de dados e boas práticas de programação em projetos reais, consolidando sua formação acadêmica.
 
-Neste contexto, o presente relatório descreve as atividades desenvolvidas durante o período de estágio, cujo foco foi a concepção, desenvolvimento e implantação da plataforma web EducaFácil, um sistema de gestão escolar voltado à organização das rotinas de secretaria e gestão pedagógica de instituições de ensino. A plataforma foi projetada para atender às demandas administrativas e acadêmicas de escolas, oferecendo módulos integrados para cadastro de alunos, professores, turmas e equipe gestora, além de funcionalidades para gerenciamento de horários, calendário escolar, diário digital, frequência, notas e geração de relatórios.
+Neste contexto, o presente relatório descreve as atividades desenvolvidas durante o período de estágio, cujo foco foi a concepção, desenvolvimento e implantação da plataforma web EducaFácil, um sistema de gestão escolar voltado à organização das rotinas de secretaria e gestão pedagógica de instituições de ensino. A plataforma foi projetada para atender às demandas administrativas e acadêmicas de escolas, oferecendo módulos integrados para cadastro de Estudantes, professores, turmas e equipe gestora, além de funcionalidades para gerenciamento de horários, calendário escolar, diário digital, frequência, notas e geração de relatórios.
 
 O desenvolvimento da plataforma EducaFácil foi realizado utilizando tecnologias modernas de desenvolvimento web, incluindo React com Vite para a construção da interface do usuário, Tailwind CSS para estilização responsiva, e Lovable Cloud com Supabase para o gerenciamento do banco de dados PostgreSQL, autenticação de usuários e operações de persistência de dados. Essa escolha tecnológica permitiu a construção de uma aplicação robusta, escalável e de fácil manutenção, alinhada às melhores práticas da indústria de software.
 
@@ -65,13 +65,13 @@ Este relatório tem como objetivo apresentar de forma detalhada o contexto do pr
 
 ## 2.1 Objetivo Geral
 
-O objetivo geral do estágio foi desenvolver e implantar uma plataforma web completa de gestão escolar, denominada EducaFácil, contemplando módulos de cadastro e gerenciamento de alunos, professores, turmas e equipe gestora, além de funcionalidades para configuração de horários de aula, calendário escolar e eventos, diário digital com registro de frequência e notas, e geração de relatórios administrativos e pedagógicos. O projeto visou aplicar na prática os conhecimentos adquiridos ao longo do curso de Engenharia de Software, integrando conceitos de desenvolvimento frontend e backend, modelagem de dados, experiência do usuário e engenharia de software em um sistema funcional de valor real para instituições de ensino.
+O objetivo geral do estágio foi desenvolver e implantar uma plataforma web completa de gestão escolar, denominada EducaFácil, contemplando módulos de cadastro e gerenciamento de Estudantes, professores, turmas e equipe gestora, além de funcionalidades para configuração de horários de aula, calendário escolar e eventos, diário digital com registro de frequência e notas, e geração de relatórios administrativos e pedagógicos. O projeto visou aplicar na prática os conhecimentos adquiridos ao longo do curso de Engenharia de Software, integrando conceitos de desenvolvimento frontend e backend, modelagem de dados, experiência do usuário e engenharia de software em um sistema funcional de valor real para instituições de ensino.
 
 ## 2.2 Objetivos Específicos
 
 Para alcançar o objetivo geral, foram definidos os seguintes objetivos específicos:
 
-- Implementar o módulo de cadastro e gerenciamento de alunos, contemplando dados pessoais, familiares, escolares e administrativos, com funcionalidades de busca, edição e exclusão de registros.
+- Implementar o módulo de cadastro e gerenciamento de Estudantes, contemplando dados pessoais, familiares, escolares e administrativos, com funcionalidades de busca, edição e exclusão de registros.
 
 - Desenvolver o módulo de cadastro e gerenciamento de professores, incluindo informações profissionais, disciplinas lecionadas, formação acadêmica e status funcional.
 
@@ -95,9 +95,9 @@ Para alcançar o objetivo geral, foram definidos os seguintes objetivos específ
 
 ## 2.3 Justificativa
 
-A gestão eficiente de instituições de ensino representa um desafio significativo para administradores, coordenadores e professores. Muitas escolas, especialmente aquelas de menor porte ou localizadas em regiões com menor acesso a recursos tecnológicos, ainda dependem de processos manuais, planilhas eletrônicas dispersas e documentos físicos para organizar informações de alunos, turmas, horários e eventos. Essa abordagem fragmentada resulta em dificuldades para localizar informações, inconsistência de dados, retrabalho e ineficiência operacional.
+A gestão eficiente de instituições de ensino representa um desafio significativo para administradores, coordenadores e professores. Muitas escolas, especialmente aquelas de menor porte ou localizadas em regiões com menor acesso a recursos tecnológicos, ainda dependem de processos manuais, planilhas eletrônicas dispersas e documentos físicos para organizar informações de Estudantes, turmas, horários e eventos. Essa abordagem fragmentada resulta em dificuldades para localizar informações, inconsistência de dados, retrabalho e ineficiência operacional.
 
-A ausência de um sistema centralizado para gestão escolar dificulta o acompanhamento do desempenho acadêmico dos alunos, o controle de frequência, a organização de horários e a comunicação entre os diversos setores da escola. Além disso, a geração de relatórios e documentos oficiais torna-se um processo trabalhoso e propenso a erros, comprometendo a tomada de decisões e a qualidade do serviço prestado à comunidade escolar.
+A ausência de um sistema centralizado para gestão escolar dificulta o acompanhamento do desempenho acadêmico dos Estudantes, o controle de frequência, a organização de horários e a comunicação entre os diversos setores da escola. Além disso, a geração de relatórios e documentos oficiais torna-se um processo trabalhoso e propenso a erros, comprometendo a tomada de decisões e a qualidade do serviço prestado à comunidade escolar.
 
 Nesse contexto, o desenvolvimento da plataforma EducaFácil justifica-se pela necessidade de oferecer uma solução tecnológica acessível, intuitiva e completa para a gestão escolar. O sistema foi projetado para centralizar todas as informações administrativas e pedagógicas em uma única plataforma web, permitindo acesso rápido e seguro aos dados, automação de processos rotineiros e geração de relatórios precisos.
 
@@ -117,7 +117,7 @@ Inicialmente, foi realizado um estudo aprofundado do fluxo de trabalho escolar e
 
 Com base nos requisitos identificados, foi definida a arquitetura do sistema, optando-se por uma separação entre frontend e backend. Para o frontend, foram escolhidos React com Vite como framework de desenvolvimento, e Tailwind CSS para estilização. Para o backend, foi utilizado o Lovable Cloud com Supabase, que oferece banco de dados PostgreSQL, autenticação integrada e API para operações de dados.
 
-A modelagem de dados resultou na criação das seguintes tabelas principais: alunos, professores, turmas, equipe_gestora, eventos, horarios, frequencia, notas, anotacoes, usuarios e profiles. Foram definidas as relações entre as tabelas, incluindo chaves estrangeiras para associação de alunos a turmas, turmas a professores, entre outras.
+A modelagem de dados resultou na criação das seguintes tabelas principais: Estudantes, professores, turmas, equipe_gestora, eventos, horarios, frequencia, notas, anotacoes, usuarios e profiles. Foram definidas as relações entre as tabelas, incluindo chaves estrangeiras para associação de Estudantes a turmas, turmas a professores, entre outras.
 
 **3. Desenvolvimento Iterativo dos Módulos**
 
@@ -155,7 +155,7 @@ O curso de Engenharia de Software da UFAM tem como objetivo formar profissionais
 
 O projeto EducaFácil foi desenvolvido em parceria com a Escola Municipal Dom Paulo McHugh, instituição de ensino fundamental localizada no município de Itacoatiara. A escola forneceu o contexto real para o levantamento de requisitos e validação das funcionalidades desenvolvidas, possibilitando que o sistema fosse projetado para atender às necessidades concretas de uma instituição de ensino.
 
-A Escola Municipal Dom Paulo McHugh atende alunos do ensino fundamental e enfrenta os desafios típicos de gestão escolar, incluindo a necessidade de organizar informações de alunos, turmas, horários e eventos de forma eficiente. A parceria permitiu compreender as rotinas administrativas e pedagógicas da escola, orientando o desenvolvimento de funcionalidades que agregam valor real ao trabalho dos gestores e professores.
+A Escola Municipal Dom Paulo McHugh atende Estudantes do ensino fundamental e enfrenta os desafios típicos de gestão escolar, incluindo a necessidade de organizar informações de Estudantes, turmas, horários e eventos de forma eficiente. A parceria permitiu compreender as rotinas administrativas e pedagógicas da escola, orientando o desenvolvimento de funcionalidades que agregam valor real ao trabalho dos gestores e professores.
 
 ## 2.6 Atividades Desenvolvidas
 
@@ -166,7 +166,7 @@ As atividades desenvolvidas durante o estágio foram organizadas de forma a cont
 A primeira etapa do projeto consistiu no mapeamento detalhado dos módulos e funcionalidades que comporiam a plataforma EducaFácil. Foram identificados os seguintes módulos principais:
 
 - **Painel (Dashboard):** Tela inicial com visualização de estatísticas gerais, gráficos de frequência, eventos próximos e atividades recentes.
-- **Alunos:** Cadastro completo de alunos com dados pessoais, familiares, escolares e administrativos.
+- **Estudantes:** Cadastro completo de Estudantes com dados pessoais, familiares, escolares e administrativos.
 - **Professores:** Cadastro de professores com informações profissionais e acadêmicas.
 - **Turmas:** Gerenciamento de turmas com definição de série, turno, capacidade e professores.
 - **Equipe Gestora:** Cadastro de membros da administração escolar.
@@ -182,14 +182,14 @@ Foi definida a arquitetura do sistema baseada em uma Single Page Application (SP
 
 A modelagem de dados foi realizada considerando as entidades identificadas no levantamento de requisitos e seus relacionamentos. Foram criadas as seguintes tabelas no banco de dados PostgreSQL via Supabase:
 
-- **alunos:** Armazena dados completos dos alunos, incluindo nome, matrícula, data de nascimento, documentos, endereço, dados familiares, informações de saúde e dados administrativos.
+- **Estudantes:** Armazena dados completos dos Estudantes, incluindo nome, matrícula, data de nascimento, documentos, endereço, dados familiares, informações de saúde e dados administrativos.
 - **professores:** Contém informações dos professores, incluindo dados pessoais, disciplinas lecionadas, formação acadêmica e status funcional.
 - **turmas:** Registra as turmas da escola, com informações de série, turno, ano, capacidade e associação com professores.
 - **equipe_gestora:** Armazena dados dos membros da equipe gestora da escola.
 - **eventos:** Contém os eventos do calendário escolar, com data, horário, local e tipo.
 - **horarios:** Registra a grade horária de cada turma.
-- **frequencia:** Armazena os registros de frequência diária dos alunos.
-- **notas:** Contém as notas dos alunos por disciplina e bimestre.
+- **frequencia:** Armazena os registros de frequência diária dos Estudantes.
+- **notas:** Contém as notas dos Estudantes por disciplina e bimestre.
 - **profiles:** Armazena informações de perfil dos usuários autenticados.
 - **user_roles:** Gerencia os papéis e permissões dos usuários do sistema.
 
@@ -207,16 +207,16 @@ Foi criada uma estrutura de layout base composta por:
 Para cada módulo do sistema, foi desenvolvida uma página específica com as seguintes funcionalidades:
 
 **Painel (Dashboard):**
-- Cards de estatísticas mostrando total de alunos, turmas, eventos e média de notas.
+- Cards de estatísticas mostrando total de Estudantes, turmas, eventos e média de notas.
 - Gráfico de frequência semanal utilizando a biblioteca Recharts.
 - Lista de próximos eventos e atividades recentes.
 
-**Alunos:**
-- Tabela com listagem de todos os alunos cadastrados.
+**Estudantes:**
+- Tabela com listagem de todos os Estudantes cadastrados.
 - Campo de busca por nome ou matrícula.
 - Botões de ação para visualizar perfil, editar e excluir registros.
-- Formulário completo para cadastro de novos alunos com múltiplas seções.
-- Tela de perfil individual do aluno com todas as informações.
+- Formulário completo para cadastro de novos Estudantes com múltiplas seções.
+- Tela de perfil individual do estudante com todas as informações.
 
 **Professores:**
 - Tabela com listagem de professores.
@@ -270,7 +270,7 @@ A integração com o Supabase foi implementada utilizando o cliente JavaScript o
 - Exclusão de registros com confirmação.
 - Tratamento de erros de rede e banco de dados.
 
-A autenticação de usuários foi implementada utilizando o Supabase Auth, com suporte a login por email e senha. Foi desenvolvido um sistema de controle de acesso baseado em papéis (admin, gestor, professor, aluno), armazenados em uma tabela separada para garantir a segurança do sistema.
+A autenticação de usuários foi implementada utilizando o Supabase Auth, com suporte a login por email e senha. Foi desenvolvido um sistema de controle de acesso baseado em papéis (admin, gestor, professor, estudante), armazenados em uma tabela separada para garantir a segurança do sistema.
 
 ### Implementação do Sistema de Autenticação
 
@@ -306,7 +306,7 @@ O estágio supervisionado dedicado ao desenvolvimento da plataforma EducaFácil 
 
 O projeto permitiu integrar de forma significativa os conteúdos estudados ao longo do curso de Engenharia de Software. Conceitos de desenvolvimento web, incluindo a construção de interfaces responsivas com React e Tailwind CSS, foram aplicados na prática. Conhecimentos de banco de dados foram utilizados na modelagem das tabelas e na implementação das operações de persistência. Princípios de engenharia de software orientaram a organização do código em componentes reutilizáveis, a separação de responsabilidades e a adoção de boas práticas de programação. Conceitos de experiência do usuário guiaram o design da interface, buscando facilidade de uso e eficiência nas interações.
 
-Os resultados alcançados ao término do estágio incluem uma plataforma web funcional e completa para gestão escolar, contemplando todos os módulos previstos. O sistema permite o cadastro e gerenciamento de alunos, professores, turmas e equipe gestora. As funcionalidades de horário e calendário estão operacionais, assim como o diário digital com registro de frequência e notas. O módulo de relatórios permite a geração de documentos em PDF. O sistema de autenticação garante o controle de acesso aos dados. A navegação entre as telas é fluida e a interface é responsiva, adaptando-se a diferentes dispositivos.
+Os resultados alcançados ao término do estágio incluem uma plataforma web funcional e completa para gestão escolar, contemplando todos os módulos previstos. O sistema permite o cadastro e gerenciamento de Estudantes, professores, turmas e equipe gestora. As funcionalidades de horário e calendário estão operacionais, assim como o diário digital com registro de frequência e notas. O módulo de relatórios permite a geração de documentos em PDF. O sistema de autenticação garante o controle de acesso aos dados. A navegação entre as telas é fluida e a interface é responsiva, adaptando-se a diferentes dispositivos.
 
 Do ponto de vista técnico, o estágio proporcionou aprendizados valiosos em diversas áreas. O desenvolvimento com React e TypeScript consolidou conhecimentos de programação frontend moderna. A utilização do Tailwind CSS demonstrou a eficiência de abordagens utility-first para estilização. A integração com Supabase permitiu compreender o funcionamento de plataformas Backend as a Service e a importância de uma boa modelagem de dados. A implementação de autenticação e controle de acesso reforçou conceitos de segurança de sistemas. A geração de relatórios em PDF ampliou o repertório de bibliotecas e ferramentas disponíveis para desenvolvimento web.
 

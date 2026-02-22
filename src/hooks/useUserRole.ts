@@ -25,14 +25,14 @@ interface MenuItem {
 
 const allMenuItems: MenuItem[] = [
   { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'gestor', 'professor'] },
-  { title: 'Alunos', url: '/alunos', icon: Users, allowedRoles: ['admin', 'gestor'] },
+  { title: 'Estudantes', url: '/Estudantes', icon: Users, allowedRoles: ['admin', 'gestor'] },
   { title: 'Professores', url: '/professores', icon: GraduationCap, allowedRoles: ['admin', 'gestor'] },
   { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog, allowedRoles: ['admin', 'gestor'] },
   { title: 'Turmas', url: '/turmas', icon: School, allowedRoles: ['admin', 'gestor', 'professor'] },
   { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'professor'] },
   { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['admin', 'gestor', 'professor'] },
   { title: 'Relatórios', url: '/relatorios', icon: FileText, allowedRoles: ['admin', 'gestor'] },
-  { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'gestor', 'professor', 'aluno'] },
+  { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'gestor', 'professor', 'estudante'] },
   { title: 'Usuários', url: '/usuarios', icon: UserCog, allowedRoles: ['admin'] },
   { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['admin'] },
 ];
@@ -81,7 +81,7 @@ export function useUserRole() {
   const isAdmin = role === 'admin';
   const isGestor = role === 'gestor';
   const isProfessor = role === 'professor';
-  const isAluno = role === 'aluno';
+  const isEstudante = role === 'estudante';
 
   return {
     role,
@@ -89,7 +89,7 @@ export function useUserRole() {
     isAdmin,
     isGestor,
     isProfessor,
-    isAluno,
+    isEstudante,
     menuItems
   };
 }

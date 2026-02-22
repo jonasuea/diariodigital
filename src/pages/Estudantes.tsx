@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import Papa from 'papaparse';
 import { useUserRole } from '@/hooks/useUserRole';
 
-interface Aluno {
+interface Estudante {
   id: string;
   nome: string;
   matricula: string;
@@ -23,49 +23,49 @@ interface Aluno {
   turma_nome?: string;
 }
 
-export default function Alunos() {
+export default function Estudantes() {
   const navigate = useNavigate();
   const { isAdmin } = useUserRole();
-  const [alunos, setAlunos] = useState<Aluno[]>([]);
+  const [estudantes, setEstudantes] = useState<Estudante[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [alunoToDelete, setAlunoToDelete] = useState<Aluno | null>(null);
+  const [estudanteToDelete, setEstudanteToDelete] = useState<Estudante | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 
   useEffect(() => {
-    fetchAlunos();
+    fetchEstudantes();
   }, [search]);
 
-  async function fetchAlunos() {
+  async function fetchEstudantes() {
     setLoading(true);
     try {
       // NOTE: Firestore queries are case-sensitive. For case-insensitive search,
       // you would typically store a lowercase version of the field to search on.
-      let alunosQuery = query(collection(db, 'alunos'), orderBy('nome'));
+      let estudantesQuery = query(collection(db, 'estudantes'), orderBy('nome'));
 
       if (search) {
         // Firestore does not support OR queries on different fields directly.
         // A common workaround is to perform separate queries and merge the results.
         // For simplicity here, we will search by name first, and if no results, by matricula.
         // A better solution for complex search is using a dedicated search service like Algolia.
-        const searchQuery = query(collection(db, 'alunos'), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'));
+        const searchQuery = query(collection(db, 'estudantes'), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'));
         const querySnapshot = await getDocs(searchQuery);
         if (!querySnapshot.empty) {
-          alunosQuery = searchQuery;
+          estudantesQuery = searchQuery;
         } else {
-          alunosQuery = query(collection(db, 'alunos'), where('matricula', '>=', search), where('matricula', '<=', search + '\uf8ff'));
+          estudantesQuery = query(collection(db, 'estudantes'), where('matricula', '>=', search), where('matricula', '<=', search + '\uf8ff'));
         }
       }
 
-      const querySnapshot = await getDocs(alunosQuery);
-      const alunosData = await Promise.all(querySnapshot.docs.map(async (doc) => {
-        const alunoData = doc.data() as Omit<Aluno, 'id' | 'turma_nome'>;
+      const querySnapshot = await getDocs(estudantesQuery);
+      const estudantesData = await Promise.all(querySnapshot.docs.map(async (estudanteDoc) => {
+        const estudanteData = estudanteDoc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
         let turma_nome: string | undefined = '-';
 
-        if (alunoData.turma_id) {
-          const turmaDocRef = doc(db, 'turmas', alunoData.turma_id);
+        if (estudanteData.turma_id) {
+          const turmaDocRef = doc(db, 'turmas', estudanteData.turma_id);
           const turmaDoc = await getDoc(turmaDocRef);
           if (turmaDoc.exists()) {
             turma_nome = turmaDoc.data().nome;
@@ -73,37 +73,37 @@ export default function Alunos() {
         }
         
         return {
-          id: doc.id,
-          ...alunoData,
+          id: estudanteDoc.id,
+          ...estudanteData,
           turma_nome,
         };
       }));
 
-      setAlunos(alunosData);
+      setEstudantes(estudantesData);
     } catch (error) {
-      toast.error('Erro ao carregar alunos');
+      toast.error('Erro ao carregar estudantes');
       console.error(error);
     } finally {
       setLoading(false);
     }
   }
 
-  function openDeleteDialog(aluno: Aluno) {
-    setAlunoToDelete(aluno);
+  function openDeleteDialog(estudante: Estudante) {
+    setEstudanteToDelete(estudante);
     setDeleteDialogOpen(true);
   }
 
   async function handleDelete() {
-    if (!alunoToDelete) return;
+    if (!estudanteToDelete) return;
     
     try {
-      await deleteDoc(doc(db, 'alunos', alunoToDelete.id));
-      toast.success('Aluno excluído com sucesso!');
+      await deleteDoc(doc(db, 'estudantes', estudanteToDelete.id));
+      toast.success('Estudante excluído com sucesso!');
       setDeleteDialogOpen(false);
-      setAlunoToDelete(null);
-      fetchAlunos();
+      setEstudanteToDelete(null);
+      fetchEstudantes();
     } catch (error) {
-      toast.error('Erro ao excluir aluno');
+      toast.error('Erro ao excluir estudante');
       console.error(error);
     }
   }
@@ -124,7 +124,12 @@ export default function Alunos() {
         return;
       }
 
-      const text = await file.text();
+      const text = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target?.result as string);
+        reader.onerror = (error) => reject(error);
+        reader.readAsText(file, 'UTF-8');
+      });
 
       // Verificar se o arquivo não está vazio
       if (!text.trim()) {
@@ -201,13 +206,7 @@ export default function Alunos() {
         return;
       }
 
-      // Verificar se há dados após parsing
-      if (!result.data || result.data.length === 0) {
-        toast.error('O arquivo CSV não contém dados válidos após o cabeçalho.');
-        return;
-      }
-
-      const alunosData = result.data as any[];
+      const estudantesData = result.data as any[];
 
       // Verificar colunas obrigatórias
       const firstRow = result.data[0] as any;
@@ -230,8 +229,13 @@ export default function Alunos() {
       let errorCount = 0;
       let errorMessages: string[] = [];
 
-      for (let i = 0; i < alunosData.length; i++) {
-        const row = alunosData[i];
+      // Otimização: Carregar todas as matrículas existentes para a memória
+      const matriculasSnapshot = await getDocs(query(collection(db, 'estudantes'), where('matricula', '!=', '')));
+      const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
+      const matriculasInCsv = new Set();
+
+      for (let i = 0; i < estudantesData.length; i++) {
+        const row = estudantesData[i];
         const rowNumber = i + 2; // +2 porque header é linha 1 e array começa em 0
 
         try {
@@ -250,6 +254,14 @@ export default function Alunos() {
             errorCount++;
             continue;
           }
+
+          // Verificar duplicados no sistema ou no próprio CSV
+          if (existingMatriculas.has(matricula) || matriculasInCsv.has(matricula)) {
+            errorMessages.push(`Linha ${rowNumber}: Matrícula '${matricula}' já existe e foi ignorada`);
+            errorCount++;
+            continue;
+          }
+          matriculasInCsv.add(matricula);
 
           // Validar formato da data se presente
           let dataNascimento = null;
@@ -310,7 +322,7 @@ export default function Alunos() {
           }
 
           // Mapeamento dos dados
-          const alunoData = {
+          const estudanteData = {
             // Status e Informações Básicas
             status: (row.status || 'Frequentando').toString().trim() || 'Frequentando',
             matricula,
@@ -343,8 +355,8 @@ export default function Alunos() {
               return validOptions.includes(vacinacaoValue) ? vacinacaoValue : 'Não';
             })(),
             // Saúde
-            aluno_pcd: row.aluno_pcd ? Boolean(row.aluno_pcd) : false,
-            aluno_aee: row.aluno_aee ? Boolean(row.aluno_aee) : false,
+            estudante_pcd: row.estudante_pcd ? Boolean(row.estudante_pcd) : false,
+            estudante_aee: row.estudante_aee ? Boolean(row.estudante_aee) : false,
             dieta_restritiva: row.dieta_restritiva ? Boolean(row.dieta_restritiva) : false,
             // Informações Escolares
             largura_farda: row.largura_farda ? row.largura_farda.toString().trim() : null,
@@ -376,7 +388,7 @@ export default function Alunos() {
             turma_id: row.turma_id ? row.turma_id.toString().trim() : null,
           };
 
-          await addDoc(collection(db, 'alunos'), alunoData);
+          await addDoc(collection(db, 'estudantes'), estudanteData);
           successCount++;
         } catch (error) {
           errorMessages.push(`Linha ${rowNumber}: Erro ao salvar - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
@@ -387,7 +399,7 @@ export default function Alunos() {
 
       // Mostrar resultado
       if (successCount > 0) {
-        toast.success(`${successCount} alunos importados com sucesso!`);
+        toast.success(`${successCount} estudantes importados com sucesso!`);
       }
 
       if (errorCount > 0) {
@@ -404,7 +416,7 @@ export default function Alunos() {
       }
 
       setImportDialogOpen(false);
-      fetchAlunos();
+      fetchEstudantes();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       toast.error(`Erro ao processar arquivo: ${errorMessage}`);
@@ -416,16 +428,16 @@ export default function Alunos() {
 
   async function handleExportCSV() {
     try {
-      // Buscar todos os alunos sem filtros para exportação completa
-      const alunosQuery = query(collection(db, 'alunos'), orderBy('nome'));
-      const querySnapshot = await getDocs(alunosQuery);
+      // Buscar todos os estudantes sem filtros para exportação completa
+      const estudantesQuery = query(collection(db, 'estudantes'), orderBy('nome'));
+      const querySnapshot = await getDocs(estudantesQuery);
       
-      const alunosData = await Promise.all(querySnapshot.docs.map(async (doc) => {
-        const alunoData = doc.data() as Omit<Aluno, 'id' | 'turma_nome'>;
+      const estudantesData = await Promise.all(querySnapshot.docs.map(async (doc) => {
+        const estudanteData = doc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
         let turma_nome: string | undefined = '';
 
-        if (alunoData.turma_id) {
-          const turmaDocRef = doc(db, 'turmas', alunoData.turma_id);
+        if (estudanteData.turma_id) {
+          const turmaDocRef = doc(db, 'turmas', estudanteData.turma_id);
           const turmaDoc = await getDoc(turmaDocRef);
           if (turmaDoc.exists()) {
             turma_nome = turmaDoc.data().nome;
@@ -434,91 +446,87 @@ export default function Alunos() {
         
         return {
           // Status e Informações Básicas
-          status: alunoData.status || '',
-          matricula: alunoData.matricula || '',
-          nome: alunoData.nome || '',
-          foto_url: alunoData.foto_url || '',
+          status: estudanteData.status || '',
+          matricula: estudanteData.matricula || '',
+          nome: estudanteData.nome || '',
+          foto_url: estudanteData.foto_url || '',
           // Informações Pessoais
-          sexo: alunoData.sexo || '',
-          raca_cor: alunoData.raca_cor || '',
+          sexo: estudanteData.sexo || '',
+          raca_cor: estudanteData.raca_cor || '',
           // Movimentação
-          tipo_movimentacao: alunoData.tipo_movimentacao || '',
-          data_movimentacao: alunoData.data_movimentacao || '',
-          de_onde_veio: alunoData.de_onde_veio || '',
-          para_onde_vai: alunoData.para_onde_vai || '',
+          tipo_movimentacao: estudanteData.tipo_movimentacao || '',
+          data_movimentacao: estudanteData.data_movimentacao || '',
+          de_onde_veio: estudanteData.de_onde_veio || '',
+          para_onde_vai: estudanteData.para_onde_vai || '',
           // Documentos e Dados Pessoais
-          data_nascimento: alunoData.data_nascimento || '',
-          nacionalidade: alunoData.nacionalidade || '',
-          naturalidade: alunoData.naturalidade || '',
-          uf: alunoData.uf || '',
-          rg: alunoData.rg || '',
-          cpf: alunoData.cpf || '',
+          data_nascimento: estudanteData.data_nascimento || '',
+          nacionalidade: estudanteData.nacionalidade || '',
+          naturalidade: estudanteData.naturalidade || '',
+          uf: estudanteData.uf || '',
+          rg: estudanteData.rg || '',
+          cpf: estudanteData.cpf || '',
           // Programas Sociais
-          bolsa_familia: alunoData.bolsa_familia || false,
+          bolsa_familia: estudanteData.bolsa_familia || false,
           // Censo e SUS
-          censo_escola: alunoData.censo_escola || false,
-          id_censo: alunoData.id_censo || '',
-          cartao_sus: alunoData.cartao_sus || '',
-          vacinado_covid: alunoData.vacinado_covid || '',
+          censo_escola: estudanteData.censo_escola || false,
+          id_censo: estudanteData.id_censo || '',
+          cartao_sus: estudanteData.cartao_sus || '',
+          vacinado_covid: estudanteData.vacinado_covid || '',
           // Saúde
-          aluno_pcd: alunoData.aluno_pcd || false,
-          aluno_aee: alunoData.aluno_aee || false,
-          dieta_restritiva: alunoData.dieta_restritiva || false,
+          estudante_pcd: estudanteData.estudante_pcd || false,
+          estudante_aee: estudanteData.estudante_aee || false,
+          dieta_restritiva: estudanteData.dieta_restritiva || false,
           // Informações Escolares
-          largura_farda: alunoData.largura_farda || '',
-          altura_farda: alunoData.altura_farda || '',
-          pasta: alunoData.pasta || '',
-          prateleira: alunoData.prateleira || '',
-          transporte_escolar: alunoData.transporte_escolar || false,
+          largura_farda: estudanteData.largura_farda || '',
+          altura_farda: estudanteData.altura_farda || '',
+          pasta: estudanteData.pasta || '',
+          prateleira: estudanteData.prateleira || '',
+          transporte_escolar: estudanteData.transporte_escolar || false,
           // Informações da Mãe
-          mae_nome: alunoData.mae_nome || '',
-          mae_email: alunoData.mae_email || '',
-          mae_contato: alunoData.mae_contato || '',
-          mae_rg: alunoData.mae_rg || '',
-          mae_cpf: alunoData.mae_cpf || '',
+          mae_nome: estudanteData.mae_nome || '',
+          mae_email: estudanteData.mae_email || '',
+          mae_contato: estudanteData.mae_contato || '',
+          mae_rg: estudanteData.mae_rg || '',
+          mae_cpf: estudanteData.mae_cpf || '',
           // Informações do Pai
-          pai_nome: alunoData.pai_nome || '',
-          pai_email: alunoData.pai_email || '',
-          pai_contato: alunoData.pai_contato || '',
-          pai_rg: alunoData.pai_rg || '',
-          pai_cpf: alunoData.pai_cpf || '',
+          pai_nome: estudanteData.pai_nome || '',
+          pai_email: estudanteData.pai_email || '',
+          pai_contato: estudanteData.pai_contato || '',
+          pai_rg: estudanteData.pai_rg || '',
+          pai_cpf: estudanteData.pai_cpf || '',
           // Endereço
-          endereco: alunoData.endereco || '',
-          endereco_numero: alunoData.endereco_numero || '',
-          bairro: alunoData.bairro || '',
-          cidade: alunoData.cidade || '',
-          estado: alunoData.estado || '',
-          cep: alunoData.cep || '',
+          endereco: estudanteData.endereco || '',
+          endereco_numero: estudanteData.endereco_numero || '',
+          bairro: estudanteData.bairro || '',
+          cidade: estudanteData.cidade || '',
+          estado: estudanteData.estado || '',
+          cep: estudanteData.cep || '',
           // Outros
-          ano: alunoData.ano || new Date().getFullYear(),
-          turma_id: alunoData.turma_id || '',
+          ano: estudanteData.ano || new Date().getFullYear(),
+          turma_id: estudanteData.turma_id || '',
           turma_nome: turma_nome || '',
         };
       }));
 
       // Gerar CSV com ponto e vírgula (formato Excel brasileiro)
-      const csv = Papa.unparse(alunosData, {
-        delimiter: ';'
+      const csv = Papa.unparse(estudantesData, {
+        delimiter: ';',
       });
 
-      // Adicionar BOM UTF-8 para garantir que caracteres acentuados sejam exibidos corretamente
-      const BOM = '\uFEFF';
-      const csvWithBOM = BOM + csv;
-
-      // Criar blob e download
-      const blob = new Blob([csvWithBOM], { type: 'text/csv;charset=utf-8;' });
+      // Adicionar BOM para garantir a codificação UTF-8 correta no Excel
+      const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `alunos_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `estudantes_${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
-      toast.success('Arquivo CSV exportado com sucesso!');
+
+      toast.success('Exportação concluída com sucesso!');
     } catch (error) {
-      toast.error('Erro ao exportar arquivo CSV');
+      toast.error('Erro ao exportar estudantes');
       console.error(error);
     }
   }
@@ -527,32 +535,32 @@ export default function Alunos() {
     { key: 'nome', header: 'Nome' },
     { key: 'matricula', header: 'Matrícula' },
     { key: 'ano', header: 'Ano' },
-    { key: 'turma_nome', header: 'Turma', render: (aluno: Aluno) => aluno.turma_nome || '-' },
+    { key: 'turma_nome', header: 'Turma', render: (estudante: Estudante) => estudante.turma_nome || '-' },
     { 
       key: 'status', 
       header: 'Status',
-      render: (aluno: Aluno) => (
+      render: (estudante: Estudante) => (
         <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-          aluno.status === 'Ativo' || aluno.status === 'Frequentando' ? 'bg-success/10 text-success' :
-          aluno.status === 'Inativo' || aluno.status === 'Desistente' ? 'bg-muted text-muted-foreground' :
+          estudante.status === 'Ativo' || estudante.status === 'Frequentando' ? 'bg-success/10 text-success' :
+          estudante.status === 'Inativo' || estudante.status === 'Desistente' ? 'bg-muted text-muted-foreground' :
           'bg-warning/10 text-warning'
         }`}>
-          {aluno.status}
+          {estudante.status}
         </span>
       )
     },
     {
       key: 'actions',
       header: 'Ações',
-      render: (aluno: Aluno) => (
+      render: (estudante: Estudante) => (
         <div className="flex gap-2">
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/alunos/${aluno.id}`); }}>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/estudantes/${estudante.id}`); }}>
             <Eye className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/alunos/${aluno.id}/editar`); }}>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/estudantes/${estudante.id}/editar`); }}>
             <Pencil className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(aluno); }}>
+          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(estudante); }}>
             <Trash2 className="h-4 w-4 text-destructive" />
           </Button>
         </div>
@@ -561,7 +569,7 @@ export default function Alunos() {
   ];
 
   return (
-    <AppLayout title="Alunos">
+    <AppLayout title="Estudantes">
       <div className="space-y-6 animate-fade-in">
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative flex-1 max-w-md">
@@ -587,38 +595,36 @@ export default function Alunos() {
                 </Button>
               </>
             )}
-            <Button onClick={() => navigate('/alunos/novo')}>
+            <Button onClick={() => navigate('/estudantes/novo')}>
               <Plus className="h-4 w-4 mr-2" />
-              Adicionar Aluno
+              Adicionar Estudante
             </Button>
           </div>
         </div>
 
-        <DataTable columns={columns} data={alunos} loading={loading} emptyMessage="Nenhum aluno encontrado" />
+        <DataTable columns={columns} data={estudantes} loading={loading} emptyMessage="Nenhum estudante encontrado" />
 
         {/* Dialog de Importação CSV */}
         <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Importar Alunos via CSV</DialogTitle>
+              <DialogTitle>Importar Estudantes via CSV</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
+              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800 font-semibold">Instruções Importantes</p>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Para garantir que os acentos (ex: ç, ã, é) funcionem corretamente, salve seu arquivo no Excel com o formato <strong>"CSV UTF-8 (Delimitado por vírgulas)"</strong>.
+                </p>
+              </div>
               <p className="text-sm text-muted-foreground">
-                Selecione um arquivo CSV com os dados dos alunos. O arquivo deve conter as seguintes colunas:
-                nome, matricula, data_nascimento, status, endereco, bairro, cidade, estado, telefone, mae_nome, mae_contato, mae_email, pai_nome, pai_contato, pai_email, largura_farda, altura_farda, pasta, prateleira, turma_id, ano.
-                A coluna turma_nome é opcional e será gerada automaticamente se não estiver presente.
+                Selecione um arquivo CSV com os dados dos estudantes. As colunas obrigatórias são <strong>nome</strong> e <strong>matricula</strong>.
                 <br />
-                <strong>Use ponto e vírgula (;) como separador de campos.</strong>
-                <br />
-                <em>Nota: O arquivo exportado usa UTF-8 com BOM, garantindo que acentos sejam exibidos corretamente no Excel.</em>
+                Use ponto e vírgula (;) como separador de campos.
               </p>
               <p className="text-sm">
-                <a href="/exemplo_alunos.csv" download className="text-primary hover:underline">
-                  Baixar exemplo CSV (recomendado)
-                </a>
-                {' | '}
-                <a href="/exemplo_alunos_com_erros.csv" download className="text-orange-600 hover:underline">
-                  Baixar exemplo com erros (para teste)
+                <a href="/exemplo_estudantes.csv" download className="text-primary hover:underline">
+                  Baixar modelo CSV (recomendado)
                 </a>
               </p>
               <Input
@@ -632,7 +638,7 @@ export default function Alunos() {
                 }}
                 disabled={importing}
               />
-              {importing && <p className="text-sm text-muted-foreground">Importando alunos...</p>}
+              {importing && <p className="text-sm text-muted-foreground">Importando estudantes...</p>}
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => setImportDialogOpen(false)} disabled={importing}>
@@ -648,7 +654,7 @@ export default function Alunos() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o aluno "{alunoToDelete?.nome}"? 
+                Tem certeza que deseja excluir o estudante "{estudanteToDelete?.nome}"? 
                 Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>

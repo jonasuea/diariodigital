@@ -4,10 +4,13 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Mail, Phone, GraduationCap, Calendar, FileText, User } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ArrowLeft, Mail, Phone, GraduationCap, Calendar, FileText, User, Pencil, Link as LinkIcon } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 interface Formacao {
   id: string;
@@ -30,6 +33,7 @@ interface Membro {
   data_lotacao: string | null;
   formacoes: Formacao[] | null;
   biografia: string | null;
+  link_lattes: string | null;
 }
 
 export default function PerfilMembro() {
@@ -77,18 +81,9 @@ export default function PerfilMembro() {
     }
   };
 
-  const getCargoColor = (cargo: string) => {
-    switch (cargo) {
-      case 'Diretor': return 'bg-primary text-primary-foreground';
-      case 'Coordenador Pedagógico': return 'bg-success text-success-foreground';
-      case 'Secretário': return 'bg-info text-info-foreground';
-      default: return 'bg-muted text-muted-foreground';
-    }
-  };
-
   if (loading) {
     return (
-      <AppLayout title="Perfil">
+      <AppLayout title="Carregando...">
         <div className="flex justify-center py-12">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -96,122 +91,175 @@ export default function PerfilMembro() {
     );
   }
 
-  if (!membro) return null;
+  if (!membro) {
+    return (
+      <AppLayout title="Membro não encontrado">
+        <div className="text-center py-12">
+          <p className="text-muted-foreground">Membro da equipe gestora não encontrado.</p>
+          <Button className="mt-4" onClick={() => navigate('/equipe-gestora')}>
+            Voltar para Equipe Gestora
+          </Button>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
-    <AppLayout title="Equipe Gestora">
-      <div className="space-y-6 animate-fade-in max-w-4xl">
-        <Button variant="ghost" onClick={() => navigate('/equipe-gestora')} className="gap-2">
-          <ArrowLeft className="h-4 w-4" />
-          Voltar
-        </Button>
+    <AppLayout title="Detalhes do Membro da Equipe">
+      <div className="space-y-6 animate-fade-in">
+        <p className="text-muted-foreground -mt-2">
+          Visualize informações detalhadas do membro da equipe gestora
+        </p>
 
-        {/* Header com foto e info básica */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-              <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center border-4 border-border overflow-hidden">
-                {membro.foto_url ? (
-                  <img src={membro.foto_url} alt="Foto" className="w-full h-full object-cover" />
-                ) : (
-                  <User className="h-16 w-16 text-muted-foreground" />
-                )}
-              </div>
-              <div className="flex-1 text-center sm:text-left">
-                <h1 className="text-2xl font-bold text-foreground">{membro.nome}</h1>
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-2">
-                  <Badge className={getCargoColor(membro.cargo)}>{membro.cargo}</Badge>
-                  <Badge className={getStatusColor(membro.status)}>{membro.status}</Badge>
-                </div>
-                <p className="text-muted-foreground mt-2">Matrícula: {membro.matricula}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Contato */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Informações de Contato</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Mail className="h-5 w-5 text-muted-foreground" />
-                <span>{membro.email}</span>
-              </div>
-              {membro.telefone && (
-                <div className="flex items-center gap-3">
-                  <Phone className="h-5 w-5 text-muted-foreground" />
-                  <span>{membro.telefone}</span>
-                </div>
-              )}
-              {membro.data_lotacao && (
-                <div className="flex items-center gap-3">
-                  <Calendar className="h-5 w-5 text-muted-foreground" />
-                  <span>Lotado em: {new Date(membro.data_lotacao).toLocaleDateString('pt-BR')}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Documentos */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Documentos</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {membro.rg && (
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span>RG: {membro.rg}</span>
-                </div>
-              )}
-              {membro.cpf && (
-                <div className="flex items-center gap-3">
-                  <FileText className="h-5 w-5 text-muted-foreground" />
-                  <span>CPF: {membro.cpf}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="flex items-center justify-between">
+          <Button variant="outline" onClick={() => navigate('/equipe-gestora')}>
+            <ArrowLeft className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Voltar para a Lista</span>
+          </Button>
+          <Button onClick={() => navigate(`/equipe-gestora/${id}/editar`)}>
+            <Pencil className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Editar Membro</span>
+          </Button>
         </div>
 
-        {/* Formações */}
-        {membro.formacoes && membro.formacoes.length > 0 && (
-          <Card>
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Card de Informações Pessoais */}
+          <Card className="lg:col-span-1">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <GraduationCap className="h-5 w-5" />
-                Formação Acadêmica
-              </CardTitle>
+              <CardTitle>Informações Pessoais</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {membro.formacoes.map((formacao, index) => (
-                  <div key={index} className="p-4 bg-muted/50 rounded-lg">
-                    <h4 className="font-semibold">{formacao.curso}</h4>
-                    <p className="text-sm text-muted-foreground">
-                      {formacao.nivel} • Conclusão: {formacao.ano_conclusao}
-                    </p>
+            <CardContent className="flex flex-col items-center text-center">
+              <Avatar className="h-24 w-24 mb-4">
+                <AvatarImage src={membro.foto_url || undefined} />
+                <AvatarFallback className="text-2xl bg-primary/10 text-primary">
+                  {membro.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
+                </AvatarFallback>
+              </Avatar>
+
+              <h2 className="text-xl font-bold">{membro.nome}</h2>
+              <p className="text-muted-foreground">Matrícula: {membro.matricula}</p>
+
+              <div className="flex flex-wrap gap-2 mt-2">
+                <Badge variant="secondary">{membro.cargo}</Badge>
+                <Badge className={getStatusColor(membro.status)}>
+                  {membro.status}
+                </Badge>
+              </div>
+
+              <div className="w-full mt-6 space-y-4 text-left">
+                {membro.data_lotacao && (
+                  <div className="flex items-start gap-3">
+                    <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Data de Lotação</p>
+                      <p className="font-medium">
+                        {(() => {
+                          if (!membro.data_lotacao) return 'Não informada';
+                          const date = new Date(membro.data_lotacao);
+                          // Adiciona uma verificação para garantir que a data é válida
+                          if (isNaN(date.getTime())) return 'Data inválida';
+                          // O fuso horário pode ser um problema, adicionando 1 dia para corrigir datas 'off-by-one'
+                          date.setDate(date.getDate() + 1);
+                          return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+                        })()}
+                      </p>
+                    </div>
                   </div>
-                ))}
+                )}
+
+                <div className="flex items-start gap-3">
+                  <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p className="font-medium">{membro.email}</p>
+                  </div>
+                </div>
+
+                {membro.telefone && (
+                  <div className="flex items-start gap-3">
+                    <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Telefone</p>
+                      <p className="font-medium">{membro.telefone}</p>
+                    </div>
+                  </div>
+                )}
+
+                {membro.cpf && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">CPF</p>
+                      <p className="font-medium">{membro.cpf}</p>
+                    </div>
+                  </div>
+                )}
+
+                {membro.rg && (
+                  <div className="flex items-start gap-3">
+                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">RG</p>
+                      <p className="font-medium">{membro.rg}</p>
+                    </div>
+                  </div>
+                )}
+
+                {membro.link_lattes && (
+                  <div className="flex items-start gap-3">
+                    <LinkIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Currículo Lattes</p>
+                      <a href={membro.link_lattes} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
+                        Acessar currículo
+                      </a>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
-        )}
 
-        {/* Biografia */}
-        {membro.biografia && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Biografia</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-foreground whitespace-pre-wrap">{membro.biografia}</p>
-            </CardContent>
-          </Card>
-        )}
+          {/* Card de Informações Acadêmicas e Biografia */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Informações Acadêmicas</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {membro.formacoes && membro.formacoes.length > 0 ? (
+                  <div className="space-y-3">
+                    {membro.formacoes.map((formacao, i) => (
+                      <div key={i} className="flex items-start gap-4 p-3 border rounded-lg">
+                        <div className="flex-shrink-0 flex items-center justify-center h-10 w-10 rounded-full bg-primary/10 text-primary">
+                          <GraduationCap className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-base">{formacao.curso}</p>
+                          <p className="text-sm text-muted-foreground">{formacao.nivel}</p>
+                          <p className="text-xs text-muted-foreground mt-1">Concluído em {formacao.ano_conclusao}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhuma formação acadêmica registrada.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {membro.biografia && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Biografia</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{membro.biografia}</p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
       </div>
     </AppLayout>
   );

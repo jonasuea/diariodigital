@@ -5,16 +5,16 @@ Sistema completo de gestão escolar desenvolvido para facilitar a administraçã
 ## 🚀 Funcionalidades
 
 ### 📊 Painel (Dashboard)
-- Visualização de estatísticas gerais (alunos, turmas, eventos, média de notas)
+- Visualização de estatísticas gerais (Estudantes, turmas, eventos, média de notas)
 - Gráfico de frequência semanal
 - Lista de próximos eventos
 - Atividades recentes
 
-### 👨‍🎓 Alunos
-- Cadastro completo de alunos com dados pessoais, familiares e escolares
+### 👨‍🎓 Estudantes
+- Cadastro completo de Estudantes com dados pessoais, familiares e escolares
 - Busca por nome ou matrícula
 - Edição e exclusão de registros
-- Upload de foto do aluno
+- Upload de foto do estudante
 
 ### 👨‍🏫 Professores
 - Cadastro de professores com informações profissionais
@@ -27,7 +27,7 @@ Sistema completo de gestão escolar desenvolvido para facilitar a administraçã
 - Definição de capacidade e turno
 
 ### 📚 Diário Digital
-- **Frequência**: Registro diário de presença dos alunos
+- **Frequência**: Registro diário de presença dos Estudantes
 - **Notas**: Lançamento de notas por bimestre
 - **Objetos de Conhecimento**: Planejamento pedagógico
 - **Avaliações**: Gerenciamento de avaliações
@@ -60,7 +60,7 @@ Sistema completo de gestão escolar desenvolvido para facilitar a administraçã
 O sistema possui autenticação segura com:
 - Login com email e senha
 - Cadastro de novos usuários
-- Controle de acesso por perfil (admin, gestor, professor, aluno)
+- Controle de acesso por perfil (admin, gestor, professor, estudante)
 
 ## 📱 Como Usar
 
@@ -75,9 +75,9 @@ O sistema possui autenticação segura com:
 - O painel inicial mostra um resumo geral do sistema
 - Clique nos cards de estatísticas para acessar as respectivas páginas
 
-### 3. Cadastro de Alunos
-1. Acesse "Alunos" no menu lateral
-2. Clique em "Novo Aluno"
+### 3. Cadastro de Estudantes
+1. Acesse "Estudantes" no menu lateral
+2. Clique em "Novo Estudante"
 3. Preencha os dados obrigatórios: nome, matrícula, ano
 4. Complete as informações adicionais conforme necessário
 5. Clique em "Salvar"
@@ -94,7 +94,7 @@ O sistema possui autenticação segura com:
 2. Selecione o professor e a turma
 3. Clique em "Frequência"
 4. Selecione a data desejada
-5. Marque a presença/ausência de cada aluno
+5. Marque a presença/ausência de cada estudante
 6. Salve o registro
 
 ### 6. Lançamento de Notas
@@ -102,7 +102,7 @@ O sistema possui autenticação segura com:
 2. Selecione o professor e a turma
 3. Clique em "Notas"
 4. Selecione a disciplina e o bimestre
-5. Lance as notas de cada aluno
+5. Lance as notas de cada estudante
 6. Salve as alterações
 
 ### 7. Cadastro de Eventos

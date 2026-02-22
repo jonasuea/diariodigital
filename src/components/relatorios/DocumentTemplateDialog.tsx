@@ -13,9 +13,9 @@ interface DocumentTemplateDialogProps {
 }
 
 const VARIABLES = [
-  { name: '[NOME_ALUNO]', description: 'Nome do aluno' },
-  { name: '[RG_ALUNO]', description: 'RG do aluno' },
-  { name: '[CPF_ALUNO]', description: 'CPF do aluno' },
+  { name: '[NOME_estudante]', description: 'Nome do estudante' },
+  { name: '[RG_estudante]', description: 'RG do estudante' },
+  { name: '[CPF_estudante]', description: 'CPF do estudante' },
   { name: '[TURMA]', description: 'Nome da turma' },
   { name: '[ANO_SERIE]', description: 'Ano/Série' },
   { name: '[ANO_LETIVO]', description: 'Ano letivo' },
@@ -50,7 +50,7 @@ export function DocumentTemplateDialog({ open, onOpenChange, title, defaultTempl
         <DialogHeader>
           <DialogTitle>Editar Modelo - {title}</DialogTitle>
           <DialogDescription>
-            Edite o modelo do documento. Use variáveis como [NOME_ALUNO], [TURMA], [DATA] etc. Este modelo será usado para impressão em papel timbrado.
+            Edite o modelo do documento. Use variáveis como [NOME_estudante], [TURMA], [DATA] etc. Este modelo será usado para impressão em papel timbrado.
           </DialogDescription>
         </DialogHeader>
         
@@ -86,7 +86,7 @@ export function DocumentTemplateDialog({ open, onOpenChange, title, defaultTempl
 export const DEFAULT_TEMPLATES = {
   declaracaoMatricula: `DECLARAÇÃO DE MATRÍCULA
 
-Declaro para os devidos fins que o(a) aluno(a) [NOME_ALUNO], portador(a) do RG nº [RG_ALUNO] e CPF nº [CPF_ALUNO], está devidamente matriculado(a) nesta instituição de ensino no [ANO_SERIE] do Ensino [NIVEL_ENSINO], no ano letivo de [ANO_LETIVO], turno [TURNO].
+Declaro para os devidos fins que o(a) estudante(a) [NOME_estudante], portador(a) do RG nº [RG_estudante] e CPF nº [CPF_estudante], está devidamente matriculado(a) nesta instituição de ensino no [ANO_SERIE] do Ensino [NIVEL_ENSINO], no ano letivo de [ANO_LETIVO], turno [TURNO].
 
 [CIDADE], [DATA]
 
@@ -96,7 +96,7 @@ Diretor(a)`,
 
   termoMatricula: `TERMO DE MATRÍCULA
 
-Pelo presente termo, fica matriculado(a) nesta instituição o(a) aluno(a) [NOME_ALUNO], filho(a) de [NOME_PAI] e [NOME_MAE], nascido(a) em [DATA_NASCIMENTO], natural de [NATURALIDADE], portador(a) do RG nº [RG_ALUNO] e CPF nº [CPF_ALUNO].
+Pelo presente termo, fica matriculado(a) nesta instituição o(a) estudante(a) [NOME_estudante], filho(a) de [NOME_PAI] e [NOME_MAE], nascido(a) em [DATA_NASCIMENTO], natural de [NATURALIDADE], portador(a) do RG nº [RG_estudante] e CPF nº [CPF_estudante].
 
 Série/Ano: [ANO_SERIE]
 Turma: [TURMA]
@@ -106,11 +106,11 @@ Ano Letivo: [ANO_LETIVO]
 [CIDADE], [DATA]
 
 _________________________________          _________________________________
-Responsável pela Matrícula                 Responsável pelo Aluno`,
+Responsável pela Matrícula                 Responsável pelo estudante`,
 
   termoCompromisso: `TERMO DE COMPROMISSO E CONDUTA
 
-O(A) aluno(a) [NOME_ALUNO], matriculado(a) no [ANO_SERIE] da turma [TURMA], e seu responsável [NOME_RESPONSAVEL], comprometem-se a:
+O(A) estudante(a) [NOME_estudante], matriculado(a) no [ANO_SERIE] da turma [TURMA], e seu responsável [NOME_RESPONSAVEL], comprometem-se a:
 
 1. Respeitar as normas da instituição;
 2. Zelar pelo patrimônio escolar;
@@ -121,11 +121,11 @@ O(A) aluno(a) [NOME_ALUNO], matriculado(a) no [ANO_SERIE] da turma [TURMA], e se
 [CIDADE], [DATA]
 
 _________________________________          _________________________________
-Aluno(a)                                   Responsável`,
+estudante(a)                                   Responsável`,
 
   autorizacaoSaida: `AUTORIZAÇÃO PARA ATIVIDADE EXTERNA
 
-Eu, [NOME_RESPONSAVEL], responsável pelo(a) aluno(a) [NOME_ALUNO], da turma [TURMA], autorizo sua participação na atividade externa denominada "[ATIVIDADE]", que ocorrerá em [DATA_ATIVIDADE], das [HORARIO_INICIO] às [HORARIO_FIM], no local [LOCAL_ATIVIDADE].
+Eu, [NOME_RESPONSAVEL], responsável pelo(a) estudante(a) [NOME_estudante], da turma [TURMA], autorizo sua participação na atividade externa denominada "[ATIVIDADE]", que ocorrerá em [DATA_ATIVIDADE], das [HORARIO_INICIO] às [HORARIO_FIM], no local [LOCAL_ATIVIDADE].
 
 Declaro estar ciente dos riscos e responsabilidades envolvidas.
 

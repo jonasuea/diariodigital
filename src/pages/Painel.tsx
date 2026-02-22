@@ -1,31 +1,37 @@
 import { useEffect, useState } from 'react';
-import { useUserRole } from '@/hooks/useUserRole';
-import { useAuth } from '@/contexts/AuthContext';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Users, School, Calendar, Trophy, UserCircle, FileText, ChevronRight, BookOpen } from 'lucide-react';
+import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, limit, getDocs, getCountFromServer, Query } from 'firebase/firestore';
-import { format, startOfMonth, endOfMonth, getDay, parseISO, formatDistanceToNow } from 'date-fns';
+import { toast } from 'sonner';
+import { format, formatDistanceToNow, startOfWeek, endOfWeek, startOfMonth, getDay, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
+import { List, User, Clock, Users, Calendar, BookOpen, Trophy } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip as RechartsTooltip } from 'recharts';
 import { useNavigate } from 'react-router-dom';
-import { formatInTimeZone } from 'date-fns-tz';
+import { cn } from '@/lib/utils';
 
-interface DashboardStats {
-  totalAlunos: number;
-  totalTurmas: number;
-  totalEventos: number;
-  mediaNotas: number | null;
+interface ActivityLog {
+  id: string;
+  user_name: string;
+  action: string;
+  created_at: Timestamp;
 }
 
 interface Evento {
   id: string;
   titulo: string;
-  data: string;
+  data: Timestamp;
   tipo: string;
+}
+
+interface DashboardStats {
+  totalEstudantes: number;
+  totalTurmas: number;
+  totalEventos: number;
+  totalProfessores: number;
+  mediaNotas: number | null;
 }
 
 interface FrequenciaData {
@@ -33,75 +39,97 @@ interface FrequenciaData {
   presencas: number;
 }
 
-interface AtividadeRecente {
-  id: string;
-  tipo: 'presenca' | 'nota' | 'evento' | 'aluno' | 'professor' | 'turma';
-  descricao: string;
-  tempo: string;
-  created_at: string;
-}
+const DIAS_SEMANA_CHART = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
-const DIAS_SEMANA = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+function StatCard({ title, value, icon: Icon, onClick }: { title: string, value: string | number, icon: React.ElementType, onClick?: () => void }) {
+  return (
+    <Card onClick={onClick} className={cn(onClick ? 'cursor-pointer hover:bg-muted/50 transition-colors' : '')}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-bold">{value}</div>
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Painel() {
   const navigate = useNavigate();
-  const { user } = useAuth();
-  const { role } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
-    totalAlunos: 0,
+    totalEstudantes: 0,
     totalTurmas: 0,
     totalEventos: 0,
+    totalProfessores: 0,
     mediaNotas: null,
   });
   const [proximosEventos, setProximosEventos] = useState<Evento[]>([]);
   const [frequenciaData, setFrequenciaData] = useState<FrequenciaData[]>([]);
-  const [atividadesRecentes, setAtividadesRecentes] = useState<AtividadeRecente[]>([]);
-  const [periodoFrequencia, setPeriodoFrequencia] = useState('mes');
+  const [atividadesRecentes, setAtividadesRecentes] = useState<ActivityLog[]>([]);
+  const [periodoFrequencia, setPeriodoFrequencia] = useState('semana');
   const [loading, setLoading] = useState(true);
 
-  const canViewRecentActivities = role === 'admin' || role === 'gestor';
-
   useEffect(() => {
-    if (user && role) {
-      fetchData();
-      if (canViewRecentActivities) {
-        fetchAtividadesRecentes();
+    async function fetchAllData() {
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchStatsAndEvents(),
+          fetchFrequenciaData(periodoFrequencia),
+          fetchAtividadesRecentes()
+        ]);
+      } catch (error) {
+        console.error("Erro ao carregar dados do painel:", error);
+        toast.error("Não foi possível carregar todos os dados do painel.");
+      } finally {
+        setLoading(false);
       }
     }
-  }, [user, role, canViewRecentActivities]);
+    fetchAllData();
+  }, []);
 
   useEffect(() => {
-    fetchFrequenciaData();
+    fetchFrequenciaData(periodoFrequencia);
   }, [periodoFrequencia]);
 
-  async function fetchData() {
+  async function fetchStatsAndEvents() {
     try {
-      const hoje = new Date().toISOString().split('T')[0];
-      
-      // Fetch stats (remains the same)
-      const [alunosSnap, turmasSnap, notasRes] = await Promise.all([
-        getCountFromServer(collection(db, 'alunos')),
+      const hojeDate = new Date();
+      hojeDate.setHours(0, 0, 0, 0);
+      const hojeStr = format(hojeDate, 'yyyy-MM-dd');
+
+      const [estudantesSnap, turmasSnap, profsSnap, notasRes, eventosTimestampRes, eventosStringRes] = await Promise.all([
+        getCountFromServer(collection(db, 'estudantes')),
         getCountFromServer(collection(db, 'turmas')),
+        getCountFromServer(collection(db, 'professores')),
         getDocs(collection(db, 'notas')),
+        getDocs(query(collection(db, 'eventos'), where('data', '>=', hojeDate), orderBy('data', 'asc'))),
+        getDocs(query(collection(db, 'eventos'), where('data', '>=', hojeStr), orderBy('data', 'asc')))
       ]);
 
-      // Eventos Query Logic - Refactored to filter on the client
-      const eventosQuery = query(
-        collection(db, 'eventos'),
-        where('data', '>=', hoje),
-        orderBy('data')
-      );
-      const proximosRes = await getDocs(eventosQuery);
-      const todosEventos = proximosRes.docs.map(doc => ({ id: doc.id, ...doc.data() as { creator_id?: string } } as Evento & { creator_id?: string }));
+      const eventosMap = new Map<string, Evento>();
 
-      const eventosFiltrados = todosEventos;
+      eventosTimestampRes.docs.forEach(doc => {
+        eventosMap.set(doc.id, { id: doc.id, ...doc.data() } as Evento);
+      });
+
+      eventosStringRes.docs.forEach(doc => {
+        if (!eventosMap.has(doc.id)) {
+          const data = doc.data();
+          const timestamp = Timestamp.fromDate(parseISO(data.data as string));
+          eventosMap.set(doc.id, { ...data, id: doc.id, data: timestamp } as Evento);
+        }
+      });
+
+      const eventosData = Array.from(eventosMap.values())
+        .sort((a, b) => a.data.toMillis() - b.data.toMillis())
+        .slice(0, 5);
       
-      
-      // Calculate average notes
       let mediaNotas: number | null = null;
       const notasData = notasRes.docs.map(doc => doc.data());
       if (notasData.length > 0) {
-        const notasValidas = notasData.filter(n => n.media_anual != null);
+        const notasValidas = notasData.filter(n => n.media_anual != null && typeof n.media_anual === 'number');
         if (notasValidas.length > 0) {
           const soma = notasValidas.reduce((acc, n) => acc + (n.media_anual || 0), 0);
           mediaNotas = Math.round((soma / notasValidas.length) * 10) / 10;
@@ -109,112 +137,36 @@ export default function Painel() {
       }
 
       setStats({
-        totalAlunos: alunosSnap.data().count,
+        totalEstudantes: estudantesSnap.data().count,
         totalTurmas: turmasSnap.data().count,
-        totalEventos: eventosFiltrados.length,
+        totalProfessores: profsSnap.data().count,
+        totalEventos: eventosData.length,
         mediaNotas,
       });
 
-      setProximosEventos(eventosFiltrados.slice(0, 5));
+      setProximosEventos(eventosData);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error fetching stats and events:', error);
+      toast.error("Erro ao carregar estatísticas e eventos.");
     }
   }
 
-  async function fetchAtividadesRecentes() {
-    // ... (rest of the function is unchanged)
-    try {
-      const atividades: AtividadeRecente[] = [];
-      const now = new Date();
-
-      const collectionsToFetch = ['frequencia', 'notas', 'eventos', 'alunos'];
-      
-      const promises = collectionsToFetch.map(async (coll) => {
-        const q = query(collection(db, coll), orderBy('created_at', 'desc'), limit(5));
-        return getDocs(q);
-      });
-
-      const snapshots = await Promise.all(promises);
-
-      // Process Frequencias
-      snapshots[0].forEach(doc => {
-        const data = doc.data();
-        if (data.created_at) {
-          atividades.push({
-            id: `freq-${doc.id}`,
-            tipo: 'presenca',
-            descricao: `Presença registrada`,
-            tempo: formatDistanceToNow(data.created_at.toDate(), { addSuffix: true, locale: ptBR }),
-            created_at: data.created_at.toDate().toISOString(),
-          });
-        }
-      });
-      
-      snapshots[1].forEach(doc => {
-        const data = doc.data();
-        if (data.created_at) {
-          atividades.push({
-            id: `nota-${doc.id}`,
-            tipo: 'nota',
-            descricao: `Notas registradas para ${data.disciplina}`,
-            tempo: formatDistanceToNow(data.created_at.toDate(), { addSuffix: true, locale: ptBR }),
-            created_at: data.created_at.toDate().toISOString(),
-          });
-        }
-      });
-      
-      snapshots[2].forEach(doc => {
-        const data = doc.data();
-        if (data.created_at) {
-          atividades.push({
-            id: `evento-${doc.id}`,
-            tipo: 'evento',
-            descricao: `Evento "${data.titulo}" foi adicionado`,
-            tempo: formatDistanceToNow(data.created_at.toDate(), { addSuffix: true, locale: ptBR }),
-            created_at: data.created_at.toDate().toISOString(),
-          });
-        }
-      });
-      
-      snapshots[3].forEach(doc => {
-        const data = doc.data();
-        if (data.created_at) {
-          atividades.push({
-            id: `aluno-${doc.id}`,
-            tipo: 'aluno',
-            descricao: `Aluno ${data.nome} foi cadastrado`,
-            tempo: formatDistanceToNow(data.created_at.toDate(), { addSuffix: true, locale: ptBR }),
-            created_at: data.created_at.toDate().toISOString(),
-          });
-        }
-      });
-
-      atividades.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setAtividadesRecentes(atividades.slice(0, 6));
-    } catch (error) {
-      console.error('Error fetching recent activities:', error);
-    }
-  }
-
-  async function fetchFrequenciaData() {
+  async function fetchFrequenciaData(periodo: string) {
     try {
       const hoje = new Date();
       let dataInicio: Date;
       let dataFim: Date = hoje;
 
-      if (periodoFrequencia === 'mes') {
+      if (periodo === 'mes') {
         dataInicio = startOfMonth(hoje);
-      } else {
-        dataInicio = new Date(hoje);
-        dataInicio.setDate(dataInicio.getDate() - 7);
+      } else { // semana
+        dataInicio = startOfWeek(hoje, { weekStartsOn: 1 }); // Monday
       }
 
       const q = query(
-        collection(db, 'frequencia'), 
-        where('data', '>=', dataInicio), 
-        where('data', '<=', dataFim)
+        collection(db, 'frequencias'), 
+        where('data', '>=', format(dataInicio, 'yyyy-MM-dd')), 
+        where('data', '<=', format(dataFim, 'yyyy-MM-dd'))
       );
 
       const querySnapshot = await getDocs(q);
@@ -222,136 +174,92 @@ export default function Painel() {
 
       const diasAgrupados: { [key: number]: number } = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
       
-      if (frequencias) {
-        frequencias.forEach(f => {
-          if (f.status === 'presente') {
-            const diaSemana = getDay(f.data.toDate());
-            diasAgrupados[diaSemana]++;
-          }
-        });
-      }
+      frequencias.forEach(f => {
+        if (f.status === 'presente') {
+          const diaSemana = getDay(parseISO(f.data));
+          diasAgrupados[diaSemana]++;
+        }
+      });
 
       const dadosGrafico: FrequenciaData[] = [1, 2, 3, 4, 5].map(dia => ({
-        dia: DIAS_SEMANA[dia],
-        presencas: diasAgrupados[dia],
+        dia: DIAS_SEMANA_CHART[dia],
+        presencas: diasAgrupados[dia] || 0,
       }));
 
       setFrequenciaData(dadosGrafico);
     } catch (error) {
       console.error('Error fetching frequency data:', error);
+      toast.error("Erro ao carregar dados de frequência.");
     }
   }
 
-  const getTipoIcon = (tipo: string) => {
-    switch (tipo.toLowerCase()) {
-      case 'reunião': return 'bg-blue-100 text-blue-600';
-      case 'avaliação': return 'bg-amber-100 text-amber-600';
-      case 'feriado': return 'bg-green-100 text-green-600';
-      case 'festa': return 'bg-pink-100 text-pink-600';
-      default: return 'bg-purple-100 text-purple-600';
+  async function fetchAtividadesRecentes() {
+    try {
+      const q = query(collection(db, 'activity_log'), orderBy('created_at', 'desc'), limit(10));
+      const querySnapshot = await getDocs(q);
+      const activitiesData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as ActivityLog));
+      setAtividadesRecentes(activitiesData);
+    } catch (error) {
+      console.error("Erro ao buscar atividades recentes:", error);
+      toast.error("Não foi possível carregar o log de atividades.");
     }
-  };
+  }
 
-  const getAtividadeIcon = (tipo: string) => {
-    switch (tipo) {
-      case 'presenca': return <UserCircle className="h-5 w-5" />;
-      case 'nota': return <FileText className="h-5 w-5" />;
-      case 'evento': return <Calendar className="h-5 w-5" />;
-      case 'aluno': return <Users className="h-5 w-5" />;
-      case 'professor': return <BookOpen className="h-5 w-5" />;
-      case 'turma': return <School className="h-5 w-5" />;
-      default: return <FileText className="h-5 w-5" />;
-    }
-  };
-
-  const getAtividadeColor = (tipo: string) => {
-    switch (tipo) {
-      case 'presenca': return 'bg-blue-100 text-blue-600';
-      case 'nota': return 'bg-purple-100 text-purple-600';
-      case 'evento': return 'bg-amber-100 text-amber-600';
-      case 'aluno': return 'bg-green-100 text-green-600';
-      case 'professor': return 'bg-indigo-100 text-indigo-600';
-      case 'turma': return 'bg-pink-100 text-pink-600';
-      default: return 'bg-gray-100 text-gray-600';
+  const getEventTypeVariant = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'feriado': return 'bg-red-100 text-red-800 border border-red-200';
+      case 'prova': return 'bg-yellow-100 text-yellow-800 border border-yellow-200';
+      case 'reuniao': return 'bg-blue-100 text-blue-800 border border-blue-200';
+      case 'evento escolar': return 'bg-green-100 text-green-800 border border-green-200';
+      default: return 'bg-gray-100 text-gray-800 border border-gray-200';
     }
   };
 
   return (
-    <AppLayout title="Dashboard">
+    <AppLayout title="Painel">
       <div className="space-y-6 animate-fade-in">
-        <p className="text-muted-foreground -mt-2">Bem-vindo à Secretaria Digital</p>
-
-        {/* Stats Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Alunos</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalAlunos}</div>
-              <p className="text-xs text-muted-foreground">+5,2% este mês</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Total de Turmas</CardTitle>
-              <School className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalTurmas}</div>
-              <p className="text-xs text-muted-foreground">ativas</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Eventos</CardTitle>
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalEventos}</div>
-              <p className="text-xs text-muted-foreground">+2,1% próximos 30 dias</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">Média de Notas</CardTitle>
-              <Trophy className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.mediaNotas ?? '-'}</div>
-              <p className="text-xs text-muted-foreground">+0,8% último bimestre</p>
-            </CardContent>
-          </Card>
+        <div>
+          <h1 className="text-3xl font-bold">Painel</h1>
+          <p className="text-muted-foreground">Visão geral do sistema escolar.</p>
         </div>
 
-        {/* Charts and Events Row */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Total de Estudantes" value={loading ? '...' : stats.totalEstudantes} icon={Users} onClick={() => navigate('/estudantes')} />
+          <StatCard title="Total de Professores" value={loading ? '...' : stats.totalProfessores} icon={Users} onClick={() => navigate('/professores')} />
+          <StatCard title="Total de Turmas" value={loading ? '...' : stats.totalTurmas} icon={BookOpen} onClick={() => navigate('/turmas')} />
+          <StatCard title="Média Geral de Notas" value={loading ? '...' : stats.mediaNotas?.toFixed(1) || 'N/A'} icon={Trophy} />
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Frequência */}
           <Card className="lg:col-span-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg font-semibold">Estatísticas de Frequência</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Frequência Geral</CardTitle>
+                <CardDescription>Total de presenças por dia.</CardDescription>
+              </div>
               <Select value={periodoFrequencia} onValueChange={setPeriodoFrequencia}>
                 <SelectTrigger className="w-[120px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="mes">Este mês</SelectItem>
-                  <SelectItem value="semana">Esta semana</SelectItem>
+                  <SelectItem value="semana">Esta Semana</SelectItem>
+                  <SelectItem value="mes">Este Mês</SelectItem>
                 </SelectContent>
               </Select>
             </CardHeader>
-            <CardContent className="h-[300px] pt-4">
+            <CardContent className="h-[300px] pr-0">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={frequenciaData} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                  <XAxis dataKey="dia" tickLine={false} axisLine={false} tickMargin={10} />
-                  <YAxis tickLine={false} axisLine={false} tickMargin={10} allowDecimals={false} />
-                  <Tooltip
-                    cursor={{ fill: 'hsl(var(--muted))' }}
+                <BarChart data={frequenciaData}>
+                  <XAxis dataKey="dia" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
+                  <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <RechartsTooltip
                     contentStyle={{
-                      background: 'hsl(var(--background))',
+                      backgroundColor: 'hsl(var(--card))',
+                      borderColor: 'hsl(var(--border))',
                       borderRadius: 'var(--radius)',
-                      border: '1px solid hsl(var(--border))',
                     }}
                   />
                   <Bar dataKey="presencas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
@@ -360,72 +268,88 @@ export default function Painel() {
             </CardContent>
           </Card>
 
-          {/* Próximos Eventos */}
           <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold">Próximos Eventos</CardTitle>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Próximos Eventos
+              </CardTitle>
+              <CardDescription>
+                Os próximos 5 eventos no calendário escolar.
+              </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="h-[300px] overflow-y-auto pr-4">
               {loading ? (
-                <div className="flex justify-center py-8">
-                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-                </div>
-              ) : proximosEventos.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  <p>Nenhum evento futuro</p>
-                </div>
+                <p className="text-sm text-muted-foreground text-center py-4">Carregando eventos...</p>
               ) : (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                  {proximosEventos.map((evento) => (
-                    <div key={evento.id} className="flex items-start gap-3">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${getTipoIcon(evento.tipo)}`}>
-                        <Calendar className="h-4 w-4" />
+                <div className="space-y-4">
+                  {proximosEventos.length > 0 ? (
+                    proximosEventos.map(evento => (
+                      <div key={evento.id} className="flex items-start gap-4">
+                        <div className="flex-shrink-0 text-center font-semibold bg-muted p-2 rounded-md w-14">
+                          <div className="text-xs uppercase text-red-600">{format(evento.data.toDate(), 'MMM', { locale: ptBR })}</div>
+                          <div className="text-xl">{format(evento.data.toDate(), 'dd')}</div>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold leading-tight">{evento.titulo}</p>
+                          <p className={`text-xs font-medium inline-flex items-center px-2 py-0.5 rounded-full mt-1 ${getEventTypeVariant(evento.tipo)}`}>
+                            {evento.tipo}
+                          </p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm text-foreground truncate">{evento.titulo}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {formatInTimeZone(evento.data, 'America/Sao_Paulo', "d MMM, yyyy", { locale: ptBR })}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento futuro encontrado.</p>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Atividades Recentes */}
-        {canViewRecentActivities && (
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg font-semibold">Atividades Recentes</CardTitle>
-              <Button variant="link" size="sm" className="h-auto p-0" onClick={fetchAtividadesRecentes}>
-                Atualizar
-                <ChevronRight className="h-4 w-4 ml-1" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {atividadesRecentes.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8">Nenhuma atividade recente.</p>
-              ) : (
-                <div className="space-y-4">
-                  {atividadesRecentes.map((atividade) => (
-                    <div key={atividade.id} className="flex items-start gap-3">
-                      <div className={`h-8 w-8 rounded-full flex items-center justify-center flex-shrink-0 ${getAtividadeColor(atividade.tipo)}`}>
-                        {getAtividadeIcon(atividade.tipo)}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <List className="h-5 w-5" />
+              Atividades Recentes
+            </CardTitle>
+            <CardDescription>
+              Log das últimas interações no sistema.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Carregando atividades...</p>
+            ) : (
+              <div className="space-y-4">
+                {atividadesRecentes.length > 0 ? (
+                  atividadesRecentes.map(activity => (
+                    <div key={activity.id} className="flex items-start gap-3">
+                      <div className="flex-shrink-0 pt-1">
+                        <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        </div>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm text-foreground">{atividade.descricao}</p>
-                        <p className="text-xs text-muted-foreground">{atividade.tempo}</p>
+                      <div className="flex-1">
+                        <p className="text-sm">
+                          <span className="font-semibold">{activity.user_name || 'Usuário do Sistema'}</span> {activity.action}
+                        </p>
+                        <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                          <Clock className="h-3 w-3" />
+                          {activity.created_at ? formatDistanceToNow(activity.created_at.toDate(), { addSuffix: true, locale: ptBR }) : 'agora mesmo'}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    Nenhuma atividade registrada ainda.
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </AppLayout>
   );

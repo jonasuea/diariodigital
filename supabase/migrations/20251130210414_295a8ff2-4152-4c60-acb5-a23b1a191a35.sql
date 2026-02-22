@@ -30,7 +30,7 @@ ADD COLUMN IF NOT EXISTS capacidade integer DEFAULT 30;
 -- Create notas table
 CREATE TABLE IF NOT EXISTS public.notas (
   id serial PRIMARY KEY,
-  aluno_id integer REFERENCES public.alunos(id) ON DELETE CASCADE NOT NULL,
+  estudante_id integer REFERENCES public.Estudantes(id) ON DELETE CASCADE NOT NULL,
   turma_id integer REFERENCES public.turmas(id) ON DELETE CASCADE NOT NULL,
   disciplina text NOT NULL,
   bimestre_1 numeric(4,2),
@@ -59,12 +59,12 @@ CREATE TABLE IF NOT EXISTS public.notas (
 -- Create frequencia table  
 CREATE TABLE IF NOT EXISTS public.frequencia (
   id serial PRIMARY KEY,
-  aluno_id integer REFERENCES public.alunos(id) ON DELETE CASCADE NOT NULL,
+  estudante_id integer REFERENCES public.Estudantes(id) ON DELETE CASCADE NOT NULL,
   turma_id integer REFERENCES public.turmas(id) ON DELETE CASCADE NOT NULL,
   data date NOT NULL,
   status text NOT NULL DEFAULT 'presente' CHECK (status IN ('presente', 'faltou', 'justificado')),
   created_at timestamp with time zone DEFAULT now(),
-  UNIQUE(aluno_id, turma_id, data)
+  UNIQUE(estudante_id, turma_id, data)
 );
 
 -- Enable RLS on new tables
