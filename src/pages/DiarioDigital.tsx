@@ -97,7 +97,7 @@ export default function DiarioDigital() {
       icon: BookOpen,
       color: 'text-green-500',
       bgColor: 'bg-green-50',
-      action: () => {},
+      action: () => navigate(selectedTurma ? `/diario-digital/objetos-de-conhecimento/${selectedTurma}` : '/diario-digital/objetos-de-conhecimento'),
     },
     {
       title: 'Avaliações',

@@ -192,7 +192,6 @@ export default function Configuracoes() {
       const dataToUpdate = {
         nome: profileData.nome,
         telefone: profileData.telefone,
-        cargo: profileData.cargo,
       };
       await setDoc(profileDocRef, dataToUpdate, { merge: true });
 
@@ -678,7 +677,7 @@ export default function Configuracoes() {
                     id="profile-cargo"
                     className="pl-10"
                     value={profileData.cargo}
-                    onChange={(e) => setProfileData({ ...profileData, cargo: e.target.value })}
+                    disabled
                   />
                 </div>
               </div>

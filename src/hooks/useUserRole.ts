@@ -13,6 +13,7 @@ import {
   Calendar, 
   BookOpen, 
   Settings,
+  User,
   LucideIcon
 } from 'lucide-react';
 
@@ -24,15 +25,16 @@ interface MenuItem {
 }
 
 const allMenuItems: MenuItem[] = [
-  { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'gestor', 'professor'] },
-  { title: 'Estudantes', url: '/Estudantes', icon: Users, allowedRoles: ['admin', 'gestor'] },
-  { title: 'Professores', url: '/professores', icon: GraduationCap, allowedRoles: ['admin', 'gestor'] },
-  { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog, allowedRoles: ['admin', 'gestor'] },
-  { title: 'Turmas', url: '/turmas', icon: School, allowedRoles: ['admin', 'gestor', 'professor'] },
-  { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'professor'] },
-  { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['admin', 'gestor', 'professor'] },
-  { title: 'Relatórios', url: '/relatorios', icon: FileText, allowedRoles: ['admin', 'gestor'] },
-  { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'gestor', 'professor', 'estudante'] },
+  { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
+  { title: 'Estudantes', url: '/Estudantes', icon: Users, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+  { title: 'Professores', url: '/professores', icon: GraduationCap, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+  { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+  { title: 'Turmas', url: '/turmas', icon: School, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
+  { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
+  { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
+  { title: 'Relatórios', url: '/relatorios', icon: FileText, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+  { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante'] },
+  { title: 'Perfil', url: '/perfil', icon: User, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante'] },
   { title: 'Usuários', url: '/usuarios', icon: UserCog, allowedRoles: ['admin'] },
   { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['admin'] },
 ];

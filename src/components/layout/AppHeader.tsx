@@ -7,8 +7,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useState, useEffect } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
+import { db } from '@/lib/firebase'; 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
 
@@ -25,6 +25,11 @@ interface SearchResult {
   email?: string;
 }
 
+interface UserProfile {
+  nome: string;
+  foto_url?: string;
+}
+
 export function AppHeader({ title }: AppHeaderProps) {
   const { user } = useAuth();
   const { role } = useUserRole();
@@ -35,8 +40,52 @@ export function AppHeader({ title }: AppHeaderProps) {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      if (!user || !role || role === 'pending') {
+        setUserProfile({ nome: user?.email || 'Usuário', foto_url: user?.photoURL || undefined });
+        return;
+      }
+
+      try {
+        let profileData: UserProfile | null = null;
+
+        if (['gestor', 'pedagogo', 'secretario', 'professor'].includes(role)) {
+            const collectionName = role === 'professor' ? 'professores' : 'equipe_gestora';
+            const q = query(collection(db, collectionName), where('email', '==', user.email));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              const data = querySnapshot.docs[0].data();
+              profileData = {
+                nome: data.nome,
+                foto_url: data.foto_url || undefined,
+              };
+            }
+        }
+
+        if (!profileData) {
+            const profileDocRef = doc(db, 'profiles', user.uid);
+            const profileDoc = await getDoc(profileDocRef);
+            if (profileDoc.exists()) {
+              const data = profileDoc.data();
+              profileData = { nome: data.nome, foto_url: data.foto_url || undefined };
+            }
+        }
+        
+        setUserProfile(profileData || { nome: user.displayName || user.email || 'Usuário', foto_url: user.photoURL || undefined });
+      } catch (error) {
+        console.error("Erro ao carregar perfil no header:", error);
+        setUserProfile({ nome: user.displayName || user.email || 'Usuário', foto_url: user.photoURL || undefined });
+      }
+    }
+
+    fetchProfile();
+  }, [user, role]);
 
   useEffect(() => {
     async function performSearch() {
@@ -110,8 +159,13 @@ export function AppHeader({ title }: AppHeaderProps) {
     }
   };
   
-  const getInitials = (email: string) => {
-    return email.substring(0, 2).toUpperCase();
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return 'U';
+    const parts = name.split(' ');
+    if (parts.length > 1 && parts[0] && parts[1]) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, 2).toUpperCase();
   };
 
   const capitalize = (s: string | null) => {
@@ -198,13 +252,14 @@ export function AppHeader({ title }: AppHeaderProps) {
 
       <div className="flex items-center gap-3">
         <Avatar className="h-9 w-9">
+          <AvatarImage src={userProfile?.foto_url} />
           <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
-            {user?.email ? getInitials(user.email) : 'U'}
+            {getInitials(userProfile?.nome || user?.email)}
           </AvatarFallback>
         </Avatar>
         <div className="hidden lg:block">
           <p className="text-sm font-medium text-foreground truncate max-w-[150px]">
-            {user?.email}
+            {userProfile?.nome || user?.email}
           </p>
           <p className="text-xs text-muted-foreground">{capitalize(role)}</p>
         </div>

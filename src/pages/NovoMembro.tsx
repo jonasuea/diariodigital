@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, User, Plus, Trash2, Upload, FileText, X } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
-import { collection, doc, getDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDoc, addDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
@@ -23,6 +23,7 @@ interface Formacao {
 }
 
 const CARGOS = ['Diretor', 'Vice-Diretor', 'Coordenador Pedagógico', 'Secretário', 'Orientador Educacional', 'Supervisor'];
+const ROLES = ['gestor', 'pedagogo', 'secretario'];
 
 export default function NovoMembro() {
   const navigate = useNavigate();
@@ -49,6 +50,7 @@ export default function NovoMembro() {
     arquivo_url: '',
     biografia: '',
     link_lattes: '',
+    role: 'gestor', // Adicionando o estado para o perfil de acesso
   });
 
   const [formacoes, setFormacoes] = useState<Formacao[]>([
@@ -142,6 +144,7 @@ export default function NovoMembro() {
           arquivo_url: data.arquivo_url || '',
           biografia: data.biografia || '',
           link_lattes: data.link_lattes || '',
+          role: data.role || 'gestor',
         });
         if (data.formacoes && Array.isArray(data.formacoes)) {
           setFormacoes(data.formacoes as Formacao[]);
@@ -187,12 +190,29 @@ export default function NovoMembro() {
         if (!id) return;
         const docRef = doc(db, 'equipe_gestora', id);
         await updateDoc(docRef, payload);
+        
+        // Atualiza o e-mail em user_roles se tiver mudado
+        const userRoleRef = doc(db, 'user_roles', id);
+        const userRoleSnap = await getDoc(userRoleRef);
+        if (userRoleSnap.exists()) {
+            const currentRole = userRoleSnap.data().role;
+            const currentEmail = userRoleSnap.data().email;
+            if (currentRole !== formData.role || currentEmail !== formData.email) {
+                await updateDoc(userRoleRef, { role: formData.role, email: formData.email });
+            }
+        }
+        
         await logActivity(`atualizou o cadastro do membro da equipe "${formData.nome}".`);
         toast.success('Membro atualizado com sucesso!');
       } else {
-        await addDoc(collection(db, 'equipe_gestora'), payload);
+        const docRef = await addDoc(collection(db, 'equipe_gestora'), payload);
+        await setDoc(doc(db, 'user_roles', docRef.id), {
+          email: formData.email,
+          role: formData.role,
+          status: 'pending'
+        });
         await logActivity(`cadastrou o novo membro da equipe "${formData.nome}".`);
-        toast.success('Membro cadastrado com sucesso!');
+        toast.success('Membro cadastrado com sucesso! Acesse a página de "Usuários" para definir o acesso.');
       }
       navigate('/equipe-gestora');
     } catch (error: any) {
@@ -342,6 +362,22 @@ export default function NovoMembro() {
                     <SelectContent>
                       {CARGOS.map((cargo) => (
                         <SelectItem key={cargo} value={cargo}>{cargo}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="role">Perfil de Acesso*</Label>
+                  <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o perfil de acesso" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ROLES.map((role) => (
+                        <SelectItem key={role} value={role}>
+                          {role.charAt(0).toUpperCase() + role.slice(1)}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

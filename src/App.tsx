@@ -31,6 +31,7 @@ import NotFound from "./pages/NotFound";
 import Logs from "./pages/Logs";
 import Perfil from "./pages/Perfil";
 import Manutencao from "./pages/Manutencao";
+import ObjetosDeConhecimento from "./pages/ObjetosDeConhecimento";
 
 const queryClient = new QueryClient();
 
@@ -39,35 +40,37 @@ const router = createBrowserRouter([
   { path: "/auth", element: <Auth /> },
   { path: "/manutencao", element: <Manutencao /> },
 
-  { path: "/painel", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Painel /></ProtectedRoute> },
+  { path: "/painel", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Painel /></ProtectedRoute> },
 
-  { path: "/estudantes", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Estudantes /></ProtectedRoute> },
-  { path: "/estudantes/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoEstudante /></ProtectedRoute> },
-  { path: "/estudantes/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilEstudante /></ProtectedRoute> },
-  { path: "/estudantes/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoEstudante /></ProtectedRoute> },
+  { path: "/estudantes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Estudantes /></ProtectedRoute> },
+  { path: "/estudantes/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
+  { path: "/estudantes/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><PerfilEstudante /></ProtectedRoute> },
+  { path: "/estudantes/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
 
-  { path: "/professores", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Professores /></ProtectedRoute> },
-  { path: "/professores/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute> },
-  { path: "/professores/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilProfessor /></ProtectedRoute> },
-  { path: "/professores/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoProfessor /></ProtectedRoute> },
+  { path: "/professores", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Professores /></ProtectedRoute> },
+  { path: "/professores/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoProfessor /></ProtectedRoute> },
+  { path: "/professores/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><PerfilProfessor /></ProtectedRoute> },
+  { path: "/professores/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoProfessor /></ProtectedRoute> },
 
-  { path: "/turmas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Turmas /></ProtectedRoute> },
-  { path: "/turmas/:turmaId/notas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Notas /></ProtectedRoute> },
-  { path: "/turmas/:turmaId/frequencia", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Frequencia /></ProtectedRoute> },
-  { path: "/turmas/:turmaId/ata-final", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><AtaFinal /></ProtectedRoute> },
+  { path: "/turmas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Turmas /></ProtectedRoute> },
+  { path: "/turmas/:turmaId/notas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Notas /></ProtectedRoute> },
+  { path: "/turmas/:turmaId/frequencia", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Frequencia /></ProtectedRoute> },
+  { path: "/turmas/:turmaId/ata-final", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><AtaFinal /></ProtectedRoute> },
 
-  { path: "/equipe-gestora", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><EquipeGestora /></ProtectedRoute> },
-  { path: "/equipe-gestora/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoMembro /></ProtectedRoute> },
-  { path: "/equipe-gestora/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><PerfilMembro /></ProtectedRoute> },
-  { path: "/equipe-gestora/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><NovoMembro /></ProtectedRoute> },
+  { path: "/equipe-gestora", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><EquipeGestora /></ProtectedRoute> },
+  { path: "/equipe-gestora/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoMembro /></ProtectedRoute> },
+  { path: "/equipe-gestora/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><PerfilMembro /></ProtectedRoute> },
+  { path: "/equipe-gestora/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoMembro /></ProtectedRoute> },
 
-  { path: "/horario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><Horario /></ProtectedRoute> },
-  { path: "/calendario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor', 'estudante']}><Calendario /></ProtectedRoute> },
-  { path: "/diario-digital", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'professor']}><DiarioDigital /></ProtectedRoute> },
-  { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Relatorios /></ProtectedRoute> },
+  { path: "/horario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Horario /></ProtectedRoute> },
+  { path: "/calendario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Calendario /></ProtectedRoute> },
+  { path: "/diario-digital", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><DiarioDigital /></ProtectedRoute> },
+  { path: "/diario-digital/objetos-de-conhecimento/:turmaId", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
+  { path: "/diario-digital/objetos-de-conhecimento", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
+  { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Relatorios /></ProtectedRoute> },
   { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin']}><Configuracoes /></ProtectedRoute> },
   { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin']}><Usuarios /></ProtectedRoute> },
-  { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Logs /></ProtectedRoute> },
+  { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Logs /></ProtectedRoute> },
 
   { path: "/perfil", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Perfil /></ProtectedRoute> },
 

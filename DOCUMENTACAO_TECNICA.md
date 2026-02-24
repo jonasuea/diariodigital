@@ -460,7 +460,20 @@ Anotações e registros diversos.
 | `data` | date | Sim | Data da anotação |
 | `created_at` | timestamptz | Não | Data de criação |
 
-### 5.2.10. Tabela: `profiles`
+### 5.2.10. Tabela: `objetos_conhecimento`
+
+Armazena o planejamento de objetos de conhecimento e habilidades por turma e disciplina.
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `id` | integer (PK) | Sim | Identificador único |
+| `turma_id` | integer (FK) | Sim | Referência à turma (`turmas.id`) |
+| `disciplina` | text | Sim | Nome da disciplina |
+| `bimestre` | integer | Sim | Bimestre (1, 2, 3, 4) |
+| `conteudo` | text | Sim | Descrição do objeto de conhecimento/conteúdo |
+| `created_at` | timestamptz | Não | Data de criação (default: now()) |
+
+### 5.2.11. Tabela: `profiles`
 
 Perfis de usuários do sistema (vinculados ao auth.users).
 
@@ -470,7 +483,7 @@ Perfis de usuários do sistema (vinculados ao auth.users).
 | `nome` | text | Sim | Nome do usuário |
 | `created_at` | timestamptz | Não | Data de criação |
 
-### 5.2.11. Tabela: `user_roles`
+### 5.2.12. Tabela: `user_roles`
 
 Papéis/funções dos usuários no sistema.
 
@@ -480,7 +493,7 @@ Papéis/funções dos usuários no sistema.
 | `user_id` | uuid (FK) | Sim | ID do usuário |
 | `role` | app_role (enum) | Sim | Papel: 'admin', 'professor', 'estudante' (default: 'estudante') |
 
-### 5.2.12. Tabela: `usuarios` (legado)
+### 5.2.13. Tabela: `usuarios` (legado)
 
 Tabela de usuários legada.
 
@@ -683,6 +696,7 @@ src/
 │   ├── NovoMembro.tsx    # Cadastro de membro
 │   ├── PerfilMembro.tsx  # Perfil do membro
 │   ├── Horario.tsx       # Grade horária
+│   ├── ObjetosDeConhecimento.tsx # Planejamento de conteúdo
 │   ├── Calendario.tsx    # Calendário de eventos
 │   ├── DiarioDigital.tsx # Hub do diário digital
 │   ├── Relatorios.tsx    # Central de relatórios
@@ -740,20 +754,27 @@ src/
   - Avaliações
   - Notas
 
-### 7.2.6. Frequência (`/turmas/:turmaId/frequencia`)
+### 7.2.6. Objetos de Conhecimento (`/diario-digital/objetos-de-conhecimento`)
+
+- Tela para planejamento pedagógico.
+- Seleção de turma e disciplina.
+- Registro de objetos de conhecimento e habilidades por bimestre.
+- Utiliza um acordeão para organizar o conteúdo dos 4 bimestres.
+
+### 7.2.7. Frequência (`/turmas/:turmaId/frequencia`)
 
 - Calendário de frequência
 - Marcação: presente, faltou, justificado
 - Toggle rápido por clique
 
-### 7.2.7. Notas (`/turmas/:turmaId/notas`)
+### 7.2.8. Notas (`/turmas/:turmaId/notas`)
 
 - Tabela de notas por disciplina
 - Colunas: 4 bimestres + média anual
 - Cálculo automático de média
 - Situação automática (aprovado/reprovado)
 
-### 7.2.8. Relatórios (`/relatorios`)
+### 7.2.9. Relatórios (`/relatorios`)
 
 - Geração de relatórios em PDF:
   - Relatório de Notas
