@@ -35,7 +35,7 @@ const allMenuItems: MenuItem[] = [
   { title: 'Relatórios', url: '/relatorios', icon: FileText, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
   { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante'] },
   { title: 'Usuários', url: '/usuarios', icon: UserCog, allowedRoles: ['admin'] },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['admin'] },
+  { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
 ];
 
 export function useUserRole() {

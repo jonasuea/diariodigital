@@ -23,7 +23,7 @@ interface Formacao {
   ano_conclusao: string;
 }
 
-const DISCIPLINAS = [
+const componentes = [
   'Língua Portuguesa',
   'Matemática',
   'Ciências',
@@ -71,10 +71,10 @@ export default function NovoProfessor() {
     arquivo_url: '',
     link_lattes: '',
     biografia: '',
-    disciplinas: [] as string[],
+    componentes: [] as string[],
     series: [] as string[],
     ativo: true,
-    disciplina: '',
+    componente: '',
   });
 
   const [formacoes, setFormacoes] = useState<Formacao[]>([
@@ -167,10 +167,10 @@ export default function NovoProfessor() {
           arquivo_url: data.arquivo_url || '',
           link_lattes: data.link_lattes || '',
           biografia: data.biografia || '',
-          disciplinas: data.disciplinas || [],
+          componentes: data.componentes || [],
           series: data.series || [],
           ativo: data.ativo ?? true,
-          disciplina: data.disciplina,
+          componente: data.componente,
         });
         if (data.formacoes && Array.isArray(data.formacoes)) {
           setFormacoes(data.formacoes as Formacao[]);
@@ -204,9 +204,9 @@ export default function NovoProfessor() {
   function toggleDisciplina(disc: string) {
     setFormData(prev => ({
       ...prev,
-      disciplinas: prev.disciplinas.includes(disc)
-        ? prev.disciplinas.filter(d => d !== disc)
-        : [...prev.disciplinas, disc]
+      componentes: prev.componentes.includes(disc)
+        ? prev.componentes.filter(d => d !== disc)
+        : [...prev.componentes, disc]
     }));
   }
 
@@ -227,7 +227,7 @@ export default function NovoProfessor() {
       ...formData,
       nome_lower: formData.nome.toLowerCase(),
       formacoes: formacoes.filter(f => f.curso),
-      disciplina: formData.disciplinas[0] || formData.disciplina || 'Geral',
+      componente: formData.componentes[0] || formData.componente || 'Geral',
     };
 
     try {
@@ -540,15 +540,15 @@ export default function NovoProfessor() {
                 </div>
               </div>
 
-              {/* Disciplinas */}
+              {/* componentes */}
               <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground">Disciplinas</h3>
+                <h3 className="text-sm font-semibold text-muted-foreground">componentes</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {DISCIPLINAS.map((disc) => (
+                  {componentes.map((disc) => (
                     <div key={disc} className="flex items-center space-x-2">
                       <Checkbox
                         id={`disc-${disc}`}
-                        checked={formData.disciplinas.includes(disc)}
+                        checked={formData.componentes.includes(disc)}
                         onCheckedChange={() => toggleDisciplina(disc)}
                       />
                       <Label htmlFor={`disc-${disc}`} className="font-normal">{disc}</Label>

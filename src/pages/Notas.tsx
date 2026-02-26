@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ interface Nota {
   id?: string;
   estudante_id: string;
   turma_id: string;
-  disciplina: string;
+  componente: string;
   bimestre_1: number | null;
   bimestre_2: number | null;
   bimestre_3: number | null;
@@ -37,24 +37,8 @@ interface Nota {
 interface Turma {
   id: string;
   nome: string;
+  componentes?: { nome: string; professorId: string }[];
 }
-
-const DISCIPLINAS = [
-  'Língua Portuguesa',
-  'Matemática',
-  'Ciências',
-  'História',
-  'Geografia',
-  'Arte',
-  'Educação Física',
-  'Inglês',
-  'Ensino Religioso',
-  'Física',
-  'Química',
-  'Biologia',
-  'Filosofia',
-  'Sociologia',
-];
 
 const DEFAULT_BOLETIM_TEMPLATE = `BOLETIM ESCOLAR
 
@@ -83,16 +67,23 @@ Data de emissão: {DATA_EMISSAO}`;
 export default function Notas() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
+  const [searchParams] = useSearchParams();
+
   const [turma, setTurma] = useState<Turma | null>(null);
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
-  // Correção do tipo do estado para suportar a estrutura aninhada: estudante -> disciplina -> nota
+  // Correção do tipo do estado para suportar a estrutura aninhada: estudante -> componente -> nota
   const [notas, setNotas] = useState<Record<string, Record<string, Nota>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
-  const [disciplina, setDisciplina] = useState('todos');
+  const [componente, setDisciplina] = useState(searchParams.get('componente') || 'todos');
   const [boletimDialogOpen, setBoletimDialogOpen] = useState(false);
   const [boletimTemplate, setBoletimTemplate] = useState(DEFAULT_BOLETIM_TEMPLATE);
+
+  const isComponenteFixo = !!searchParams.get('componente');
+  const origem = searchParams.get('origem');
+
+  const componentesDaTurma = turma?.componentes?.filter(c => c.professorId) || [];
 
   useEffect(() => {
     if (turmaId) {
@@ -131,7 +122,7 @@ export default function Notas() {
           notasData[estudanteId] = {};
         }
         
-        notasData[estudanteId][data.disciplina] = { id: doc.id, ...data } as Nota;
+        notasData[estudanteId][data.componente] = { id: doc.id, ...data } as Nota;
       });
       
       setNotas(notasData);
@@ -149,7 +140,7 @@ export default function Notas() {
       const disciplinaNota = estudanteNotas[disc] || {
         estudante_id: estudanteId,
         turma_id: turmaId!,
-        disciplina: disc,
+        componente: disc,
         bimestre_1: null,
         bimestre_2: null,
         bimestre_3: null,
@@ -199,16 +190,16 @@ export default function Notas() {
   }
 
   async function handleSave() {
-    if (disciplina === 'todos') {
-      toast.error('Selecione uma disciplina para salvar as notas');
+    if (componente === 'todos') {
+      toast.error('Selecione uma componente para salvar as notas');
       return;
     }
 
     setSaving(true);
     try {
-      // Iterar sobre todos os estudantes para salvar as notas da disciplina selecionada
+      // Iterar sobre todos os estudantes para salvar as notas da componente selecionada
       for (const estudanteId of Object.keys(notas)) {
-        const nota = notas[estudanteId]?.[disciplina];
+        const nota = notas[estudanteId]?.[componente];
         if (nota) {
           const { id, ...notaData } = nota;
           // Apenas salvar se houver alguma nota lançada ou se já existir um ID (edição)
@@ -228,12 +219,12 @@ export default function Notas() {
               ...notaData,
               estudante_id: estudanteId,
               turma_id: turmaId!,
-              disciplina: disciplina,
+              componente: componente,
             });
           }
         }
       }
-      await logActivity(`salvou as notas de "${disciplina}" para a turma "${turma?.nome}".`);
+      await logActivity(`salvou as notas de "${componente}" para a turma "${turma?.nome}".`);
       toast.success('Notas salvas com sucesso!');
       loadData();
     } catch (error) {
@@ -245,7 +236,7 @@ export default function Notas() {
   }
 
   async function handleGerarBoletins() {
-    if (Estudantes.length === 0) {
+    if (estudantes.length === 0) {
       toast.error('Nenhum estudante encontrado');
       return;
     }
@@ -253,7 +244,7 @@ export default function Notas() {
     const doc = new jsPDF();
     const ano = new Date().getFullYear();
 
-    Estudantes.forEach((estudante, index) => {
+    estudantes.forEach((estudante, index) => {
       if (index > 0) doc.addPage();
 
       const estudanteNotas = notas[estudante.id] || {};
@@ -261,7 +252,8 @@ export default function Notas() {
       let totalMedia = 0;
       let countMedia = 0;
 
-      DISCIPLINAS.forEach(disc => {
+      componentesDaTurma.forEach(comp => {
+        const disc = comp.nome;
         const nota = estudanteNotas[disc];
         const media = calcularMedia(nota);
         if (nota && (nota.bimestre_1 != null || nota.bimestre_2 != null || nota.bimestre_3 != null || nota.bimestre_4 != null)) {
@@ -299,7 +291,7 @@ export default function Notas() {
     a.nome.toLowerCase().includes(search.toLowerCase())
   );
 
-  const isInputDisabled = disciplina === 'todos';
+  const isInputDisabled = componente === 'todos';
 
   return (
     <AppLayout title={`Notas da Turma ${turma?.nome || ''}`}>
@@ -309,9 +301,9 @@ export default function Notas() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/turmas')} className="gap-2">
+          <Button variant="outline" onClick={() => navigate(origem === 'diario' ? '/diario-digital' : '/turmas')} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Voltar para Turmas
+            {origem === 'diario' ? 'Voltar para Diário Digital' : 'Voltar para Turmas'}
           </Button>
 
           <div className="relative flex-1 max-w-xs">
@@ -324,14 +316,15 @@ export default function Notas() {
             />
           </div>
 
-          <Select value={disciplina} onValueChange={setDisciplina}>
+          <Select value={componente} onValueChange={setDisciplina} disabled={isComponenteFixo}>
             <SelectTrigger className="w-[220px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os componentes</SelectItem>
-              {DISCIPLINAS.map(disc => (
-                <SelectItem key={disc} value={disc}>{disc}</SelectItem>
+              {/* Popula o Select com os componentes da turma */}
+              {componentesDaTurma.map(comp => (
+                <SelectItem key={comp.nome} value={comp.nome}>{comp.nome}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -356,7 +349,7 @@ export default function Notas() {
 
         {isInputDisabled && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800 text-sm">
-            Selecione uma disciplina específica para lançar notas. Com "Todos os componentes" selecionado, as notas são exibidas apenas para visualização.
+            Selecione uma componente específica para lançar notas. Com "Todos os componentes" selecionado, as notas são exibidas apenas para visualização.
           </div>
         )}
 
@@ -371,7 +364,7 @@ export default function Notas() {
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="p-3 text-left font-medium min-w-[200px]">Estudante</th>
-                    {disciplina === 'todos' ? (
+                    {componente === 'todos' ? (
                       <>
                         <th className="p-3 text-center font-medium" colSpan={4}>Resumo Geral</th>
                         <th className="p-3 text-center font-medium w-28">Média Geral</th>
@@ -391,7 +384,7 @@ export default function Notas() {
                 </thead>
                 <tbody>
                   {filteredEstudantes.map((estudante) => {
-                    if (disciplina === 'todos') {
+                    if (componente === 'todos') {
                       const estudanteNotas = notas[estudante.id] || {};
                       const mediasDasDisciplinas = Object.values(estudanteNotas)
                         .map(nota => calcularMedia(nota))
@@ -421,7 +414,7 @@ export default function Notas() {
                         </tr>
                       );
                     } else {
-                      const nota = notas[estudante.id]?.[disciplina] || {};
+                      const nota = notas[estudante.id]?.[componente] || {};
                       const media = calcularMedia(nota);
                       const situacao = calcularSituacao(media);
                       return (
@@ -431,16 +424,16 @@ export default function Notas() {
                             <div className="text-xs text-muted-foreground">{estudante.matricula}</div>
                           </td>
                           <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_1 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_1', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_1 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_1', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
                           </td>
                           <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_2 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_2', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_2 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_2', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
                           </td>
                           <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_3 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_3', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_3 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_3', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
                           </td>
                           <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_4 ?? ''} onChange={(e) => updateNota(estudante.id, disciplina, 'bimestre_4', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_4 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_4', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
                           </td>
                           <td className="p-4">
                             <div className={`w-20 py-2 rounded text-center mx-auto font-semibold ${getMediaColor(media)}`}>

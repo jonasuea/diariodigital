@@ -18,7 +18,7 @@ Sistema completo de gestão escolar desenvolvido para facilitar a administraçã
 
 ### 👨‍🏫 Professores
 - Cadastro de professores com informações profissionais
-- Gerenciamento de disciplinas e séries
+- Gerenciamento de componentes e séries
 - Controle de status funcional (efetivo, contratado, etc.)
 
 ### 🏫 Turmas
@@ -101,7 +101,7 @@ O sistema possui autenticação segura com:
 1. Acesse "Diário Digital" no menu lateral
 2. Selecione o professor e a turma
 3. Clique em "Notas"
-4. Selecione a disciplina e o bimestre
+4. Selecione a componente e o bimestre
 5. Lance as notas de cada estudante
 6. Salve as alterações
 

@@ -25,7 +25,7 @@ interface Horario {
   dia: string;
   inicio: string;
   fim: string;
-  disciplina: string;
+  componente: string;
 }
 
 const DIAS = [
@@ -36,7 +36,7 @@ const DIAS = [
   { value: 'sexta', label: 'Sexta' },
 ];
 
-const DISCIPLINAS = [
+const componentes = [
   'Língua Portuguesa',
   'Matemática',
   'Ciências',
@@ -64,7 +64,7 @@ export default function Horario() {
     dia: 'segunda',
     inicio: '07:00',
     fim: '08:00',
-    disciplina: '',
+    componente: '',
     turma_ids: [] as string[],
   });
 
@@ -126,18 +126,18 @@ export default function Horario() {
       dia: formData.dia,
       inicio: formData.inicio,
       fim: formData.fim,
-      disciplina: formData.disciplina,
+      componente: formData.componente,
     };
 
     try {
       if (editingHorario) {
         const docRef = doc(db, 'horarios', editingHorario.id);
         await updateDoc(docRef, payload);
-        await logActivity(`atualizou o horário de ${payload.disciplina} para as turmas selecionadas.`);
+        await logActivity(`atualizou o horário de ${payload.componente} para as turmas selecionadas.`);
         toast.success('Horário atualizado com sucesso!');
       } else {
         await addDoc(collection(db, 'horarios'), payload);
-        await logActivity(`cadastrou um novo horário de ${payload.disciplina} para as turmas selecionadas.`);
+        await logActivity(`cadastrou um novo horário de ${payload.componente} para as turmas selecionadas.`);
         toast.success('Horário cadastrado com sucesso!');
       }
       setIsOpen(false);
@@ -157,7 +157,7 @@ export default function Horario() {
     try {
       const docRef = doc(db, 'horarios', horario.id);
       await deleteDoc(docRef);
-      await logActivity(`excluiu o horário de ${horario.disciplina} de ${horario.inicio} às ${horario.fim}.`);
+      await logActivity(`excluiu o horário de ${horario.componente} de ${horario.inicio} às ${horario.fim}.`);
       toast.success('Horário excluído com sucesso!');
       if (selectedTurma) fetchHorarios(selectedTurma.id);
     } catch (error) {
@@ -171,7 +171,7 @@ export default function Horario() {
       dia: 'segunda',
       inicio: '07:00',
       fim: '08:00',
-      disciplina: '',
+      componente: '',
       turma_ids: [],
     });
     setEditingHorario(null);
@@ -183,7 +183,7 @@ export default function Horario() {
       dia: horario.dia,
       inicio: horario.inicio,
       fim: horario.fim,
-      disciplina: horario.disciplina,
+      componente: horario.componente,
       turma_ids: horario.turma_ids || [],
     });
     setIsOpen(true);
@@ -282,13 +282,13 @@ export default function Horario() {
                         </Select>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="disciplina">Disciplina</Label>
-                        <Select value={formData.disciplina} onValueChange={(value) => setFormData({ ...formData, disciplina: value })}>
+                        <Label htmlFor="componente">componente</Label>
+                        <Select value={formData.componente} onValueChange={(value) => setFormData({ ...formData, componente: value })}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Selecione a disciplina" />
+                            <SelectValue placeholder="Selecione a componente" />
                           </SelectTrigger>
                           <SelectContent>
-                            {DISCIPLINAS.map((disc) => (
+                            {componentes.map((disc) => (
                               <SelectItem key={disc} value={disc}>
                                 {disc}
                               </SelectItem>
@@ -348,7 +348,7 @@ export default function Horario() {
                               key={horario.id}
                               className="p-3 bg-primary/5 border border-primary/20 rounded-lg group relative"
                             >
-                              <p className="font-medium text-sm text-foreground">{horario.disciplina}</p>
+                              <p className="font-medium text-sm text-foreground">{horario.componente}</p>
                               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                                 <Clock className="h-3 w-3" />
                                 {horario.inicio} - {horario.fim}

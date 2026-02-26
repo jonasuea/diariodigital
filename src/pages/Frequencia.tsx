@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ArrowLeft, Calendar, CheckCircle, XCircle, FileText, User } from 'lucide-react';
@@ -33,6 +34,7 @@ interface Turma {
   id: string;
   nome: string;
   ano: number;
+  componentes?: { nome: string; professorId: string }[]; // Adicionar a lista de componentes
 }
 
 const DIAS_SEMANA = ['dom.', 'seg.', 'ter.', 'qua.', 'qui.', 'sex.', 'sáb.'];
@@ -40,7 +42,12 @@ const DIAS_SEMANA = ['dom.', 'seg.', 'ter.', 'qua.', 'qui.', 'sex.', 'sáb.'];
 export default function Frequencia() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [turma, setTurma] = useState<Turma | null>(null);
+  const [componente, setComponente] = useState(searchParams.get('componente') || '');
+  const isComponenteFixo = !!searchParams.get('componente');
+  const origem = searchParams.get('origem');
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
   const [frequencias, setFrequencias] = useState<Record<string, FrequenciaRecord>>({});
   const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
@@ -56,7 +63,19 @@ export default function Frequencia() {
     if (turmaId) {
       loadData();
     }
-  }, [turmaId, currentMonth]);
+  }, [turmaId, currentMonth, componente]);
+
+  // Efeito para atualizar a URL quando o componente muda, preservando outros parâmetros
+  useEffect(() => {
+    setSearchParams(prev => {
+      if (componente) {
+        prev.set('componente', componente);
+      } else {
+        prev.delete('componente');
+      }
+      return prev;
+    }, { replace: true });
+  }, [componente, setSearchParams]);
 
   async function loadData() {
     if (!turmaId) return;
@@ -99,20 +118,26 @@ export default function Frequencia() {
       });
       setDiasLetivos(diasLetivosSet);
 
-      const freqQuery = query(
-        collection(db, 'frequencias'),
-        where('turma_id', '==', turmaId),
-        where('data', '>=', format(startDate, 'yyyy-MM-dd')),
-        where('data', '<=', format(endDate, 'yyyy-MM-dd'))
-      );
-      
-      const freqSnapshot = await getDocs(freqQuery);
-      const freqData: Record<string, FrequenciaRecord> = {};
-      freqSnapshot.forEach(doc => {
-        const data = doc.data() as FrequenciaRecord;
-        freqData[`${data.estudante_id}-${data.data}`] = { id: doc.id, ...data };
-      });
-      setFrequencias(freqData);
+      // Só busca frequência se um componente estiver selecionado
+      if (componente) {
+        let freqQuery = query(
+          collection(db, 'frequencias'),
+          where('turma_id', '==', turmaId),
+          where('componente', '==', componente), // Filtro por componente
+          where('data', '>=', format(startDate, 'yyyy-MM-dd')),
+          where('data', '<=', format(endDate, 'yyyy-MM-dd'))
+        );
+        
+        const freqSnapshot = await getDocs(freqQuery);
+        const freqData: Record<string, FrequenciaRecord> = {};
+        freqSnapshot.forEach(doc => {
+          const data = doc.data() as FrequenciaRecord;
+          freqData[`${data.estudante_id}-${data.data}`] = { id: doc.id, ...data };
+        });
+        setFrequencias(freqData);
+      } else {
+        setFrequencias({}); // Limpa as frequências se nenhum componente for selecionado
+      }
 
     } catch (error) {
       toast.error("Erro ao carregar dados da frequência");
@@ -156,6 +181,11 @@ export default function Frequencia() {
       return;
     }
 
+    if (!componente) {
+      toast.info('Por favor, selecione um componente curricular para registrar a frequência.');
+      return;
+    }
+
     const key = `${estudanteId}-${dateStr}`;
     const existingFreq = frequencias[key];
 
@@ -172,6 +202,7 @@ export default function Frequencia() {
           turma_id: turmaId,
           data: dateStr,
           status: newStatus,
+          componente: componente, // Salva o componente junto
         });
       }
       
@@ -208,6 +239,7 @@ export default function Frequencia() {
           data: frequenciaParaJustificar.data,
           status: 'justificado',
           justificativa: justificativaText,
+          componente: componente, // Salva o componente junto
         });
       }
 
@@ -258,10 +290,24 @@ export default function Frequencia() {
         <p className="text-muted-foreground -mt-2">Controle de frequência dos Estudantes - Ano {turma?.ano}</p>
 
         <div className="flex flex-wrap items-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/turmas')} className="gap-2">
+          <Button variant="outline" onClick={() => navigate(origem === 'diario' ? '/diario-digital' : '/turmas')} className="gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Voltar para Turmas
+            {origem === 'diario' ? 'Voltar para Diário Digital' : 'Voltar para Turmas'}
           </Button>
+
+          <div className="flex items-center gap-2">
+            <Label htmlFor="componente-select">Componente</Label>
+            <Select value={componente} onValueChange={setComponente} disabled={isComponenteFixo || !turma?.componentes || turma.componentes.length === 0}>
+              <SelectTrigger id="componente-select" className="w-[200px]">
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                {turma?.componentes?.map(c => (
+                  <SelectItem key={c.nome} value={c.nome}>{c.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Mês:</span>
@@ -286,7 +332,10 @@ export default function Frequencia() {
         <div className="bg-card border rounded-lg p-6 space-y-6">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="h-5 w-5 text-primary" />
-            <h2 className="text-lg font-semibold">Frequência - {MESES[currentMonth]} de {turma?.ano}</h2>
+            <h2 className="text-lg font-semibold">
+              Frequência - {MESES[currentMonth]} de {turma?.ano}
+              {componente && <span className="text-primary font-bold ml-2">({componente})</span>}
+            </h2>
           </div>
 
           <div className="flex items-center gap-6 mb-4 text-sm">
@@ -307,6 +356,10 @@ export default function Frequencia() {
           {loading ? (
             <div className="flex justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+            </div>
+          ) : !componente ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>Por favor, selecione um componente curricular para visualizar ou lançar a frequência.</p>
             </div>
           ) : (
             <div className="overflow-x-auto border rounded-lg">

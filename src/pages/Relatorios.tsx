@@ -25,7 +25,7 @@ export default function Relatorios() {
     {
       id: 'notas' as const,
       title: 'Relatório de Notas por Turma',
-      description: 'Consolidado de notas por turma e disciplina',
+      description: 'Consolidado de notas por turma e componente',
     },
     {
       id: 'frequencia' as const,

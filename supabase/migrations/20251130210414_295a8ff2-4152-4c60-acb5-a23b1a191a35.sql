@@ -9,7 +9,7 @@ ADD COLUMN IF NOT EXISTS arquivo_url text,
 ADD COLUMN IF NOT EXISTS formacoes jsonb DEFAULT '[]'::jsonb,
 ADD COLUMN IF NOT EXISTS link_lattes text,
 ADD COLUMN IF NOT EXISTS biografia text,
-ADD COLUMN IF NOT EXISTS disciplinas text[] DEFAULT '{}',
+ADD COLUMN IF NOT EXISTS componentes text[] DEFAULT '{}',
 ADD COLUMN IF NOT EXISTS series text[] DEFAULT '{}';
 
 -- Add new columns to equipe_gestora table
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS public.notas (
   id serial PRIMARY KEY,
   estudante_id integer REFERENCES public.Estudantes(id) ON DELETE CASCADE NOT NULL,
   turma_id integer REFERENCES public.turmas(id) ON DELETE CASCADE NOT NULL,
-  disciplina text NOT NULL,
+  componente text NOT NULL,
   bimestre_1 numeric(4,2),
   bimestre_2 numeric(4,2),
   bimestre_3 numeric(4,2),

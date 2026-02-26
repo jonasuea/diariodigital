@@ -8,6 +8,13 @@ import { Users, BookOpen, ClipboardList, GraduationCap } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
+
+interface ComponenteCurricular {
+  nome: string;
+  professorId: string;
+}
 
 interface Professor {
   id: string;
@@ -18,69 +25,108 @@ interface Turma {
   id: string;
   nome: string;
   ano: number;
-  professor_id: string | null;
-  professor_id_2: string | null;
-  professores_disciplinas?: { professor_id: string; disciplina: string }[];
+  componentes: ComponenteCurricular[];
+  professoresIds: string[];
 }
 
 export default function DiarioDigital() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { role, loading: roleLoading } = useUserRole();
+
   const [professores, setProfessores] = useState<Professor[]>([]);
-  const [filteredTurmas, setFilteredTurmas] = useState<Turma[]>([]);
-  const [selectedProfessor, setSelectedProfessor] = useState('');
-  const [selectedTurma, setSelectedTurma] = useState('');
-  const [loadingTurmas, setLoadingTurmas] = useState(false);
+  const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [componentes, setComponentes] = useState<ComponenteCurricular[]>([]);
+  
+  const [selectedProfessorId, setSelectedProfessorId] = useState('');
+  const [selectedTurmaId, setSelectedTurmaId] = useState('');
+  const [selectedComponente, setSelectedComponente] = useState('');
+  const [loading, setLoading] = useState(true);
+  
+  const isGestor = role && role !== 'professor';
 
+  // Efeito para carregar professores (apenas para gestores)
   useEffect(() => {
-    async function fetchProfessores() {
-      try {
-        const profQuery = query(collection(db, 'professores'), where('ativo', '==', true), orderBy('nome'));
-        const profSnapshot = await getDocs(profQuery);
-        setProfessores(profSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
-      } catch (error) {
-        console.error("Error fetching professors: ", error);
-        toast.error("Erro ao carregar professores.");
+    if (isGestor) {
+      async function fetchProfessores() {
+        try {
+          const profQuery = query(collection(db, 'professores'), where('ativo', '==', true), orderBy('nome'));
+          const profSnapshot = await getDocs(profQuery);
+          setProfessores(profSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
+        } catch (error) {
+          console.error("Error fetching professors: ", error);
+          toast.error("Erro ao carregar professores.");
+        }
       }
+      fetchProfessores();
     }
-    fetchProfessores();
-  }, []);
+  }, [isGestor]);
 
+  // Efeito para carregar turmas baseado no usuário logado (professor) ou selecionado (gestor)
   useEffect(() => {
-    if (!selectedProfessor) {
-      setFilteredTurmas([]);
-      setSelectedTurma('');
+    const professorId = isGestor ? selectedProfessorId : user?.uid;
+
+    if (!professorId) {
+      setTurmas([]);
       return;
-    }
+    };
 
-    async function fetchAndFilterTurmas() {
-      setLoadingTurmas(true);
-      setSelectedTurma(''); // Reseta a turma selecionada ao trocar de professor
+    async function fetchTurmas() {
+      setLoading(true);
       try {
-        const turmasQuery = query(collection(db, 'turmas'), where('ano', '==', new Date().getFullYear()));
+        const turmasQuery = query(
+          collection(db, 'turmas'),
+          where('ano', '==', new Date().getFullYear()),
+          where('professoresIds', 'array-contains', professorId)
+        );
         const turmasSnapshot = await getDocs(turmasQuery);
-        const todasAsTurmas = turmasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
+        const turmasData = turmasSnapshot.docs
+          .map(doc => {
+            const data = doc.data();
+            return {
+              id: doc.id,
+              nome: data.nome,
+              ano: data.ano,
+              componentes: data.componentes || [], // Garante que o campo exista
+              professoresIds: data.professoresIds || [],
+            } as Turma;
+          })
+          .sort((a, b) => a.nome.localeCompare(b.nome));
 
-        const turmasDoProfessor = todasAsTurmas.filter(turma => {
-          const isMonitor1 = turma.professor_id === selectedProfessor;
-          const isMonitor2 = turma.professor_id_2 === selectedProfessor;
-          const isProfessorDisciplina = turma.professores_disciplinas?.some(
-            pd => pd.professor_id === selectedProfessor
-          );
-          return isMonitor1 || isMonitor2 || isProfessorDisciplina;
-        });
-
-        setFilteredTurmas(turmasDoProfessor.sort((a, b) => a.nome.localeCompare(b.nome)));
-
+        setTurmas(turmasData);
       } catch (error) {
-        console.error("Error fetching turmas: ", error);
-        toast.error("Erro ao carregar as turmas do professor.");
+        toast.error("Erro ao carregar as turmas.");
+        console.error(error);
       } finally {
-        setLoadingTurmas(false);
+        setLoading(false);
       }
     }
+    
+    fetchTurmas();
+  }, [user, selectedProfessorId, isGestor]);
 
-    fetchAndFilterTurmas();
-  }, [selectedProfessor]);
+  // Efeito para resetar seleções quando o professor muda
+  useEffect(() => {
+    setSelectedTurmaId('');
+    setSelectedComponente('');
+    setComponentes([]);
+  }, [selectedProfessorId]);
+
+  // Efeito para filtrar componentes quando a turma muda
+  useEffect(() => {
+    const professorId = isGestor ? selectedProfessorId : user?.uid;
+    setSelectedComponente('');
+    
+    if (selectedTurmaId && professorId) {
+      const turmaSelecionada = turmas.find(t => t.id === selectedTurmaId);
+      if (turmaSelecionada) {
+        const componentesDoProfessor = turmaSelecionada.componentes.filter(d => d.professorId === professorId);
+        setComponentes(componentesDoProfessor);
+      }
+    } else {
+      setComponentes([]);
+    }
+  }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, user]);
 
   const cards = [
     {
@@ -89,7 +135,7 @@ export default function DiarioDigital() {
       icon: Users,
       color: 'text-blue-500',
       bgColor: 'bg-blue-50',
-      action: () => selectedTurma && navigate(`/turmas/${selectedTurma}/frequencia`),
+      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/frequencia?componente=${encodeURIComponent(selectedComponente)}&origem=diario`),
     },
     {
       title: 'Objetos de Conhecimento',
@@ -97,7 +143,7 @@ export default function DiarioDigital() {
       icon: BookOpen,
       color: 'text-green-500',
       bgColor: 'bg-green-50',
-      action: () => navigate(selectedTurma ? `/diario-digital/objetos-de-conhecimento/${selectedTurma}` : '/diario-digital/objetos-de-conhecimento'),
+      action: () => navigate(selectedTurmaId ? `/diario-digital/objetos-de-conhecimento/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente)}` : '/diario-digital/objetos-de-conhecimento'),
     },
     {
       title: 'Avaliações',
@@ -105,7 +151,7 @@ export default function DiarioDigital() {
       icon: ClipboardList,
       color: 'text-purple-500',
       bgColor: 'bg-purple-50',
-      action: () => {},
+      action: () => navigate(`/diario-digital/avaliacoes?turmaId=${selectedTurmaId}&componente=${encodeURIComponent(selectedComponente)}`),
     },
     {
       title: 'Notas',
@@ -113,47 +159,72 @@ export default function DiarioDigital() {
       icon: GraduationCap,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-50',
-      action: () => selectedTurma && navigate(`/turmas/${selectedTurma}/notas`),
+      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/notas?componente=${encodeURIComponent(selectedComponente)}&origem=diario`),
     },
   ];
+
+  if (roleLoading) {
+    return (
+      <AppLayout title="Diário Digital">
+        <div className="flex justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Diário Digital">
       <div className="space-y-6 animate-fade-in">
         <p className="text-muted-foreground -mt-2">Gestão pedagógica completa</p>
 
-        {/* Seleção de Professor e Turma */}
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-2 mb-6">
               <GraduationCap className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Seleção de Professor e Turma</h3>
+              <h3 className="font-semibold">Filtros do Diário</h3>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className={`grid grid-cols-1 ${isGestor ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
+              {isGestor && (
+                <div className="space-y-2">
+                  <Label>Professor</Label>
+                  <Select value={selectedProfessorId} onValueChange={setSelectedProfessorId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um professor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {professores.map((prof) => (
+                        <SelectItem key={prof.id} value={prof.id}>{prof.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="space-y-2">
-                <Label>Professor</Label>
-                <Select value={selectedProfessor} onValueChange={setSelectedProfessor}>
+                <Label>Turma</Label>
+                <Select value={selectedTurmaId} onValueChange={setSelectedTurmaId} disabled={loading || turmas.length === 0 || (isGestor && !selectedProfessorId)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione um professor" />
+                    <SelectValue placeholder={loading ? "Carregando..." : "Selecione uma turma"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {professores.map((prof) => (
-                      <SelectItem key={prof.id} value={prof.id.toString()}>{prof.nome}</SelectItem>
+                    {turmas.map((turma) => (
+                      <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="space-y-2">
-                <Label>Turma</Label>
-                <Select value={selectedTurma} onValueChange={setSelectedTurma} disabled={!selectedProfessor || loadingTurmas}>
+                <Label>Componente Curricular</Label>
+                <Select value={selectedComponente} onValueChange={setSelectedComponente} disabled={!selectedTurmaId}>
                   <SelectTrigger>
-                    <SelectValue placeholder={!selectedProfessor ? "Selecione um professor primeiro" : loadingTurmas ? "Carregando turmas..." : "Selecione uma turma"} />
+                    <SelectValue placeholder={!selectedTurmaId ? "Selecione uma turma" : "Selecione um componente"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {filteredTurmas.map((turma) => (
-                      <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
+                    {componentes.map((componente) => (
+                      <SelectItem key={componente.nome} value={componente.nome}>{componente.nome}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -162,13 +233,12 @@ export default function DiarioDigital() {
           </CardContent>
         </Card>
 
-        {/* Cards de Ações */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {cards.map((card) => (
             <Card
               key={card.title}
-              className="cursor-pointer transition-all hover:shadow-md hover:scale-[1.02]"
-              onClick={card.action}
+              className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${(!selectedTurmaId || !selectedComponente) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={() => (selectedTurmaId && selectedComponente) && card.action()}
             >
               <CardContent className="pt-6 text-center">
                 <div className={`w-16 h-16 rounded-full ${card.bgColor} flex items-center justify-center mx-auto mb-4`}>

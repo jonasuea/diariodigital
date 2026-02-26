@@ -24,7 +24,7 @@
 
 # RELATÓRIO FINAL
 
-Relatório Final Apresentado como requisito parcial para aprovação na disciplina Estágio Supervisionado.
+Relatório Final Apresentado como requisito parcial para aprovação na componente Estágio Supervisionado.
 
 **Orientador:** [Nome do Orientador]
 
@@ -51,7 +51,7 @@ Relatório Final Apresentado como requisito parcial para aprovação na discipli
 
 # 1. Introdução
 
-A disciplina Estágio Curricular Supervisionado em Engenharia de Software tem como propósito fundamental proporcionar ao discente a vivência prática dos conhecimentos teóricos adquiridos ao longo da graduação, permitindo o desenvolvimento de competências técnicas, analíticas e profissionais essenciais para a atuação no mercado de trabalho. Por meio dessa experiência, o estudante tem a oportunidade de aplicar conceitos de desenvolvimento de software, arquitetura de sistemas, engenharia de requisitos, modelagem de dados e boas práticas de programação em projetos reais, consolidando sua formação acadêmica.
+A componente Estágio Curricular Supervisionado em Engenharia de Software tem como propósito fundamental proporcionar ao discente a vivência prática dos conhecimentos teóricos adquiridos ao longo da graduação, permitindo o desenvolvimento de competências técnicas, analíticas e profissionais essenciais para a atuação no mercado de trabalho. Por meio dessa experiência, o estudante tem a oportunidade de aplicar conceitos de desenvolvimento de software, arquitetura de sistemas, engenharia de requisitos, modelagem de dados e boas práticas de programação em projetos reais, consolidando sua formação acadêmica.
 
 Neste contexto, o presente relatório descreve as atividades desenvolvidas durante o período de estágio, cujo foco foi a concepção, desenvolvimento e implantação da plataforma web EducaFácil, um sistema de gestão escolar voltado à organização das rotinas de secretaria e gestão pedagógica de instituições de ensino. A plataforma foi projetada para atender às demandas administrativas e acadêmicas de escolas, oferecendo módulos integrados para cadastro de Estudantes, professores, turmas e equipe gestora, além de funcionalidades para gerenciamento de horários, calendário escolar, diário digital, frequência, notas e geração de relatórios.
 
@@ -73,7 +73,7 @@ Para alcançar o objetivo geral, foram definidos os seguintes objetivos específ
 
 - Implementar o módulo de cadastro e gerenciamento de Estudantes, contemplando dados pessoais, familiares, escolares e administrativos, com funcionalidades de busca, edição e exclusão de registros.
 
-- Desenvolver o módulo de cadastro e gerenciamento de professores, incluindo informações profissionais, disciplinas lecionadas, formação acadêmica e status funcional.
+- Desenvolver o módulo de cadastro e gerenciamento de professores, incluindo informações profissionais, componentes lecionadas, formação acadêmica e status funcional.
 
 - Criar o módulo de gerenciamento de turmas, permitindo a definição de série, turno, capacidade e associação de professores responsáveis.
 
@@ -101,7 +101,7 @@ A ausência de um sistema centralizado para gestão escolar dificulta o acompanh
 
 Nesse contexto, o desenvolvimento da plataforma EducaFácil justifica-se pela necessidade de oferecer uma solução tecnológica acessível, intuitiva e completa para a gestão escolar. O sistema foi projetado para centralizar todas as informações administrativas e pedagógicas em uma única plataforma web, permitindo acesso rápido e seguro aos dados, automação de processos rotineiros e geração de relatórios precisos.
 
-Do ponto de vista acadêmico, o projeto EducaFácil representa uma oportunidade significativa para aplicar e integrar conhecimentos de diversas disciplinas do curso de Engenharia de Software, incluindo Programação Web, Banco de Dados, Engenharia de Requisitos, Arquitetura de Software, Interface Homem-Computador e Gerência de Projetos. O desenvolvimento de um sistema real, com usuários e requisitos concretos, proporciona uma experiência de aprendizado incomparável, preparando o discente para os desafios do mercado de trabalho.
+Do ponto de vista acadêmico, o projeto EducaFácil representa uma oportunidade significativa para aplicar e integrar conhecimentos de diversas componentes do curso de Engenharia de Software, incluindo Programação Web, Banco de Dados, Engenharia de Requisitos, Arquitetura de Software, Interface Homem-Computador e Gerência de Projetos. O desenvolvimento de um sistema real, com usuários e requisitos concretos, proporciona uma experiência de aprendizado incomparável, preparando o discente para os desafios do mercado de trabalho.
 
 ## 2.4 Metodologia
 
@@ -149,9 +149,9 @@ Ao longo do desenvolvimento, foram realizados testes funcionais em cada módulo 
 
 ## 2.5 Apresentação da Instituição
 
-O estágio foi realizado no contexto da disciplina Estágio Curricular Supervisionado do curso de Engenharia de Software da Universidade Federal do Amazonas (UFAM), vinculada ao Instituto de Ciências Exatas e Tecnologia (ICET), localizado no município de Itacoatiara, Amazonas.
+O estágio foi realizado no contexto da componente Estágio Curricular Supervisionado do curso de Engenharia de Software da Universidade Federal do Amazonas (UFAM), vinculada ao Instituto de Ciências Exatas e Tecnologia (ICET), localizado no município de Itacoatiara, Amazonas.
 
-O curso de Engenharia de Software da UFAM tem como objetivo formar profissionais capacitados para atuar no desenvolvimento de sistemas de software, aplicando princípios de engenharia para a construção de soluções tecnológicas de qualidade. A grade curricular contempla disciplinas teóricas e práticas que abrangem programação, banco de dados, engenharia de requisitos, arquitetura de software, testes, gerência de projetos e desenvolvimento web, entre outras.
+O curso de Engenharia de Software da UFAM tem como objetivo formar profissionais capacitados para atuar no desenvolvimento de sistemas de software, aplicando princípios de engenharia para a construção de soluções tecnológicas de qualidade. A grade curricular contempla componentes teóricas e práticas que abrangem programação, banco de dados, engenharia de requisitos, arquitetura de software, testes, gerência de projetos e desenvolvimento web, entre outras.
 
 O projeto EducaFácil foi desenvolvido em parceria com a Escola Municipal Dom Paulo McHugh, instituição de ensino fundamental localizada no município de Itacoatiara. A escola forneceu o contexto real para o levantamento de requisitos e validação das funcionalidades desenvolvidas, possibilitando que o sistema fosse projetado para atender às necessidades concretas de uma instituição de ensino.
 
@@ -183,13 +183,13 @@ Foi definida a arquitetura do sistema baseada em uma Single Page Application (SP
 A modelagem de dados foi realizada considerando as entidades identificadas no levantamento de requisitos e seus relacionamentos. Foram criadas as seguintes tabelas no banco de dados PostgreSQL via Supabase:
 
 - **Estudantes:** Armazena dados completos dos Estudantes, incluindo nome, matrícula, data de nascimento, documentos, endereço, dados familiares, informações de saúde e dados administrativos.
-- **professores:** Contém informações dos professores, incluindo dados pessoais, disciplinas lecionadas, formação acadêmica e status funcional.
+- **professores:** Contém informações dos professores, incluindo dados pessoais, componentes lecionadas, formação acadêmica e status funcional.
 - **turmas:** Registra as turmas da escola, com informações de série, turno, ano, capacidade e associação com professores.
 - **equipe_gestora:** Armazena dados dos membros da equipe gestora da escola.
 - **eventos:** Contém os eventos do calendário escolar, com data, horário, local e tipo.
 - **horarios:** Registra a grade horária de cada turma.
 - **frequencia:** Armazena os registros de frequência diária dos Estudantes.
-- **notas:** Contém as notas dos Estudantes por disciplina e bimestre.
+- **notas:** Contém as notas dos Estudantes por componente e bimestre.
 - **profiles:** Armazena informações de perfil dos usuários autenticados.
 - **user_roles:** Gerencia os papéis e permissões dos usuários do sistema.
 
@@ -235,7 +235,7 @@ Para cada módulo do sistema, foi desenvolvida uma página específica com as se
 **Horário:**
 - Seleção de turma via sidebar.
 - Exibição da grade horária semanal.
-- Configuração de disciplinas por horário e dia da semana.
+- Configuração de componentes por horário e dia da semana.
 
 **Calendário:**
 - Visualização de eventos em formato de calendário mensal.
@@ -247,7 +247,7 @@ Para cada módulo do sistema, foi desenvolvida uma página específica com as se
 - Módulo de frequência com registro de presença por data.
 - Sistema de três estados: presente, ausente e justificado.
 - Modal para inserção de justificativa em caso de falta.
-- Módulo de notas com lançamento por disciplina e bimestre.
+- Módulo de notas com lançamento por componente e bimestre.
 - Cálculo automático de média anual.
 
 **Relatórios:**
@@ -296,7 +296,7 @@ Durante todo o processo de desenvolvimento, foram realizados testes funcionais p
 
 Foram identificados e corrigidos diversos bugs, incluindo problemas de navegação, validação de campos, exibição de dados e integração com APIs. Também foram realizadas melhorias de usabilidade, como feedbacks visuais para ações do usuário, mensagens de confirmação e tratamento de estados de carregamento.
 
-As atividades foram realizadas ao longo de aproximadamente 12 semanas de estágio, seguindo o cronograma estabelecido pela disciplina e adaptando-se às necessidades identificadas durante o desenvolvimento.
+As atividades foram realizadas ao longo de aproximadamente 12 semanas de estágio, seguindo o cronograma estabelecido pela componente e adaptando-se às necessidades identificadas durante o desenvolvimento.
 
 ---
 
@@ -314,7 +314,7 @@ Além dos aprendizados técnicos, o estágio contribuiu para o desenvolvimento d
 
 Como trabalhos futuros, identificam-se diversas possibilidades de evolução para a plataforma EducaFácil. O módulo de relatórios pode ser expandido com novos tipos de documentos e opções de personalização. Dashboards analíticos mais avançados podem ser implementados, com indicadores de desempenho e visualizações interativas. O sistema de permissões pode ser refinado, permitindo configurações mais granulares de acesso por tipo de usuário. Melhorias de design e acessibilidade podem tornar o sistema ainda mais inclusivo e agradável de usar. A implementação de notificações e alertas pode melhorar a comunicação entre os usuários do sistema. Por fim, a integração com outros sistemas escolares ou governamentais pode ampliar o alcance e a utilidade da plataforma.
 
-Em síntese, o estágio supervisionado com o projeto EducaFácil representou uma experiência formativa completa, alinhada aos objetivos da disciplina e do curso de Engenharia de Software. O desenvolvimento de uma solução real para gestão escolar permitiu aplicar conhecimentos teóricos em um contexto prático, preparando o discente para os desafios profissionais da área de tecnologia.
+Em síntese, o estágio supervisionado com o projeto EducaFácil representou uma experiência formativa completa, alinhada aos objetivos da componente e do curso de Engenharia de Software. O desenvolvimento de uma solução real para gestão escolar permitiu aplicar conhecimentos teóricos em um contexto prático, preparando o discente para os desafios profissionais da área de tecnologia.
 
 ---
 
@@ -358,4 +358,4 @@ MOZILLA DEVELOPER NETWORK. **MDN Web Docs**. Disponível em: https://developer.m
 
 ---
 
-*Documento elaborado como requisito parcial para aprovação na disciplina Estágio Curricular Supervisionado do curso de Engenharia de Software da Universidade Federal do Amazonas – UFAM.*
+*Documento elaborado como requisito parcial para aprovação na componente Estágio Curricular Supervisionado do curso de Engenharia de Software da Universidade Federal do Amazonas – UFAM.*

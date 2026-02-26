@@ -34,7 +34,7 @@ O sistema implementa controle de acesso baseado em autenticação, garantindo qu
 |--------|-----------|
 | **Painel (Dashboard)** | Visão geral com estatísticas, gráficos e indicadores do sistema |
 | **Estudantes** | Cadastro completo de Estudantes com dados pessoais, familiares e administrativos |
-| **Professores** | Gestão de professores com formações, disciplinas e status funcional |
+| **Professores** | Gestão de professores com formações, componentes e status funcional |
 | **Turmas** | Organização de turmas por ano, série e turno |
 | **Diário Digital** | Módulo integrado para frequência, notas, objetos de conhecimento e avaliações |
 | **Frequência** | Registro de presença com estados: presente, faltou, justificado |
@@ -332,8 +332,8 @@ Armazena informações dos professores.
 | `nome` | text | Sim | Nome completo |
 | `matricula` | text | Sim | Número de matrícula funcional |
 | `email` | text | Sim | Email institucional |
-| `disciplina` | text | Sim | Disciplina principal (legado) |
-| `disciplinas` | text[] | Não | Array de disciplinas lecionadas |
+| `componente` | text | Sim | componente principal (legado) |
+| `componentes` | text[] | Não | Array de componentes lecionadas |
 | `series` | text[] | Não | Array de séries que leciona |
 | `telefone` | text | Não | Telefone de contato |
 | `cpf` | text | Não | CPF |
@@ -373,7 +373,7 @@ Registro de notas bimestrais dos Estudantes.
 | `id` | integer (PK) | Sim | Identificador único |
 | `estudante_id` | integer (FK) | Sim | Referência ao estudante |
 | `turma_id` | integer (FK) | Sim | Referência à turma |
-| `disciplina` | text | Sim | Nome da disciplina |
+| `componente` | text | Sim | Nome da componente |
 | `ano` | integer | Sim | Ano letivo (default: ano atual) |
 | `bimestre_1` | numeric | Não | Nota do 1º bimestre |
 | `bimestre_2` | numeric | Não | Nota do 2º bimestre |
@@ -443,7 +443,7 @@ Grade horária das turmas.
 | `id` | integer (PK) | Sim | Identificador único |
 | `turma_id` | integer (FK) | Sim | Referência à turma |
 | `dia` | text | Sim | Dia da semana |
-| `disciplina` | text | Sim | Disciplina |
+| `componente` | text | Sim | componente |
 | `inicio` | text | Sim | Horário de início |
 | `fim` | text | Sim | Horário de término |
 
@@ -462,13 +462,13 @@ Anotações e registros diversos.
 
 ### 5.2.10. Tabela: `objetos_conhecimento`
 
-Armazena o planejamento de objetos de conhecimento e habilidades por turma e disciplina.
+Armazena o planejamento de objetos de conhecimento e habilidades por turma e componente.
 
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
 | `id` | integer (PK) | Sim | Identificador único |
 | `turma_id` | integer (FK) | Sim | Referência à turma (`turmas.id`) |
-| `disciplina` | text | Sim | Nome da disciplina |
+| `componente` | text | Sim | Nome da componente |
 | `bimestre` | integer | Sim | Bimestre (1, 2, 3, 4) |
 | `conteudo` | text | Sim | Descrição do objeto de conhecimento/conteúdo |
 | `created_at` | timestamptz | Não | Data de criação (default: now()) |
@@ -757,7 +757,7 @@ src/
 ### 7.2.6. Objetos de Conhecimento (`/diario-digital/objetos-de-conhecimento`)
 
 - Tela para planejamento pedagógico.
-- Seleção de turma e disciplina.
+- Seleção de turma e componente.
 - Registro de objetos de conhecimento e habilidades por bimestre.
 - Utiliza um acordeão para organizar o conteúdo dos 4 bimestres.
 
@@ -769,7 +769,7 @@ src/
 
 ### 7.2.8. Notas (`/turmas/:turmaId/notas`)
 
-- Tabela de notas por disciplina
+- Tabela de notas por componente
 - Colunas: 4 bimestres + média anual
 - Cálculo automático de média
 - Situação automática (aprovado/reprovado)

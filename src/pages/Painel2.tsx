@@ -158,7 +158,7 @@ export default function Painel() {
           atividades.push({
             id: `nota-${doc.id}`,
             tipo: 'nota',
-            descricao: `Notas registradas para ${data.disciplina}`,
+            descricao: `Notas registradas para ${data.componente}`,
             tempo: formatDistanceToNow(data.created_at.toDate(), { addSuffix: true, locale: ptBR }),
             created_at: data.created_at.toDate().toISOString(),
           });

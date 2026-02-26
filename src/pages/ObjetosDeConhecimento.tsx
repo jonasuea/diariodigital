@@ -6,9 +6,9 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 
@@ -20,14 +20,11 @@ interface Turma {
 const bimestres = [1, 2, 3, 4];
 
 export default function ObjetosDeConhecimento() {
-  const { user } = useAuth();
   const { turmaId } = useParams<{ turmaId?: string }>();
-  const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [turmaSelecionada, setTurmaSelecionada] = useState<string | null>(null);
-  const [disciplinas, setDisciplinas] = useState<string[]>([]);
-  const [loadingDisciplinas, setLoadingDisciplinas] = useState(false);
-  const [disciplinaSelecionada, setDisciplinaSelecionada] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const componente = searchParams.get('componente');
 
+  const [turma, setTurma] = useState<Turma | null>(null);
   const [conteudos, setConteudos] = useState<Record<number, { id: string | null; texto: string }>>({
     1: { id: null, texto: "" },
     2: { id: null, texto: "" },
@@ -35,77 +32,38 @@ export default function ObjetosDeConhecimento() {
     4: { id: null, texto: "" },
   });
 
-  const [loadingTurmas, setLoadingTurmas] = useState(true);
-  const [loadingConteudos, setLoadingConteudos] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [savingBimestre, setSavingBimestre] = useState<number | null>(null);
 
   useEffect(() => {
-    async function fetchTurmas() {
-      try {
-        const turmasQuery = query(collection(db, 'turmas'), orderBy('nome'));
-        const turmasSnapshot = await getDocs(turmasQuery);
-        const turmasData = turmasSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
-        setTurmas(turmasData);
-      } catch (error) {
-        console.error("Error fetching turmas: ", error);
-        toast.error("Erro ao carregar as turmas.");
-      } finally {
-        setLoadingTurmas(false);
+    async function fetchTurmaEConteudos() {
+      if (!turmaId || !componente) {
+        setLoading(false);
+        return;
       }
-    }
-    fetchTurmas();
-  }, []);
+      setLoading(true);
 
-    useEffect(() => {
-    if (turmaId) {
-      setTurmaSelecionada(turmaId);
-    }
-  }, [turmaId]);
-
-  useEffect(() => {
-    if (!turmaSelecionada || !user) {
-      setDisciplinas([]);
-      setDisciplinaSelecionada(null);
-      return;
-    }
-
-    async function fetchDisciplinas() {
-      setLoadingDisciplinas(true);
-      setDisciplinaSelecionada(null);
       try {
+        // Fetch Turma
+        const turmaDocRef = doc(db, 'turmas', turmaId);
+        const turmaDoc = await getDoc(turmaDocRef);
+        if (turmaDoc.exists()) {
+          setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
+        } else {
+          toast.error("Turma não encontrada.");
+        }
+
+        // Fetch Conteudos
         const q = query(
-          collection(db, 'professores_turmas'),
-          where('turma_id', '==', turmaSelecionada),
-          where('professor_id', '==', user.uid)
+          collection(db, 'objetos_conhecimento'),
+          where('turma_id', '==', turmaId),
+          where('componente', '==', componente)
         );
         const querySnapshot = await getDocs(q);
-        const disciplinasData = querySnapshot.docs.map(doc => doc.data().disciplina as string);
-        const disciplinasUnicas = [...new Set(disciplinasData)];
-        setDisciplinas(disciplinasUnicas.sort());
-      } catch (error) {
-        console.error("Error fetching disciplinas: ", error);
-        toast.error("Erro ao carregar as disciplinas do professor.");
-      } finally {
-        setLoadingDisciplinas(false);
-      }
-    }
 
-    fetchDisciplinas();
-  }, [turmaSelecionada, user]);
-
-  useEffect(() => {
-    if (!turmaSelecionada || !disciplinaSelecionada) {
-      setConteudos({ 1: { id: null, texto: "" }, 2: { id: null, texto: "" }, 3: { id: null, texto: "" }, 4: { id: null, texto: "" } });
-      return;
-    }
-
-    async function fetchConteudos() {
-      setLoadingConteudos(true);
-      try {
-        const q = query(collection(db, 'objetos_conhecimento'), where('turma_id', '==', turmaSelecionada), where('disciplina', '==', disciplinaSelecionada));
-        const querySnapshot = await getDocs(q);
-        
-        const novosConteudos: Record<number, { id: string | null; texto: string }> = { 1: { id: null, texto: "" }, 2: { id: null, texto: "" }, 3: { id: null, texto: "" }, 4: { id: null, texto: "" } };
+        const novosConteudos: Record<number, { id: string | null; texto: string }> = {
+          1: { id: null, texto: "" }, 2: { id: null, texto: "" }, 3: { id: null, texto: "" }, 4: { id: null, texto: "" }
+        };
 
         querySnapshot.forEach(doc => {
           const data = doc.data();
@@ -114,20 +72,21 @@ export default function ObjetosDeConhecimento() {
           }
         });
         setConteudos(novosConteudos);
+
       } catch (error) {
-        console.error("Error fetching conteudos: ", error);
-        toast.error("Erro ao carregar os objetos de conhecimento.");
+        console.error("Error fetching data: ", error);
+        toast.error("Erro ao carregar os dados.");
       } finally {
-        setLoadingConteudos(false);
+        setLoading(false);
       }
     }
 
-    fetchConteudos();
-  }, [turmaSelecionada, disciplinaSelecionada]);
+    fetchTurmaEConteudos();
+  }, [turmaId, componente]);
 
   const handleSave = async (bimestre: number) => {
-    if (!turmaSelecionada || !disciplinaSelecionada) {
-      toast.warning("Selecione uma turma e disciplina para salvar.");
+    if (!turmaId || !componente) {
+      toast.warning("Turma ou componente não identificados.");
       return;
     }
     
@@ -141,8 +100,8 @@ export default function ObjetosDeConhecimento() {
         toast.success(`Conteúdo do ${bimestre}º Bimestre atualizado!`);
       } else {
         const docRef = await addDoc(collection(db, 'objetos_conhecimento'), {
-          turma_id: turmaSelecionada,
-          disciplina: disciplinaSelecionada,
+          turma_id: turmaId,
+          componente: componente,
           bimestre: bimestre,
           conteudo: conteudoParaSalvar.texto,
           created_at: new Date(),
@@ -166,49 +125,19 @@ export default function ObjetosDeConhecimento() {
     <AppLayout>
       <div className="space-y-4">
         <h1 className="text-2xl font-bold tracking-tight">Objetos de Conhecimento</h1>
-        <p className="text-muted-foreground">Planeje e registre os objetos de conhecimento e habilidades a serem trabalhados em cada bimestre.</p>
+        <p className="text-muted-foreground">
+          Planeje e registre os objetos de conhecimento para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
+        </p>
 
         <Card>
           <CardHeader>
-            <CardTitle>Filtros</CardTitle>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <label htmlFor="turma" className="mb-2 block text-sm font-medium">Turma</label>
-                <Select value={turmaSelecionada ?? ''} onValueChange={setTurmaSelecionada} disabled={loadingTurmas || !!turmaId}>
-                  <SelectTrigger id="turma">
-                    <SelectValue placeholder={loadingTurmas ? "Carregando turmas..." : "Selecione a turma"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {turmas.map((turma) => (
-                      <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                                <label htmlFor="disciplina" className="mb-2 block text-sm font-medium">Disciplina</label>
-                <Select 
-                  onValueChange={setDisciplinaSelecionada} 
-                  disabled={!turmaSelecionada || loadingDisciplinas}
-                  value={disciplinaSelecionada ?? ''}
-                >
-                  <SelectTrigger id="disciplina">
-                    <SelectValue placeholder={loadingDisciplinas ? "Carregando..." : "Selecione a disciplina"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {disciplinas.map((disciplina) => (
-                      <SelectItem key={disciplina} value={disciplina}>{disciplina}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+            <CardTitle>Conteúdos Bimestrais</CardTitle>
           </CardHeader>
           <CardContent>
-            {loadingConteudos ? (
+            {loading ? (
               <div className="flex h-40 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
-            ) : turmaSelecionada && disciplinaSelecionada ? (
-              <Accordion type="single" collapsible className="w-full">
+            ) : turmaId && componente ? (
+              <Accordion type="single" collapsible className="w-full" defaultValue="bimestre-1">
                 {bimestres.map((bimestre) => (
                   <AccordionItem key={bimestre} value={`bimestre-${bimestre}`}>
                     <AccordionTrigger>{bimestre}º Bimestre</AccordionTrigger>
@@ -232,7 +161,7 @@ export default function ObjetosDeConhecimento() {
               </Accordion>
             ) : (
               <div className="flex h-40 items-center justify-center rounded-md border-2 border-dashed">
-                <p className="text-muted-foreground">Selecione uma turma e uma disciplina para visualizar ou registrar os conteúdos.</p>
+                <p className="text-muted-foreground">Não foi possível carregar os dados. Verifique se a turma e o componente foram selecionados corretamente.</p>
               </div>
             )}
           </CardContent>

@@ -21,7 +21,7 @@ CREATE TABLE public.profiles (
 CREATE TABLE public.professores (
     id SERIAL PRIMARY KEY,
     nome TEXT NOT NULL,
-    disciplina TEXT NOT NULL,
+    componente TEXT NOT NULL,
     matricula TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
     telefone TEXT,
@@ -90,7 +90,7 @@ CREATE TABLE public.horarios (
     dia TEXT NOT NULL,
     inicio TEXT NOT NULL,
     fim TEXT NOT NULL,
-    disciplina TEXT NOT NULL
+    componente TEXT NOT NULL
 );
 
 -- Tabela de usuários administrativos

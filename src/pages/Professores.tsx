@@ -17,7 +17,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 interface Professor {
   id: string;
   nome: string;
-  disciplina: string;
+  componente: string;
   matricula: string;
   email: string;
   telefone: string | null;
@@ -28,7 +28,7 @@ interface Professor {
   data_lotacao: string | null;
   link_lattes: string | null;
   biografia: string | null;
-  disciplinas: string[] | null;
+  componentes: string[] | null;
   series: string[] | null;
   formacoes: string[] | null;
 }
@@ -183,11 +183,11 @@ export default function Professores() {
             data_lotacao: row.data_lotacao?.trim() || '',
             link_lattes: row.link_lattes?.trim() || '',
             biografia: row.biografia?.trim() || '',
-            disciplinas: row.disciplinas ? row.disciplinas.split(',').map((d: string) => d.trim()) : [],
+            componentes: row.componentes ? row.componentes.split(',').map((d: string) => d.trim()) : [],
             series: row.series ? row.series.split(',').map((s: string) => s.trim()) : [],
             formacoes,
             ativo: row.ativo ? (row.ativo.toLowerCase() === 'true' || row.ativo === '1') : true,
-            disciplina: row.disciplinas ? row.disciplinas.split(',')[0].trim() : '',
+            componente: row.componentes ? row.componentes.split(',')[0].trim() : '',
           };
           await addDoc(collection(db, 'professores'), professorData);
           successCount++;
@@ -228,7 +228,7 @@ export default function Professores() {
           data_lotacao: data.data_lotacao || '',
           link_lattes: data.link_lattes || '',
           biografia: data.biografia || '',
-          disciplinas: (data.disciplinas || []).join(','),
+          componentes: (data.componentes || []).join(','),
           series: (data.series || []).join(','),
           formacoes: JSON.stringify(data.formacoes || []),
           ativo: data.ativo ?? true,
@@ -263,7 +263,7 @@ export default function Professores() {
 
   const columns = [
     { key: 'nome', header: 'Nome' },
-    { key: 'disciplina', header: 'Disciplina' },
+    { key: 'componente', header: 'componente' },
     { key: 'matricula', header: 'Matrícula' },
     { key: 'email', header: 'E-mail' },
     { key: 'telefone', header: 'Telefone', render: (p: Professor) => p.telefone || '-' },

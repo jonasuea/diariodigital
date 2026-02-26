@@ -14,6 +14,13 @@ import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, dele
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface ComponenteCurricular {
+  nome: string;
+  professorId: string;
+  professorNome?: string;
+}
 
 interface Turma {
   id: string;
@@ -21,16 +28,13 @@ interface Turma {
   serie: string;
   turno: string;
   ano: number;
-  professor_id: string | null;
-  professor_id_2: string | null;
-  professores_disciplinas?: { professor_id: string; disciplina: string }[];
   capacidade: number;
-  professor_nome?: string;
-  professor_nome_2?: string;
+  componentes: ComponenteCurricular[];
+  professoresIds: string[]; // Para facilitar a busca
   estudantes_count?: number;
 }
 
-const DISCIPLINAS = [
+const COMPONENTES_CURRICULARES = [
   'Língua Portuguesa',
   'Matemática',
   'Ciências',
@@ -77,16 +81,16 @@ export default function Turmas() {
   
   const [alocarDialogOpen, setAlocarDialogOpen] = useState(false);
   const [turmaParaAlocar, setTurmaParaAlocar] = useState<Turma | null>(null);
-  const [alocacaoData, setAlocacaoData] = useState<{ professor_id: string; disciplina: string }[]>([]);
-  const [novaAlocacao, setNovaAlocacao] = useState({ professor_id: '', disciplina: '' });
+  const [alocacaoData, setAlocacaoData] = useState<Omit<ComponenteCurricular, 'professorNome'>[]>([]);
+  const [novaAlocacao, setNovaAlocacao] = useState({ professorId: '', nome: '' });
+
+  const { user } = useAuth();
 
   const [formData, setFormData] = useState({
     nome: '',
     serie: '',
     turno: 'Manhã',
     ano: new Date().getFullYear(),
-    professor_id: '',
-    professor_id_2: '',
     capacidade: 30,
   });
 
@@ -122,8 +126,12 @@ export default function Turmas() {
       const querySnapshot = await getDocs(turmasQuery);
       const turmasData = await Promise.all(querySnapshot.docs.map(async (turmaDoc) => {
         const turmaData = turmaDoc.data() as Omit<Turma, 'id'>;
-        const professor_nome = turmaData.professor_id ? profsMap.get(turmaData.professor_id) : '-';
-        const professor_nome_2 = turmaData.professor_id_2 ? profsMap.get(turmaData.professor_id_2) : '-';
+        
+        // Adiciona o nome do professor a cada componente
+        const disciplinasComNomes = turmaData.componentes?.map(d => ({
+            ...d,
+            professorNome: profsMap.get(d.professorId) || 'Não encontrado'
+        })) || [];
         
         const estudantesColl = query(collection(db, "estudantes"), where('turma_id', '==', turmaDoc.id));
         const snapshot = await getCountFromServer(estudantesColl);
@@ -132,8 +140,7 @@ export default function Turmas() {
         return {
           id: turmaDoc.id,
           ...turmaData,
-          professor_nome,
-          professor_nome_2,
+          componentes: disciplinasComNomes,
           estudantes_count,
         };
       }));
@@ -159,22 +166,26 @@ export default function Turmas() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!user) {
+      toast.error("Você precisa estar autenticado para realizar esta ação.");
+      return;
+    }
     
-    const payload = {
-      ...formData,
-      professor_id: formData.professor_id || null,
-      professor_id_2: formData.professor_id_2 === 'none' ? null : formData.professor_id_2 || null,
-    };
+    // O payload não precisa de ajustes, pois o formData já está sem professor_id
+    const payload = { ...formData };
 
     try {
       if (editingTurma) {
         const turmaDocRef = doc(db, 'turmas', editingTurma.id);
         await updateDoc(turmaDocRef, payload);
-        await logActivity(`atualizou a turma "${payload.nome}".`);
+        await logActivity(`(App) ${user.email} atualizou a turma "${payload.nome}".`);
         toast.success('Turma atualizada com sucesso!');
       } else {
-        await addDoc(collection(db, 'turmas'), payload);
-        await logActivity(`criou a nova turma "${payload.nome}".`);
+        // Para novas turmas, iniciamos com componentes e professores vazios
+        const newPayload = { ...payload, componentes: [], professoresIds: [] };
+        await addDoc(collection(db, 'turmas'), newPayload);
+        await logActivity(`(App) ${user.email} criou a nova turma "${payload.nome}".`);
         toast.success('Turma cadastrada com sucesso!');
       }
 
@@ -193,8 +204,6 @@ export default function Turmas() {
       serie: '',
       turno: 'Manhã',
       ano: new Date().getFullYear(),
-      professor_id: '',
-      professor_id_2: '',
       capacidade: 30,
     });
     setEditingTurma(null);
@@ -207,8 +216,6 @@ export default function Turmas() {
       serie: turma.serie,
       turno: turma.turno,
       ano: turma.ano,
-      professor_id: turma.professor_id || '',
-      professor_id_2: turma.professor_id_2 || '',
       capacidade: turma.capacidade || 30,
     });
     setIsOpen(true);
@@ -220,11 +227,11 @@ export default function Turmas() {
   }
 
   async function handleDelete() {
-    if (!turmaToDelete) return;
+    if (!turmaToDelete || !user) return;
     
     try {
       await deleteDoc(doc(db, 'turmas', turmaToDelete.id));
-      await logActivity(`excluiu a turma "${turmaToDelete.nome}".`);
+      await logActivity(`(App) ${user.email} excluiu a turma "${turmaToDelete.nome}".`);
       toast.success('Turma excluída com sucesso!');
       setDeleteDialogOpen(false);
       setTurmaToDelete(null);
@@ -266,7 +273,7 @@ export default function Turmas() {
   }
 
   async function handleSalvarEnturmacao() {
-    if (!turmaParaEnturmar) return;
+    if (!turmaParaEnturmar || !user) return;
 
     const estudantesIds = Object.keys(selecaoEstudantes).filter(id => selecaoEstudantes[id]);
     if (estudantesIds.length === 0) {
@@ -282,7 +289,7 @@ export default function Turmas() {
       });
       await batch.commit();
       
-      await logActivity(`enturmou ${estudantesIds.length} estudante(s) na turma "${turmaParaEnturmar.nome}".`);
+      await logActivity(`(App) ${user.email} enturmou ${estudantesIds.length} estudante(s) na turma "${turmaParaEnturmar.nome}".`);
       toast.success(`${estudantesIds.length} estudante(s) enturmado(s) com sucesso!`);
       setEnturmarDialogOpen(false);
       setTurmaParaEnturmar(null);
@@ -296,34 +303,43 @@ export default function Turmas() {
 
   function openAlocarDialog(turma: Turma) {
     setTurmaParaAlocar(turma);
-    setAlocacaoData(turma.professores_disciplinas || []);
+    // Remove o campo professorNome antes de colocar no estado de edição
+    const disciplinasParaEdicao = turma.componentes?.map(({nome, professorId}) => ({nome, professorId})) || [];
+    setAlocacaoData(disciplinasParaEdicao);
     setAlocarDialogOpen(true);
   }
 
   function adicionarAlocacao() {
-    if (!novaAlocacao.professor_id || !novaAlocacao.disciplina) {
-      toast.error('Selecione um professor e uma disciplina.');
+    if (!novaAlocacao.professorId || !novaAlocacao.nome) {
+      toast.error('Selecione um professor e um componente curricular.');
       return;
     }
-    if (alocacaoData.some(a => a.disciplina === novaAlocacao.disciplina)) {
-      toast.warning(`A disciplina ${novaAlocacao.disciplina} já possui um professor alocado.`);
+    if (alocacaoData.some(a => a.nome === novaAlocacao.nome)) {
+      toast.warning(`O componente curricular ${novaAlocacao.nome} já possui um professor alocado.`);
       return;
     }
     setAlocacaoData(prev => [...prev, novaAlocacao]);
-    setNovaAlocacao({ professor_id: '', disciplina: '' });
+    setNovaAlocacao({ professorId: '', nome: '' });
   }
 
-  function removerAlocacao(index: number) {
-    setAlocacaoData(prev => prev.filter((_, i) => i !== index));
+  function removerAlocacao(disciplinaNome: string) {
+    setAlocacaoData(prev => prev.filter(d => d.nome !== disciplinaNome));
   }
 
   async function handleSalvarAlocacao() {
-    if (!turmaParaAlocar) return;
+    if (!turmaParaAlocar || !user) return;
+
+    // Criar o array de IDs de professores para facilitar as queries
+    const professoresIds = [...new Set(alocacaoData.map(d => d.professorId))];
+
     try {
       const turmaRef = doc(db, 'turmas', turmaParaAlocar.id);
-      await updateDoc(turmaRef, { professores_disciplinas: alocacaoData });
-      await logActivity(`alocou professores de disciplina para a turma "${turmaParaAlocar.nome}".`);
-      toast.success('Professores de disciplina salvos com sucesso!');
+      await updateDoc(turmaRef, { 
+        componentes: alocacaoData,
+        professoresIds: professoresIds 
+      });
+      await logActivity(`(App) ${user.email} alocou professores para a turma "${turmaParaAlocar.nome}".`);
+      toast.success('Alocação de professores salva com sucesso!');
       setAlocarDialogOpen(false);
       setTurmaParaAlocar(null);
       setAlocacaoData([]);
@@ -402,33 +418,7 @@ export default function Turmas() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="professor1">Professor Responsável 1 (Monitor)</Label>
-                  <Select value={formData.professor_id} onValueChange={(value) => setFormData({ ...formData, professor_id: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar professor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {professores.map((prof) => (
-                        <SelectItem key={prof.id} value={prof.id}>{prof.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="professor2">Professor Responsável 2 (Monitor)</Label>
-                  <Select value={formData.professor_id_2} onValueChange={(value) => setFormData({ ...formData, professor_id_2: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecionar professor (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum</SelectItem>
-                      {professores.map((prof) => (
-                        <SelectItem key={prof.id} value={prof.id}>{prof.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                
                 <div className="space-y-2">
                   <Label htmlFor="capacidade">Capacidade da Sala</Label>
                   <Input
@@ -476,9 +466,9 @@ export default function Turmas() {
               <thead className="bg-muted/50">
                 <tr>
                   <th className="text-left p-4 font-medium text-muted-foreground">Turma</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Monitores</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Professores</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Período</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Capacidade</th>
+                  <th className="text-left p-4 font-medium text-muted-foreground">Vagas</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Estudantes</th>
                   <th className="text-left p-4 font-medium text-muted-foreground">Ano</th>
                   <th className="text-right p-4 font-medium text-muted-foreground">Ações</th>
@@ -488,12 +478,19 @@ export default function Turmas() {
                 {turmas.map((turma) => (
                   <tr key={turma.id} className="border-t hover:bg-muted/30">
                     <td className="p-4 font-medium">{turma.nome}</td>
-                    <td className="p-4"> 
-                      <p>{turma.professor_nome || ''}</p>
-                      <p>{turma.professor_nome_2 || ''}</p>
+                    <td className="p-4 text-sm"> 
+                      {turma.componentes && turma.componentes.length > 0 ? (
+                        <ul className="list-disc list-inside">
+                            {turma.componentes.map(d => (
+                                <li key={d.nome}><strong>{d.nome}:</strong> {d.professorNome}</li>
+                            ))}
+                        </ul>
+                      ) : (
+                        <span className="text-muted-foreground">Nenhum componente alocado</span>
+                      )}
                     </td>
                     <td className="p-4">{turma.turno}</td>
-                    <td className="p-4">{turma.capacidade}</td>
+                    <td className="p-4">{turma.capacidade - (turma.estudantes_count || 0)}</td>
                     <td className="p-4">{turma.estudantes_count}</td>
                     <td className="p-4">{turma.ano}</td>
                     <td className="p-4">
@@ -504,7 +501,7 @@ export default function Turmas() {
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => openAlocarDialog(turma)}>
                           <BookOpen className="h-4 w-4 md:mr-1" />
-                          <span className="hidden md:inline">Disciplinas</span>
+                          <span className="hidden md:inline">Componentes</span>
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => openEdit(turma)}>
                           <Pencil className="h-4 w-4 md:mr-1" />
@@ -530,130 +527,151 @@ export default function Turmas() {
             </table>
           </div>
         )}
+      </div>
 
-        {/* Dialog de Confirmação de Exclusão */}
-        <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
-              <AlertDialogDescription>
-                Tem certeza que deseja excluir a turma "{turmaToDelete?.nome}"? 
-                Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+      {/* Dialog de Confirmação de Exclusão */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a turma "{turmaToDelete?.nome}"?
+              Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        {/* Dialog de Enturmação */}
-        <Dialog open={enturmarDialogOpen} onOpenChange={setEnturmarDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Enturmar Estudantes na Turma: {turmaParaEnturmar?.nome}</DialogTitle>
-              <DialogDescription>
-                Selecione os estudantes da série "{turmaParaEnturmar?.serie}" que deseja adicionar a esta turma. Apenas estudantes sem turma são listados.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="max-h-[60vh] overflow-y-auto p-1">
-              {loadingEstudantes ? (
-                <p>Carregando estudantes...</p>
-              ) : estudantesParaEnturmar.length > 0 ? (
-                <div className="space-y-2">
-                  {estudantesParaEnturmar.map(estudante => (
-                    <div key={estudante.id} className="flex items-center space-x-2 p-2 rounded hover:bg-muted">
-                      <Checkbox
-                        id={`estudante-${estudante.id}`}
-                        checked={selecaoEstudantes[estudante.id] || false}
-                        onCheckedChange={(checked) => handleSelecaoEstudante(estudante.id, !!checked)}
-                      />
-                      <Label htmlFor={`estudante-${estudante.id}`} className="flex-1 cursor-pointer">
-                        {estudante.nome}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-center text-muted-foreground py-8">
-                  Nenhum estudante elegível encontrado para esta série.
-                </p>
-              )}
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEnturmarDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSalvarEnturmacao}>Salvar Seleção</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* Dialog de Alocação de Professores por Disciplina */}
-        <Dialog open={alocarDialogOpen} onOpenChange={setAlocarDialogOpen}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Alocar Professores por Disciplina</DialogTitle>
-              <DialogDescription>
-                Gerencie os professores de cada disciplina para a turma: {turmaParaAlocar?.nome}.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {/* List of current allocations */}
+      {/* Dialog de Enturmação */}
+      <Dialog open={enturmarDialogOpen} onOpenChange={setEnturmarDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Enturmar Estudantes na Turma: {turmaParaEnturmar?.nome}</DialogTitle>
+            <DialogDescription>
+              Selecione os estudantes da série "{turmaParaEnturmar?.serie}" que deseja adicionar a esta turma. Apenas estudantes sem turma são listados.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto p-1">
+            {loadingEstudantes ? (
+              <p>Carregando estudantes...</p>
+            ) : estudantesParaEnturmar.length > 0 ? (
               <div className="space-y-2">
-                <Label>Alocações Atuais</Label>
-                <div className="max-h-48 overflow-y-auto rounded-md border p-2 space-y-2">
-                  {alocacaoData.length > 0 ? (
-                    alocacaoData.map((aloc, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                {estudantesParaEnturmar.map(estudante => (
+                  <div key={estudante.id} className="flex items-center space-x-2 p-2 rounded hover:bg-muted">
+                    <Checkbox
+                      id={`estudante-${estudante.id}`}
+                      checked={selecaoEstudantes[estudante.id] || false}
+                      onCheckedChange={(checked) => handleSelecaoEstudante(estudante.id, !!checked)}
+                    />
+                    <Label htmlFor={`estudante-${estudante.id}`} className="flex-1 cursor-pointer">
+                      {estudante.nome}
+                    </Label>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-center text-muted-foreground py-8">
+                Nenhum estudante elegível encontrado para esta série.
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEnturmarDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSalvarEnturmacao}>Salvar Seleção</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog para Alocar Professores */}
+      <Dialog open={alocarDialogOpen} onOpenChange={setAlocarDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Alocar Professores por Componente Curricular</DialogTitle>
+            <DialogDescription>
+              Vincule professores aos componentes curriculares para a turma: {turmaParaAlocar?.nome}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            {/* Formulário de Nova Alocação */}
+            <div className="space-y-4 p-4 border rounded-md">
+              <h4 className="font-semibold text-lg">Adicionar Componente</h4>
+              <div className="space-y-2">
+                <Label>Componente Curricular</Label>
+                <Select value={novaAlocacao.nome} onValueChange={(value) => setNovaAlocacao(prev => ({ ...prev, nome: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o componente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COMPONENTES_CURRICULARES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Professor</Label>
+                <Select value={novaAlocacao.professorId} onValueChange={(value) => setNovaAlocacao(prev => ({ ...prev, professorId: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o professor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {professores.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button onClick={adicionarAlocacao} className="w-full">
+                <Plus className="h-4 w-4 mr-2" /> Adicionar
+              </Button>
+            </div>
+            
+            {/* Lista de Alocações Atuais */}
+            <div className="space-y-2">
+              <h4 className="font-semibold text-lg mb-2">Alocações Atuais</h4>
+              {alocacaoData.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">Nenhum componente adicionado ainda.</p>
+              ) : (
+                <div className="border rounded-md max-h-64 overflow-y-auto">
+                  {alocacaoData.map((alocacao, index) => {
+                    const professor = professores.find(p => p.id === alocacao.professorId);
+                    return (
+                      <div key={index} className="flex items-center justify-between p-3 border-b last:border-b-0">
                         <div>
-                          <p className="font-medium">{professores.find(p => p.id === aloc.professor_id)?.nome}</p>
-                          <p className="text-sm text-muted-foreground">{aloc.disciplina}</p>
+                          <p className="font-medium">{alocacao.nome}</p>
+                          <p className="text-sm text-muted-foreground">{professor?.nome || 'Professor não encontrado'}</p>
                         </div>
-                        <Button variant="ghost" size="icon" onClick={() => removerAlocacao(index)}>
+                        <Button variant="ghost" size="icon" onClick={() => removerAlocacao(alocacao.nome)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
-                    ))
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center p-4">Nenhum professor de disciplina alocado.</p>
-                  )}
+                    );
+                  })}
                 </div>
-              </div>
-              {/* Form to add new allocation */}
-              <div className="space-y-2 pt-4 border-t">
-                <Label>Nova Alocação</Label>
-                <div className="flex items-end gap-2">
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="novo-prof" className="text-xs">Professor</Label>
-                    <Select value={novaAlocacao.professor_id} onValueChange={(v) => setNovaAlocacao(p => ({...p, professor_id: v}))}>
-                      <SelectTrigger id="novo-prof"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                      <SelectContent>
-                        {professores.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <Label htmlFor="nova-disc" className="text-xs">Disciplina</Label>
-                    <Select value={novaAlocacao.disciplina} onValueChange={(v) => setNovaAlocacao(p => ({...p, disciplina: v}))}>
-                      <SelectTrigger id="nova-disc"><SelectValue placeholder="Selecione..." /></SelectTrigger>
-                      <SelectContent>
-                        {DISCIPLINAS.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button type="button" onClick={adicionarAlocacao}>Adicionar</Button>
-                </div>
-              </div>
+              )}
             </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setAlocarDialogOpen(false)}>Cancelar</Button>
-              <Button onClick={handleSalvarAlocacao}>Salvar Alocações</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAlocarDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleSalvarAlocacao}>Salvar Alocações</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <div className="flex justify-end gap-2 pt-4">
+        <Button type="button" variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>
+          Cancelar
+        </Button>
+        <Button type="submit">
+          {editingTurma ? 'Salvar' : 'Criar Turma'}
+        </Button>
       </div>
     </AppLayout>
   );
 }
+
+// Forçar recarregamento do arquivo

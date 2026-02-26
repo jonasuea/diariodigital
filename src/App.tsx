@@ -28,6 +28,10 @@ import NotFound from "./pages/NotFound";
 import Logs from "./pages/Logs";
 import Manutencao from "./pages/Manutencao";
 import ObjetosDeConhecimento from "./pages/ObjetosDeConhecimento";
+import Avaliacoes from "./pages/Avaliacoes";
+import PerfilEstudante from "./pages/PerfilEstudante";
+import PerfilProfessor from "./pages/PerfilProfessor";
+import PerfilUsuario from "./pages/PerfilUsuario";
 
 const queryClient = new QueryClient();
 
@@ -60,9 +64,10 @@ const router = createBrowserRouter([
   { path: "/diario-digital", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><DiarioDigital /></ProtectedRoute> },
   { path: "/diario-digital/objetos-de-conhecimento/:turmaId", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
   { path: "/diario-digital/objetos-de-conhecimento", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
+  { path: "/diario-digital/avaliacoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Avaliacoes /></ProtectedRoute> },
   { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Relatorios /></ProtectedRoute> },
-  { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin']}><Configuracoes /></ProtectedRoute> },
-  { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin']}><Usuarios /></ProtectedRoute> },
+  { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Configuracoes /></ProtectedRoute> },
+  { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin','gestor']}><Usuarios /></ProtectedRoute> },
   { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Logs /></ProtectedRoute> },
 
   { path: "*", element: <NotFound /> },

@@ -203,7 +203,7 @@ export default function NovoEstudante() {
       serie: '',
       escola: '',
       concluido: false,
-      disciplinas: [{
+      componentes: [{
         id: `disciplina_${Date.now()}`,
         nome: '', nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: ''
       }]
@@ -218,7 +218,7 @@ export default function NovoEstudante() {
     }));
   };
 
-  const handleHistoricoChange = (anoId: string, field: keyof Omit<HistoricoAnual, 'id' | 'disciplinas' | 'concluido'>, value: string) => {
+  const handleHistoricoChange = (anoId: string, field: keyof Omit<HistoricoAnual, 'id' | 'componentes' | 'concluido'>, value: string) => {
     setFormData(prev => ({
       ...prev,
       historico_academico: prev.historico_academico.map(ano =>
@@ -244,7 +244,7 @@ export default function NovoEstudante() {
     setFormData(prev => ({
       ...prev,
       historico_academico: prev.historico_academico.map(ano =>
-        ano.id === anoId ? { ...ano, disciplinas: [...ano.disciplinas, novaDisciplina] } : ano
+        ano.id === anoId ? { ...ano, componentes: [...ano.componentes, novaDisciplina] } : ano
       )
     }));
   };
@@ -254,7 +254,7 @@ export default function NovoEstudante() {
       ...prev,
       historico_academico: prev.historico_academico.map(ano =>
         ano.id === anoId
-          ? { ...ano, disciplinas: ano.disciplinas.filter(d => d.id !== disciplinaId) }
+          ? { ...ano, componentes: ano.componentes.filter(d => d.id !== disciplinaId) }
           : ano
       )
     }));
@@ -267,7 +267,7 @@ export default function NovoEstudante() {
         ano.id === anoId
           ? {
               ...ano,
-              disciplinas: ano.disciplinas.map(d =>
+              componentes: ano.componentes.map(d =>
                 d.id === disciplinaId ? { ...d, [field]: value } : d
               )
             }
@@ -792,17 +792,17 @@ export default function NovoEstudante() {
 
                           <div className="space-y-2 pt-4 border-t">
                             <h4 className="font-semibold text-sm">Componentes Curriculares</h4>
-                            {ano.disciplinas.map((disciplina) => (
-                              <div key={disciplina.id} className="grid grid-cols-12 gap-2 items-center">
-                                <Input placeholder="Disciplina" value={disciplina.nome} className="col-span-3" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nome', e.target.value)} />
-                                <Input placeholder="B1" value={disciplina.nota_b1} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b1', e.target.value)} />
-                                <Input placeholder="B2" value={disciplina.nota_b2} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b2', e.target.value)} />
-                                <Input placeholder="B3" value={disciplina.nota_b3} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b3', e.target.value)} />
-                                <Input placeholder="B4" value={disciplina.nota_b4} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'nota_b4', e.target.value)} />
-                                <Input placeholder="Média" value={disciplina.media_final} className="col-span-2" onChange={(e) => handleDisciplinaChange(ano.id, disciplina.id, 'media_final', e.target.value)} />
+                            {ano.componentes.map((componente) => (
+                              <div key={componente.id} className="grid grid-cols-12 gap-2 items-center">
+                                <Input placeholder="componente" value={componente.nome} className="col-span-3" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nome', e.target.value)} />
+                                <Input placeholder="B1" value={componente.nota_b1} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b1', e.target.value)} />
+                                <Input placeholder="B2" value={componente.nota_b2} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b2', e.target.value)} />
+                                <Input placeholder="B3" value={componente.nota_b3} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b3', e.target.value)} />
+                                <Input placeholder="B4" value={componente.nota_b4} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b4', e.target.value)} />
+                                <Input placeholder="Média" value={componente.media_final} className="col-span-2" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'media_final', e.target.value)} />
                                 <div className="col-span-3 flex justify-end">
-                                  {ano.disciplinas.length > 1 && (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDisciplinaHistorico(ano.id, disciplina.id)}>
+                                  {ano.componentes.length > 1 && (
+                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDisciplinaHistorico(ano.id, componente.id)}>
                                       <Trash2 className="h-4 w-4 text-destructive" />
                                     </Button>
                                   )}
@@ -811,7 +811,7 @@ export default function NovoEstudante() {
                             ))}
                             <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => addDisciplinaHistorico(ano.id)}>
                               <Plus className="h-4 w-4 mr-2" />
-                              Adicionar Disciplina
+                              Adicionar componente
                             </Button>
                           </div>
                           <div className="flex justify-end pt-4">

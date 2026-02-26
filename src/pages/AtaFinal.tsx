@@ -15,7 +15,7 @@ interface Estudante {
 
 interface NotaCompleta {
   estudante_id: string;
-  disciplina: string;
+  componente: string;
   media: number;
   faltas: number;
 }
@@ -29,7 +29,7 @@ interface Turma {
   capacidade: number;
 }
 
-const DISCIPLINAS = [
+const componentes = [
   'Língua Portuguesa', 'Arte', 'Educação Física', 'Língua Inglesa',
   'Matemática', 'Ciências', 'Geografia', 'História'
 ];
@@ -72,10 +72,10 @@ export default function AtaFinal() {
 
       estudantesData.forEach(estudante => {
         situacoesMap[estudante.id] = 'Aprovado';
-        DISCIPLINAS.forEach(disc => {
+        componentes.forEach(disc => {
           notasMap[`${estudante.id}-${disc}`] = {
             estudante_id: estudante.id,
-            disciplina: disc,
+            componente: disc,
             media: Math.round((Math.random() * 4 + 6) * 10) / 10,
             faltas: Math.floor(Math.random() * 10),
           };
@@ -176,7 +176,7 @@ export default function AtaFinal() {
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium" rowSpan={2}>Nº</th>
                     <th className="p-3 text-left font-medium" rowSpan={2}>NOME DO ESTUDANTE(A)</th>
-                    {DISCIPLINAS.map((disc) => (
+                    {componentes.map((disc) => (
                       <th key={disc} className="p-2 text-center font-medium border-l" colSpan={2}>
                         {disc}
                       </th>
@@ -184,7 +184,7 @@ export default function AtaFinal() {
                     <th className="p-3 text-center font-medium border-l" rowSpan={2}>SITUAÇÃO</th>
                   </tr>
                   <tr className="border-b bg-muted/30">
-                    {DISCIPLINAS.map((disc) => (
+                    {componentes.map((disc) => (
                       <>
                         <th key={`${disc}-res`} className="p-2 text-center text-xs border-l">Res</th>
                         <th key={`${disc}-fal`} className="p-2 text-center text-xs">Fal</th>
@@ -197,7 +197,7 @@ export default function AtaFinal() {
                     <tr key={estudante.id} className="border-b hover:bg-muted/30">
                       <td className="p-3 font-medium">{String(index + 1).padStart(2, '0')}</td>
                       <td className="p-3 font-medium">{estudante.nome}</td>
-                      {DISCIPLINAS.map((disc) => {
+                      {componentes.map((disc) => {
                         const nota = notas[`${estudante.id}-${disc}`];
                         return (
                           <>
@@ -233,7 +233,7 @@ export default function AtaFinal() {
 
             {/* Legenda */}
             <div className="p-4 border-t bg-muted/30 text-sm text-muted-foreground">
-              <p><strong>OBS:</strong> Res = Resultado (média dos bimestres) / Fal = Faltas (total anual por disciplina)</p>
+              <p><strong>OBS:</strong> Res = Resultado (média dos bimestres) / Fal = Faltas (total anual por componente)</p>
             </div>
           </div>
         )}
