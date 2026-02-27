@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, Mail, Phone, GraduationCap, Calendar, FileText, User, Pencil, Link as LinkIcon } from 'lucide-react';
-import { db } from '@/lib/firebase';
+import { db, storage } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Formacao {
@@ -81,15 +81,17 @@ export default function PerfilMembro() {
     }
   };
 
-  if (loading) {
-    return (
-      <AppLayout title="Carregando...">
-        <div className="flex justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+  const InfoItem = ({ icon: Icon, label, value, isLink = false }: { icon: React.ElementType; label: string; value?: string | null, isLink?: boolean }) => (
+    value ? (
+      <div className="flex items-start gap-3">
+        <Icon className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+        <div>
+          <p className="text-sm text-muted-foreground">{label}</p>
+          {isLink ? <a href={value} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline break-all">{value}</a> : <p className="font-medium">{value}</p>}
         </div>
-      </AppLayout>
-    );
-  }
+      </div>
+    ) : null
+  );
 
   if (!membro) {
     return (
@@ -104,6 +106,28 @@ export default function PerfilMembro() {
     );
   }
 
+  if (loading) {
+    return (
+      <AppLayout title="Carregando...">
+        <div className="flex justify-center py-12">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  let dataLotacaoValida = null;
+  if (membro.data_lotacao) {
+    try {
+      const parsedDate = parseISO(membro.data_lotacao);
+      if (!isNaN(parsedDate.getTime())) {
+        dataLotacaoValida = format(parsedDate, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+      }
+    } catch (e) {
+      console.warn("Data de lotação inválida", membro.data_lotacao);
+    }
+  }
+
   return (
     <AppLayout title="Detalhes do Membro da Equipe">
       <div className="space-y-6 animate-fade-in">
@@ -112,9 +136,9 @@ export default function PerfilMembro() {
         </p>
 
         <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate('/equipe-gestora')}>
+          <Button variant="outline" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-4 w-4 md:mr-2" />
-            <span className="hidden md:inline">Voltar para a Lista</span>
+            <span className="hidden md:inline">Voltar</span>
           </Button>
           <Button onClick={() => navigate(`/equipe-gestora/${id}/editar`)}>
             <Pencil className="h-4 w-4 md:mr-2" />
@@ -125,9 +149,6 @@ export default function PerfilMembro() {
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Card de Informações Pessoais */}
           <Card className="lg:col-span-1">
-            <CardHeader>
-              <CardTitle>Informações Pessoais</CardTitle>
-            </CardHeader>
             <CardContent className="flex flex-col items-center text-center">
               <Avatar className="h-24 w-24 mb-4">
                 <AvatarImage src={membro.foto_url || undefined} />
@@ -146,76 +167,17 @@ export default function PerfilMembro() {
                 </Badge>
               </div>
 
-              <div className="w-full mt-6 space-y-4 text-left">
-                {membro.data_lotacao && (
-                  <div className="flex items-start gap-3">
-                    <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Data de Lotação</p>
-                      <p className="font-medium">
-                        {(() => {
-                          if (!membro.data_lotacao) return 'Não informada';
-                          const date = new Date(membro.data_lotacao);
-                          // Adiciona uma verificação para garantir que a data é válida
-                          if (isNaN(date.getTime())) return 'Data inválida';
-                          // O fuso horário pode ser um problema, adicionando 1 dia para corrigir datas 'off-by-one'
-                          date.setDate(date.getDate() + 1);
-                          return format(date, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-                        })()}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-start gap-3">
-                  <Mail className="h-5 w-5 text-muted-foreground mt-0.5" />
-                  <div>
-                    <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{membro.email}</p>
-                  </div>
-                </div>
-
-                {membro.telefone && (
-                  <div className="flex items-start gap-3">
-                    <Phone className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Telefone</p>
-                      <p className="font-medium">{membro.telefone}</p>
-                    </div>
-                  </div>
-                )}
-
-                {membro.cpf && (
-                  <div className="flex items-start gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">CPF</p>
-                      <p className="font-medium">{membro.cpf}</p>
-                    </div>
-                  </div>
-                )}
-
-                {membro.rg && (
-                  <div className="flex items-start gap-3">
-                    <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">RG</p>
-                      <p className="font-medium">{membro.rg}</p>
-                    </div>
-                  </div>
-                )}
-
-                {membro.link_lattes && (
-                  <div className="flex items-start gap-3">
-                    <LinkIcon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="text-sm text-muted-foreground">Currículo Lattes</p>
-                      <a href={membro.link_lattes} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">
-                        Acessar currículo
-                      </a>
-                    </div>
-                  </div>
-                )}
+              <div className="w-full mt-6 pt-6 border-t space-y-4 text-left">
+                <InfoItem icon={Mail} label="Email" value={membro.email} />
+                <InfoItem icon={Phone} label="Telefone" value={membro.telefone} />
+                <InfoItem icon={FileText} label="CPF" value={membro.cpf} />
+                <InfoItem icon={FileText} label="RG" value={membro.rg} />
+                <InfoItem
+                  icon={Calendar}
+                  label="Data de Lotação"
+                  value={dataLotacaoValida || 'Não informada'}
+                />
+                <InfoItem icon={LinkIcon} label="Currículo Lattes" value={membro.link_lattes} isLink />
               </div>
             </CardContent>
           </Card>

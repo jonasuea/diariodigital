@@ -202,22 +202,14 @@ export default function Frequencia() {
           turma_id: turmaId,
           data: dateStr,
           status: newStatus,
-          componente: componente, // Salva o componente junto
+          componente: componente,
+          ano: turma?.ano || new Date().getFullYear()
         });
       }
       
       await logActivity(`registrou a frequência para o dia ${dateStr} na turma "${turma?.nome}".`);
-      // Atualizar estado local para feedback imediato
-      setFrequencias(prev => ({
-        ...prev,
-        [key]: {
-          ...prev[key],
-          estudante_id: estudanteId,
-          turma_id: turmaId,
-          data: dateStr,
-          status: newStatus
-        }
-      }));
+      // Recarregar dados para garantir sincronização
+      loadData();
 
     } catch (error) {
       toast.error('Erro ao atualizar frequência');
@@ -239,7 +231,8 @@ export default function Frequencia() {
           data: frequenciaParaJustificar.data,
           status: 'justificado',
           justificativa: justificativaText,
-          componente: componente, // Salva o componente junto
+          componente: componente,
+          ano: turma?.ano || new Date().getFullYear()
         });
       }
 

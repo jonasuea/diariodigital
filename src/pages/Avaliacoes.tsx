@@ -1,15 +1,27 @@
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FileWarning } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FileWarning, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Avaliacoes() {
+  const navigate = useNavigate();
+
   return (
     <AppLayout>
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Avaliações</h1>
-        <p className="text-muted-foreground">
-          Crie e gerencie as avaliações para suas turmas.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Avaliações</h1>
+            <p className="text-muted-foreground">
+              Crie e gerencie as avaliações para suas turmas.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/diario-digital')} className="shrink-0">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar para o Diário
+          </Button>
+        </div>
 
         <Card className="mt-6">
           <CardHeader>

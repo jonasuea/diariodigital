@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useSidebar } from '@/components/ui/sidebar';
-import { 
-  GraduationCap, 
+import {
+  GraduationCap,
   LogOut,
   PanelLeftClose,
 } from 'lucide-react';
@@ -49,9 +49,9 @@ export function AppSidebar() {
             )}
           </div>
           {isMobile && isExpanded && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={toggleSidebar}
               className="h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0"
               title="Fechar menu"
@@ -67,6 +67,11 @@ export function AppSidebar() {
               <NavLink
                 key={item.title}
                 to={item.url}
+                onClick={() => {
+                  if (!item.url.startsWith('/diario-digital')) {
+                    sessionStorage.removeItem('diario_filtros');
+                  }
+                }}
                 className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-foreground/70 transition-all hover:bg-primary/10 hover:text-primary"
                 activeClassName="bg-primary text-primary-foreground font-medium hover:bg-primary hover:text-primary-foreground"
               >

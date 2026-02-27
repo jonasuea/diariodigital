@@ -37,12 +37,26 @@ export default function DiarioDigital() {
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [componentes, setComponentes] = useState<ComponenteCurricular[]>([]);
-  
-  const [selectedProfessorId, setSelectedProfessorId] = useState('');
-  const [selectedTurmaId, setSelectedTurmaId] = useState('');
-  const [selectedComponente, setSelectedComponente] = useState('');
+
+  const STORAGE_KEY = 'diario_filtros';
+
+  const getStoredFilters = () => {
+    try {
+      const stored = sessionStorage.getItem(STORAGE_KEY);
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const storedFilters = getStoredFilters();
+
+  const [selectedProfessorId, setSelectedProfessorId] = useState(storedFilters.professorId || '');
+  const [selectedTurmaId, setSelectedTurmaId] = useState(storedFilters.turmaId || '');
+  const [selectedComponente, setSelectedComponente] = useState(storedFilters.componente || '');
   const [loading, setLoading] = useState(true);
-  
+  const [isRestoring, setIsRestoring] = useState(!!storedFilters.turmaId);
+
   const isGestor = role && role !== 'professor';
 
   // Efeito para carregar professores (apenas para gestores)
@@ -101,12 +115,30 @@ export default function DiarioDigital() {
         setLoading(false);
       }
     }
-    
+
     fetchTurmas();
   }, [user, selectedProfessorId, isGestor]);
 
+  // useEffect para persistir os filtros no sessionStorage quando forem alterados
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        professorId: selectedProfessorId,
+        turmaId: selectedTurmaId,
+        componente: selectedComponente,
+      }));
+    } catch {
+      // ignore
+    }
+  }, [selectedProfessorId, selectedTurmaId, selectedComponente]);
+
   // Efeito para resetar seleções quando o professor muda
   useEffect(() => {
+    // Pular o reset se estamos restaurando os filtros da sessão anterior
+    if (isRestoring) {
+      setIsRestoring(false);
+      return;
+    }
     setSelectedTurmaId('');
     setSelectedComponente('');
     setComponentes([]);
@@ -116,7 +148,7 @@ export default function DiarioDigital() {
   useEffect(() => {
     const professorId = isGestor ? selectedProfessorId : user?.uid;
     setSelectedComponente('');
-    
+
     if (selectedTurmaId && professorId) {
       const turmaSelecionada = turmas.find(t => t.id === selectedTurmaId);
       if (turmaSelecionada) {

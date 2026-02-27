@@ -6,11 +6,11 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 
 interface Turma {
   id: string;
@@ -20,6 +20,7 @@ interface Turma {
 const bimestres = [1, 2, 3, 4];
 
 export default function ObjetosDeConhecimento() {
+  const navigate = useNavigate();
   const { turmaId } = useParams<{ turmaId?: string }>();
   const [searchParams] = useSearchParams();
   const componente = searchParams.get('componente');
@@ -89,7 +90,7 @@ export default function ObjetosDeConhecimento() {
       toast.warning("Turma ou componente não identificados.");
       return;
     }
-    
+
     setSavingBimestre(bimestre);
     const conteudoParaSalvar = conteudos[bimestre];
 
@@ -124,10 +125,18 @@ export default function ObjetosDeConhecimento() {
   return (
     <AppLayout>
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold tracking-tight">Objetos de Conhecimento</h1>
-        <p className="text-muted-foreground">
-          Planeje e registre os objetos de conhecimento para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Objetos de Conhecimento</h1>
+            <p className="text-muted-foreground">
+              Planeje e registre os objetos de conhecimento para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
+            </p>
+          </div>
+          <Button variant="outline" onClick={() => navigate('/diario-digital')} className="shrink-0">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Voltar para o Diário
+          </Button>
+        </div>
 
         <Card>
           <CardHeader>

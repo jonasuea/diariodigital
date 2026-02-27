@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Search, Users, FileText, Save, Edit } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, getDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, addDoc, getDoc, orderBy, deleteDoc } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -26,6 +26,7 @@ interface Nota {
   estudante_id: string;
   turma_id: string;
   componente: string;
+  ano?: number; // added for year filtering
   bimestre_1: number | null;
   bimestre_2: number | null;
   bimestre_3: number | null;
@@ -75,6 +76,7 @@ export default function Notas() {
   const [notas, setNotas] = useState<Record<string, Record<string, Nota>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [search, setSearch] = useState('');
   const [componente, setDisciplina] = useState(searchParams.get('componente') || 'todos');
   const [boletimDialogOpen, setBoletimDialogOpen] = useState(false);
@@ -109,22 +111,34 @@ export default function Notas() {
       const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
       setEstudantes(estudantesData.sort((a, b) => a.nome.localeCompare(b.nome)));
 
-      // Carregar notas
-      const notasQuery = query(collection(db, 'notas'), where('turma_id', '==', turmaId));
+      // Carregar notas do ano corrente
+      const currentYear = new Date().getFullYear();
+      const notasQuery = query(
+        collection(db, 'notas'),
+        where('turma_id', '==', turmaId),
+        where('ano', '==', currentYear)
+      );
       const notasSnapshot = await getDocs(notasQuery);
       const notasData: Record<string, Record<string, Nota>> = {};
       
-      notasSnapshot.forEach(doc => {
-        const data = doc.data();
+      // ensure ano field exists on each document
+      for (const docSnap of notasSnapshot.docs) {
+        const data = docSnap.data();
         const estudanteId = data.estudante_id;
-        
+
+        // if ano is missing, persist current year
+        if (data.ano == null) {
+          updateDoc(doc(db, 'notas', docSnap.id), { ano: currentYear }).catch(console.error);
+          data.ano = currentYear;
+        }
+
         if (!notasData[estudanteId]) {
           notasData[estudanteId] = {};
         }
-        
-        notasData[estudanteId][data.componente] = { id: doc.id, ...data } as Nota;
-      });
-      
+
+        notasData[estudanteId][data.componente] = { id: docSnap.id, ...data } as Nota;
+      }
+
       setNotas(notasData);
     } catch (error) {
       toast.error('Erro ao carregar dados');
@@ -212,14 +226,17 @@ export default function Notas() {
               bimestre_2: nota.bimestre_2,
               bimestre_3: nota.bimestre_3,
               bimestre_4: nota.bimestre_4,
+              ano: new Date().getFullYear(), // keep year in sync
             });
           } else if (temNotaLancada) {
             // Se for um novo registro, garantir que todos os campos obrigatórios estejam presentes
+            const currentYear = new Date().getFullYear();
             await addDoc(collection(db, 'notas'), {
               ...notaData,
               estudante_id: estudanteId,
               turma_id: turmaId!,
               componente: componente,
+              ano: currentYear,
             });
           }
         }
@@ -344,6 +361,30 @@ export default function Notas() {
           <Button onClick={handleSave} disabled={saving || isInputDisabled} className="gap-2">
             <Save className="h-4 w-4" />
             {saving ? 'Salvando...' : 'Salvar'}
+          </Button>
+
+          {/* botão temporário para apagar todas as notas do banco */}
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={clearing}
+            onClick={async () => {
+              if (!window.confirm('Tem certeza de que deseja apagar **todas** as notas? Esta ação não pode ser desfeita.')) return;
+              setClearing(true);
+              try {
+                const snapshot = await getDocs(collection(db, 'notas'));
+                await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, 'notas', d.id))));
+                toast.success('Todas as notas foram excluídas.');
+                loadData();
+              } catch (err) {
+                console.error(err);
+                toast.error('Erro ao apagar notas');
+              } finally {
+                setClearing(false);
+              }
+            }}
+          >
+            Limpar todas
           </Button>
         </div>
 

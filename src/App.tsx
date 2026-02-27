@@ -32,6 +32,7 @@ import Avaliacoes from "./pages/Avaliacoes";
 import PerfilEstudante from "./pages/PerfilEstudante";
 import PerfilProfessor from "./pages/PerfilProfessor";
 import PerfilUsuario from "./pages/PerfilUsuario";
+import PerfilMembro from "./pages/PerfilMembro";
 
 const queryClient = new QueryClient();
 
@@ -44,10 +45,12 @@ const router = createBrowserRouter([
 
   { path: "/estudantes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Estudantes /></ProtectedRoute> },
   { path: "/estudantes/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
+  { path: "/estudantes/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><PerfilEstudante /></ProtectedRoute> },
   { path: "/estudantes/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
 
   { path: "/professores", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Professores /></ProtectedRoute> },
   { path: "/professores/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoProfessor /></ProtectedRoute> },
+  { path: "/professores/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><PerfilProfessor /></ProtectedRoute> },
   { path: "/professores/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoProfessor /></ProtectedRoute> },
 
   { path: "/turmas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Turmas /></ProtectedRoute> },
@@ -57,6 +60,7 @@ const router = createBrowserRouter([
 
   { path: "/equipe-gestora", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><EquipeGestora /></ProtectedRoute> },
   { path: "/equipe-gestora/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoMembro /></ProtectedRoute> },
+  { path: "/equipe-gestora/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><PerfilMembro /></ProtectedRoute> },
   { path: "/equipe-gestora/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoMembro /></ProtectedRoute> },
 
   { path: "/horario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Horario /></ProtectedRoute> },
@@ -67,7 +71,7 @@ const router = createBrowserRouter([
   { path: "/diario-digital/avaliacoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Avaliacoes /></ProtectedRoute> },
   { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Relatorios /></ProtectedRoute> },
   { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Configuracoes /></ProtectedRoute> },
-  { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin','gestor']}><Usuarios /></ProtectedRoute> },
+  { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Usuarios /></ProtectedRoute> },
   { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Logs /></ProtectedRoute> },
 
   { path: "*", element: <NotFound /> },

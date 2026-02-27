@@ -57,7 +57,7 @@ export default function NovoProfessor() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [formData, setFormData] = useState({
     foto_url: '',
     nome: '',
@@ -75,6 +75,10 @@ export default function NovoProfessor() {
     series: [] as string[],
     ativo: true,
     componente: '',
+    logradouro: '',
+    numero: '',
+    bairro: '',
+    cep: '',
   });
 
   const [formacoes, setFormacoes] = useState<Formacao[]>([
@@ -126,7 +130,7 @@ export default function NovoProfessor() {
       const fileExt = file.name.split('.').pop();
       const fileName = `professor_${Date.now()}.${fileExt}`;
       const storageRef = ref(storage, `professores/fotos/${fileName}`);
-      
+
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
 
@@ -171,6 +175,10 @@ export default function NovoProfessor() {
           series: data.series || [],
           ativo: data.ativo ?? true,
           componente: data.componente,
+          logradouro: data.logradouro || '',
+          numero: data.numero || '',
+          bairro: data.bairro || '',
+          cep: data.cep || '',
         });
         if (data.formacoes && Array.isArray(data.formacoes)) {
           setFormacoes(data.formacoes as Formacao[]);
@@ -244,14 +252,14 @@ export default function NovoProfessor() {
       }
       navigate('/professores');
     } catch (error: any) {
-        if (error.code === 'permission-denied') {
-            toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
-        } else if (error.message.includes('matricula') || error.message.includes('email')) {
-            toast.error('Matrícula ou email já cadastrados');
-        } else {
-            toast.error('Erro ao salvar professor');
-        }
-        console.error(error);
+      if (error.code === 'permission-denied') {
+        toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
+      } else if (error.message.includes('matricula') || error.message.includes('email')) {
+        toast.error('Matrícula ou email já cadastrados');
+      } else {
+        toast.error('Erro ao salvar professor');
+      }
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -298,9 +306,9 @@ export default function NovoProfessor() {
                     className="hidden"
                     onChange={handlePhotoUpload}
                   />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     size="sm"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={uploadingPhoto}
@@ -382,6 +390,49 @@ export default function NovoProfessor() {
                 </div>
               </div>
 
+              {/* Endereço */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground">Endereço</h3>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="logradouro">Logradouro</Label>
+                    <Input
+                      id="logradouro"
+                      placeholder="Rua, Avenida, etc."
+                      value={formData.logradouro}
+                      onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="numero">Número</Label>
+                    <Input
+                      id="numero"
+                      placeholder="Número"
+                      value={formData.numero}
+                      onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="bairro">Bairro</Label>
+                    <Input
+                      id="bairro"
+                      placeholder="Bairro"
+                      value={formData.bairro}
+                      onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-4 lg:col-span-1">
+                    <Label htmlFor="cep">CEP</Label>
+                    <Input
+                      id="cep"
+                      placeholder="CEP"
+                      value={formData.cep}
+                      onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Situação Funcional */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground">Situação Funcional</h3>
@@ -423,9 +474,9 @@ export default function NovoProfessor() {
                     {formData.arquivo_url ? (
                       <div className="flex items-center gap-2 p-2 border rounded-lg bg-muted/50">
                         <FileText className="h-5 w-5 text-primary" />
-                        <a 
-                          href={formData.arquivo_url} 
-                          target="_blank" 
+                        <a
+                          href={formData.arquivo_url}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm text-primary hover:underline flex-1 truncate"
                         >
@@ -436,10 +487,10 @@ export default function NovoProfessor() {
                         </Button>
                       </div>
                     ) : (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         className="gap-2"
                         onClick={() => pdfInputRef.current?.click()}
                         disabled={uploadingPdf}
@@ -461,7 +512,7 @@ export default function NovoProfessor() {
                     Adicionar Formação
                   </Button>
                 </div>
-                
+
                 {formacoes.map((formacao, index) => (
                   <div key={formacao.id} className="space-y-4 p-4 border rounded-lg relative">
                     <div className="flex items-center justify-between">

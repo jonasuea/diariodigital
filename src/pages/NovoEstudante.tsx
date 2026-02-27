@@ -54,6 +54,8 @@ const initialState = {
   uf: '',
   rg: '',
   cpf: '',
+  contato: '',
+  email: '',
   // Programas Sociais
   bolsa_familia: false,
   // Censo e SUS
@@ -93,6 +95,13 @@ const initialState = {
   // Outros
   ano: new Date().getFullYear(),
   turma_id: null as string | null,
+  // Responsável pelo estudante (extra aos dados de mãe/pai)
+  responsavel_relacao: '',
+  responsavel_nome: '',
+  responsavel_rg: '',
+  responsavel_contato: '',
+  responsavel_email: '',
+  responsavel_cpf: '',
   historico_academico: [] as HistoricoAnual[],
 };
 
@@ -107,6 +116,49 @@ export default function NovoEstudante() {
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [turmasCarregadas, setTurmasCarregadas] = useState(false);
   const [formData, setFormData] = useState(initialState);
+
+  // if responsible is mother or father, mirror their fields automatically
+  useEffect(() => {
+    const rel = formData.responsavel_relacao;
+    if (rel === 'Mãe') {
+      setFormData(prev => ({
+        ...prev,
+        responsavel_nome: prev.mae_nome,
+        responsavel_rg: prev.mae_rg,
+        responsavel_contato: prev.mae_contato,
+        responsavel_email: prev.mae_email,
+        responsavel_cpf: prev.mae_cpf,
+      }));
+    } else if (rel === 'Pai') {
+      setFormData(prev => ({
+        ...prev,
+        responsavel_nome: prev.pai_nome,
+        responsavel_rg: prev.pai_rg,
+        responsavel_contato: prev.pai_contato,
+        responsavel_email: prev.pai_email,
+        responsavel_cpf: prev.pai_cpf,
+      }));
+    }
+  }, [
+    formData.responsavel_relacao,
+    formData.mae_nome,
+    formData.mae_rg,
+    formData.mae_contato,
+    formData.mae_email,
+    formData.mae_cpf,
+    formData.pai_nome,
+    formData.pai_rg,
+    formData.pai_contato,
+    formData.pai_email,
+    formData.pai_cpf,
+  ]);
+
+  // debugging helper: warn if historico becomes invalid
+  useEffect(() => {
+    if (!Array.isArray(formData.historico_academico)) {
+      console.warn('formData.historico_academico is not an array:', formData.historico_academico);
+    }
+  }, [formData]);
 
   useEffect(() => {
     async function carregarDependencias() {
@@ -141,11 +193,38 @@ export default function NovoEstudante() {
       const estudanteDoc = await getDoc(doc(db, 'estudantes', estudanteId));
       if (estudanteDoc.exists()) {
         const estudanteData = estudanteDoc.data();
+        // garante que historico_academico seja sempre array
+        let historico = estudanteData.historico_academico;
+        if (!Array.isArray(historico)) {
+          historico = [];
+        }
+        // normalize cada ano para ter array de componentes
+        historico = historico.map((ano: any) => ({
+          ...ano,
+          componentes: Array.isArray(ano.componentes)
+            ? ano.componentes
+            : [{
+                id: `disciplina_${Date.now()}`,
+                nome: '',
+                nota_b1: '',
+                nota_b2: '',
+                nota_b3: '',
+                nota_b4: '',
+                media_final: ''
+              }]
+        }));
         // Combina o estado inicial com os dados carregados para garantir que todos os campos existam
         setFormData({
           ...initialState,
           ...estudanteData,
+          historico_academico: historico,
           turma_id: estudanteData.turma_id || null, // Garante que o turma_id seja carregado corretamente
+          responsavel_relacao: estudanteData.responsavel_relacao || '',
+          responsavel_nome: estudanteData.responsavel_nome || '',
+          responsavel_rg: estudanteData.responsavel_rg || '',
+          responsavel_contato: estudanteData.responsavel_contato || '',
+          responsavel_email: estudanteData.responsavel_email || '',
+          responsavel_cpf: estudanteData.responsavel_cpf || '',
         });
       } else {
         toast.error('Estudante não encontrado');
@@ -188,6 +267,11 @@ export default function NovoEstudante() {
   }
 
   const handleChange = (field: string, value: string | boolean | number | null) => {
+    // historico_academico deve ser manipulado apenas pelas funções específicas
+    if (field === 'historico_academico') {
+      console.warn('Ignorando tentativa de atualização direta de historico_academico', value);
+      return;
+    }
     setFormData(prevFormData => {
       const newFormData = { ...prevFormData, [field]: value };
       console.log(`Campo '${field}' atualizado para:`, value);
@@ -208,20 +292,23 @@ export default function NovoEstudante() {
         nome: '', nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: ''
       }]
     };
-    setFormData(prev => ({ ...prev, historico_academico: [...prev.historico_academico, novoAno] }));
+    setFormData(prev => ({
+      ...prev,
+      historico_academico: [...(prev.historico_academico || []), novoAno]
+    }));
   };
 
   const removeAnoHistorico = (anoId: string) => {
     setFormData(prev => ({
       ...prev,
-      historico_academico: prev.historico_academico.filter(ano => ano.id !== anoId)
+      historico_academico: (prev.historico_academico || []).filter(ano => ano.id !== anoId)
     }));
   };
 
   const handleHistoricoChange = (anoId: string, field: keyof Omit<HistoricoAnual, 'id' | 'componentes' | 'concluido'>, value: string) => {
     setFormData(prev => ({
       ...prev,
-      historico_academico: prev.historico_academico.map(ano =>
+      historico_academico: (prev.historico_academico || []).map(ano =>
         ano.id === anoId ? { ...ano, [field]: value } : ano
       )
     }));
@@ -230,7 +317,7 @@ export default function NovoEstudante() {
   const handleHistoricoSwitchChange = (anoId: string, field: 'concluido', value: boolean) => {
     setFormData(prev => ({
       ...prev,
-      historico_academico: prev.historico_academico.map(ano =>
+      historico_academico: (prev.historico_academico || []).map(ano =>
         ano.id === anoId ? { ...ano, [field]: value } : ano
       )
     }));
@@ -243,7 +330,7 @@ export default function NovoEstudante() {
     };
     setFormData(prev => ({
       ...prev,
-      historico_academico: prev.historico_academico.map(ano =>
+      historico_academico: (prev.historico_academico || []).map(ano =>
         ano.id === anoId ? { ...ano, componentes: [...ano.componentes, novaDisciplina] } : ano
       )
     }));
@@ -252,7 +339,7 @@ export default function NovoEstudante() {
   const removeDisciplinaHistorico = (anoId: string, disciplinaId: string) => {
     setFormData(prev => ({
       ...prev,
-      historico_academico: prev.historico_academico.map(ano =>
+      historico_academico: (prev.historico_academico || []).map(ano =>
         ano.id === anoId
           ? { ...ano, componentes: ano.componentes.filter(d => d.id !== disciplinaId) }
           : ano
@@ -552,6 +639,16 @@ export default function NovoEstudante() {
                     <Input placeholder="CPF do estudante" value={formData.cpf} onChange={(e) => handleChange('cpf', e.target.value)} />
                   </div>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Contato</Label>
+                    <Input placeholder="Telefone do estudante" value={formData.contato} onChange={(e) => handleChange('contato', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input type="email" placeholder="Email do estudante" value={formData.email} onChange={(e) => handleChange('email', e.target.value)} />
+                  </div>
+                </div>
               </div>
 
               {/* Programas Sociais */}
@@ -707,6 +804,46 @@ export default function NovoEstudante() {
                 </div>
               </div>
 
+              {/* Informações do Responsável */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground">Informações do Responsável</h3>
+                <div className="space-y-2 md:w-1/2">
+                  <Label>Responsável</Label>
+                  <Select value={formData.responsavel_relacao} onValueChange={(v) => handleChange('responsavel_relacao', v)}>
+                    <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                    <SelectContent>
+                      {['Estudante','Mãe','Pai','Avó','Avô','Tia','Tio'].map(r => (
+                        <SelectItem key={r} value={r}>{r}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Nome do Responsável</Label>
+                    <Input placeholder="Nome completo do responsável" value={formData.responsavel_nome} onChange={(e) => handleChange('responsavel_nome', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input type="email" placeholder="Email do responsável" value={formData.responsavel_email} onChange={(e) => handleChange('responsavel_email', e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Contato</Label>
+                    <Input placeholder="Telefone do responsável" value={formData.responsavel_contato} onChange={(e) => handleChange('responsavel_contato', e.target.value)} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>RG</Label>
+                    <Input placeholder="RG do responsável" value={formData.responsavel_rg} onChange={(e) => handleChange('responsavel_rg', e.target.value)} />
+                  </div>
+                </div>
+                <div className="space-y-2 md:w-1/2">
+                  <Label>CPF</Label>
+                  <Input placeholder="CPF do responsável" value={formData.responsavel_cpf} onChange={(e) => handleChange('responsavel_cpf', e.target.value)} />
+                </div>
+              </div>
+
               {/* Endereço */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground">Endereço</h3>
@@ -756,7 +893,11 @@ export default function NovoEstudante() {
                 </div>
                 
                 <Accordion type="multiple" className="w-full">
-                  {formData.historico_academico.map((ano, index) => (
+                  {(() => {
+                    const historicoList = Array.isArray(formData.historico_academico)
+                      ? formData.historico_academico
+                      : [];
+                    return historicoList.map((ano, index) => (
                     <AccordionItem value={ano.id} key={ano.id}>
                       <AccordionTrigger>
                         <div className="flex justify-between w-full pr-4">
@@ -792,7 +933,7 @@ export default function NovoEstudante() {
 
                           <div className="space-y-2 pt-4 border-t">
                             <h4 className="font-semibold text-sm">Componentes Curriculares</h4>
-                            {ano.componentes.map((componente) => (
+                            {(ano.componentes || []).map((componente) => (
                               <div key={componente.id} className="grid grid-cols-12 gap-2 items-center">
                                 <Input placeholder="componente" value={componente.nome} className="col-span-3" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nome', e.target.value)} />
                                 <Input placeholder="B1" value={componente.nota_b1} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b1', e.target.value)} />
@@ -823,7 +964,8 @@ export default function NovoEstudante() {
                         </div>
                       </AccordionContent>
                     </AccordionItem>
-                  ))}
+                  ));
+                })()}
                 </Accordion>
               </div>
 

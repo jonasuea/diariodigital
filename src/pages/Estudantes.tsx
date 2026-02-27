@@ -41,22 +41,17 @@ export default function Estudantes() {
   async function fetchEstudantes() {
     setLoading(true);
     try {
-      // NOTE: Firestore queries are case-sensitive. For case-insensitive search,
-      // you would typically store a lowercase version of the field to search on.
-      let estudantesQuery = query(collection(db, 'estudantes'), orderBy('nome'));
+      let estudantesQuery;
 
       if (search) {
-        // Firestore does not support OR queries on different fields directly.
-        // A common workaround is to perform separate queries and merge the results.
-        // For simplicity here, we will search by name first, and if no results, by matricula.
-        // A better solution for complex search is using a dedicated search service like Algolia.
-        const searchQuery = query(collection(db, 'estudantes'), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'));
-        const querySnapshot = await getDocs(searchQuery);
-        if (!querySnapshot.empty) {
-          estudantesQuery = searchQuery;
-        } else {
-          estudantesQuery = query(collection(db, 'estudantes'), where('matricula', '>=', search), where('matricula', '<=', search + '\uf8ff'));
-        }
+        const searchLower = search.toLowerCase();
+        estudantesQuery = query(collection(db, 'estudantes'),
+          where('nome_lower', '>=', searchLower),
+          where('nome_lower', '<=', searchLower + '\uf8ff'),
+          orderBy('nome_lower')
+        );
+      } else {
+        estudantesQuery = query(collection(db, 'estudantes'), orderBy('nome'));
       }
 
       const querySnapshot = await getDocs(estudantesQuery);
@@ -575,7 +570,7 @@ export default function Estudantes() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome ou matrícula..."
+              placeholder="Buscar por nome..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
