@@ -33,6 +33,7 @@ import PerfilEstudante from "./pages/PerfilEstudante";
 import PerfilProfessor from "./pages/PerfilProfessor";
 import PerfilUsuario from "./pages/PerfilUsuario";
 import PerfilMembro from "./pages/PerfilMembro";
+import NotasParciais from "./pages/NotasParciais";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +56,7 @@ const router = createBrowserRouter([
 
   { path: "/turmas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Turmas /></ProtectedRoute> },
   { path: "/turmas/:turmaId/notas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Notas /></ProtectedRoute> },
+  { path: "/turmas/:turmaId/notas-parciais", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><NotasParciais /></ProtectedRoute> },
   { path: "/turmas/:turmaId/frequencia", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Frequencia /></ProtectedRoute> },
   { path: "/turmas/:turmaId/ata-final", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><AtaFinal /></ProtectedRoute> },
 

@@ -66,7 +66,7 @@ export default function Estudantes() {
             turma_nome = turmaDoc.data().nome;
           }
         }
-        
+
         return {
           id: estudanteDoc.id,
           ...estudanteData,
@@ -90,7 +90,7 @@ export default function Estudantes() {
 
   async function handleDelete() {
     if (!estudanteToDelete) return;
-    
+
     try {
       await deleteDoc(doc(db, 'estudantes', estudanteToDelete.id));
       toast.success('Estudante excluído com sucesso!');
@@ -426,9 +426,9 @@ export default function Estudantes() {
       // Buscar todos os estudantes sem filtros para exportação completa
       const estudantesQuery = query(collection(db, 'estudantes'), orderBy('nome'));
       const querySnapshot = await getDocs(estudantesQuery);
-      
-      const estudantesData = await Promise.all(querySnapshot.docs.map(async (doc) => {
-        const estudanteData = doc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
+
+      const estudantesData = await Promise.all(querySnapshot.docs.map(async (estudanteDoc) => {
+        const estudanteData = estudanteDoc.data() as any;
         let turma_nome: string | undefined = '';
 
         if (estudanteData.turma_id) {
@@ -438,7 +438,7 @@ export default function Estudantes() {
             turma_nome = turmaDoc.data().nome;
           }
         }
-        
+
         return {
           // Status e Informações Básicas
           status: estudanteData.status || '',
@@ -530,16 +530,15 @@ export default function Estudantes() {
     { key: 'nome', header: 'Nome' },
     { key: 'matricula', header: 'Matrícula' },
     { key: 'ano', header: 'Ano' },
-    { key: 'turma_nome', header: 'Turma', render: (estudante: Estudante) => estudante.turma_nome || '-' },
-    { 
-      key: 'status', 
+    { key: 'turma_nome', header: 'Turma', render: (estudante: Estudante) => estudante.turma_nome && estudante.turma_nome !== '-' ? estudante.turma_nome : <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-warning/10 text-warning">Sem turma</span> },
+    {
+      key: 'status',
       header: 'Status',
       render: (estudante: Estudante) => (
-        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-          estudante.status === 'Ativo' || estudante.status === 'Frequentando' ? 'bg-success/10 text-success' :
+        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${estudante.status === 'Ativo' || estudante.status === 'Frequentando' ? 'bg-success/10 text-success' :
           estudante.status === 'Inativo' || estudante.status === 'Desistente' ? 'bg-muted text-muted-foreground' :
-          'bg-warning/10 text-warning'
-        }`}>
+            'bg-warning/10 text-warning'
+          }`}>
           {estudante.status}
         </span>
       )
@@ -576,7 +575,7 @@ export default function Estudantes() {
               className="pl-9"
             />
           </div>
-          
+
           <div className="flex gap-2">
             {isAdmin && (
               <>
@@ -649,7 +648,7 @@ export default function Estudantes() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o estudante "{estudanteToDelete?.nome}"? 
+                Tem certeza que deseja excluir o estudante "{estudanteToDelete?.nome}"?
                 Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>

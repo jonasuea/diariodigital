@@ -165,10 +165,10 @@ export default function NovoEstudante() {
       try {
         const querySnapshot = await getDocs(collection(db, 'turmas'));
         const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
-        setTurmas(turmasData.sort((a,b) => a.nome.localeCompare(b.nome)));
-      } catch(error) {
-          console.error("Error fetching turmas: ", error);
-          toast.error("Erro ao carregar a lista de turmas.");
+        setTurmas(turmasData.sort((a, b) => a.nome.localeCompare(b.nome)));
+      } catch (error) {
+        console.error("Error fetching turmas: ", error);
+        toast.error("Erro ao carregar a lista de turmas.");
       } finally {
         setTurmasCarregadas(true);
       }
@@ -203,22 +203,54 @@ export default function NovoEstudante() {
           ...ano,
           componentes: Array.isArray(ano.componentes)
             ? ano.componentes
-            : [{
-                id: `disciplina_${Date.now()}`,
-                nome: '',
-                nota_b1: '',
-                nota_b2: '',
-                nota_b3: '',
-                nota_b4: '',
-                media_final: ''
-              }]
+            : [{ id: `disciplina_${Date.now()}`, nome: '', nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: '' }]
         }));
+
+        // Busca notas do estudante e mescla no histórico para preencher os campos B1-B4
+        try {
+          const notasSnap = await getDocs(
+            query(collection(db, 'notas'), where('estudante_id', '==', id))
+          );
+          // Mapa: `${ano}_${componente}` → nota
+          const notasMap = new Map<string, any>();
+          notasSnap.docs.forEach(d => {
+            const n = d.data();
+            if (n.ano != null) notasMap.set(`${n.ano}_${n.componente}`, n);
+          });
+
+          if (notasMap.size > 0) {
+            const fmtN = (v: number | null | undefined) => v != null ? v.toFixed(1) : '';
+            historico = historico.map((ano: any) => ({
+              ...ano,
+              componentes: ano.componentes.map((comp: any) => {
+                const key = `${ano.ano_letivo}_${comp.nome}`;
+                const nota = notasMap.get(key);
+                if (!nota) return comp;
+                const media = (nota.bimestre_1 != null && nota.bimestre_2 != null && nota.bimestre_3 != null && nota.bimestre_4 != null)
+                  ? ((nota.bimestre_1 + nota.bimestre_2 + nota.bimestre_3 + nota.bimestre_4) / 4)
+                  : null;
+                return {
+                  ...comp,
+                  nota_b1: nota.bimestre_1 != null ? fmtN(nota.bimestre_1) : (comp.nota_b1 || ''),
+                  nota_b2: nota.bimestre_2 != null ? fmtN(nota.bimestre_2) : (comp.nota_b2 || ''),
+                  nota_b3: nota.bimestre_3 != null ? fmtN(nota.bimestre_3) : (comp.nota_b3 || ''),
+                  nota_b4: nota.bimestre_4 != null ? fmtN(nota.bimestre_4) : (comp.nota_b4 || ''),
+                  media_final: nota.media_anual != null ? fmtN(nota.media_anual)
+                    : (media != null ? fmtN(Math.round(media * 10) / 10) : (comp.media_final || '')),
+                };
+              }),
+            }));
+          }
+        } catch (notasErr) {
+          console.warn('Não foi possível carregar notas para o histórico:', notasErr);
+        }
+
         // Combina o estado inicial com os dados carregados para garantir que todos os campos existam
         setFormData({
           ...initialState,
           ...estudanteData,
           historico_academico: historico,
-          turma_id: estudanteData.turma_id || null, // Garante que o turma_id seja carregado corretamente
+          turma_id: estudanteData.turma_id || null,
           responsavel_relacao: estudanteData.responsavel_relacao || '',
           responsavel_nome: estudanteData.responsavel_nome || '',
           responsavel_rg: estudanteData.responsavel_rg || '',
@@ -252,7 +284,7 @@ export default function NovoEstudante() {
       const fileExt = file.name.split('.').pop();
       const fileName = `estudante-${Date.now()}.${fileExt}`;
       const storageRef = ref(storage, `Estudantes/${fileName}`);
-      
+
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
 
@@ -274,6 +306,10 @@ export default function NovoEstudante() {
     }
     setFormData(prevFormData => {
       const newFormData = { ...prevFormData, [field]: value };
+      // Ao transferir o estudante, remove a turma do cadastro
+      if (field === 'status' && value === 'Transferido') {
+        newFormData.turma_id = null;
+      }
       console.log(`Campo '${field}' atualizado para:`, value);
       return newFormData;
     });
@@ -313,7 +349,7 @@ export default function NovoEstudante() {
       )
     }));
   };
-  
+
   const handleHistoricoSwitchChange = (anoId: string, field: 'concluido', value: boolean) => {
     setFormData(prev => ({
       ...prev,
@@ -322,7 +358,7 @@ export default function NovoEstudante() {
       )
     }));
   };
-  
+
   const addDisciplinaHistorico = (anoId: string) => {
     const novaDisciplina: HistoricoDisciplina = {
       id: `disciplina_${Date.now()}`,
@@ -353,14 +389,29 @@ export default function NovoEstudante() {
       historico_academico: prev.historico_academico.map(ano =>
         ano.id === anoId
           ? {
-              ...ano,
-              componentes: ano.componentes.map(d =>
-                d.id === disciplinaId ? { ...d, [field]: value } : d
-              )
-            }
+            ...ano,
+            componentes: ano.componentes.map(d =>
+              d.id === disciplinaId ? { ...d, [field]: value } : d
+            )
+          }
           : ano
       )
     }));
+  };
+
+  // Máscara decimal para campos de nota: permite apenas dígitos e ponto (0–10)
+  const maskNota = (raw: string): string => {
+    // Remove tudo que não seja dígito ou ponto
+    let v = raw.replace(/[^0-9.]/g, '');
+    // Garante apenas um ponto decimal
+    const parts = v.split('.');
+    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
+    // Limita a um dígito após o ponto
+    if (parts.length === 2) v = parts[0] + '.' + parts[1].slice(0, 1);
+    // Limita o valor máximo a 10
+    const num = parseFloat(v);
+    if (!isNaN(num) && num > 10) v = '10';
+    return v;
   };
 
   const calculateAge = (birthDate: string) => {
@@ -405,12 +456,10 @@ export default function NovoEstudante() {
       let isDuplicate = false;
       if (!querySnapshot.empty) {
         if (isEditing) {
-          // No modo de edição, permitir que a matrícula seja a mesma do estudante atual
           if (querySnapshot.docs.some(doc => doc.id !== id)) {
             isDuplicate = true;
           }
         } else {
-          // No modo de criação, qualquer resultado é um duplicado
           isDuplicate = true;
         }
       }
@@ -421,8 +470,67 @@ export default function NovoEstudante() {
         return;
       }
 
+      // Se há turma selecionada, cria automaticamente o histórico do ano vigente
+      let historicoAtualizado = [...(formData.historico_academico || [])];
+      if (formData.turma_id) {
+        try {
+          // Busca turma e nome da escola em paralelo
+          const [turmaSnap, configSnap] = await Promise.all([
+            getDoc(doc(db, 'turmas', formData.turma_id)),
+            getDoc(doc(db, 'configuracoes', 'escola')),
+          ]);
+
+          let nomeEscola = '';
+          if (configSnap.exists()) nomeEscola = configSnap.data()?.escolaConfig?.nome || '';
+
+          if (turmaSnap.exists()) {
+            const turmaData = turmaSnap.data();
+            const anoAtual = new Date().getFullYear().toString();
+            const serieAtual = turmaData.serie || '';
+
+            // Verifica entrada existente para o mesmo ano e série
+            const idxExistente = historicoAtualizado.findIndex(
+              h => h.ano_letivo === anoAtual && h.serie === serieAtual
+            );
+
+            if (idxExistente !== -1) {
+              const entradaExistente = historicoAtualizado[idxExistente];
+              if (!entradaExistente.concluido) {
+                // Ano não concluído: atualiza nome da escola (transferência durante o ano)
+                const novoHistorico = [...historicoAtualizado];
+                novoHistorico[idxExistente] = { ...entradaExistente, escola: nomeEscola };
+                historicoAtualizado = novoHistorico;
+              }
+              // Se concluído: não altera nada
+            } else {
+              // Cria nova entrada de histórico
+              const novaEntrada = {
+                id: `hist_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                ano_letivo: anoAtual,
+                serie: serieAtual,
+                escola: nomeEscola,
+                concluido: false,
+                componentes: (turmaData.componentes || []).map((c: any, i: number) => ({
+                  id: `disc_${Date.now()}_${i}`,
+                  nome: c.nome,
+                  nota_b1: '',
+                  nota_b2: '',
+                  nota_b3: '',
+                  nota_b4: '',
+                  media_final: '',
+                })),
+              };
+              historicoAtualizado = [...historicoAtualizado, novaEntrada];
+            }
+          }
+        } catch (err) {
+          console.warn('Não foi possível carregar a turma para o histórico automático.', err);
+        }
+      }
+
       const finalFormData = {
         ...formData,
+        historico_academico: historicoAtualizado,
         nome_lower: formData.nome.toLowerCase()
       };
 
@@ -437,12 +545,12 @@ export default function NovoEstudante() {
       }
       navigate('/estudantes');
     } catch (error: any) {
-        if (error.code === 'permission-denied') {
-            toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
-        } else {
-            toast.error(`Erro ao ${isEditing ? 'atualizar' : 'cadastrar'} estudante`);
-        }
-        console.error(error);
+      if (error.code === 'permission-denied') {
+        toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
+      } else {
+        toast.error(`Erro ao ${isEditing ? 'atualizar' : 'cadastrar'} estudante`);
+      }
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -491,9 +599,9 @@ export default function NovoEstudante() {
                     onChange={handlePhotoUpload}
                     className="hidden"
                   />
-                  <Button 
-                    variant="outline" 
-                    type="button" 
+                  <Button
+                    variant="outline"
+                    type="button"
                     size="sm"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
@@ -527,9 +635,13 @@ export default function NovoEstudante() {
                   </div>
                   <div className="space-y-2">
                     <Label>Turma</Label>
-                    <Select value={formData.turma_id || ''} onValueChange={(v) => handleChange('turma_id', v || null)}>
+                    <Select
+                      value={formData.turma_id || '__none__'}
+                      onValueChange={(v) => handleChange('turma_id', v === '__none__' ? null : v)}
+                    >
                       <SelectTrigger><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="__none__">— Sem turma —</SelectItem>
                         {turmas.map(t => <SelectItem key={t.id} value={t.id}>{t.nome} - {t.serie}</SelectItem>)}
                       </SelectContent>
                     </Select>
@@ -812,7 +924,7 @@ export default function NovoEstudante() {
                   <Select value={formData.responsavel_relacao} onValueChange={(v) => handleChange('responsavel_relacao', v)}>
                     <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
                     <SelectContent>
-                      {['Estudante','Mãe','Pai','Avó','Avô','Tia','Tio'].map(r => (
+                      {['Estudante', 'Mãe', 'Pai', 'Avó', 'Avô', 'Tia', 'Tio'].map(r => (
                         <SelectItem key={r} value={r}>{r}</SelectItem>
                       ))}
                     </SelectContent>
@@ -891,81 +1003,81 @@ export default function NovoEstudante() {
                     Adicionar Ano Letivo
                   </Button>
                 </div>
-                
+
                 <Accordion type="multiple" className="w-full">
                   {(() => {
                     const historicoList = Array.isArray(formData.historico_academico)
                       ? formData.historico_academico
                       : [];
                     return historicoList.map((ano, index) => (
-                    <AccordionItem value={ano.id} key={ano.id}>
-                      <AccordionTrigger>
-                        <div className="flex justify-between w-full pr-4">
-                          <span>{ano.serie || `Ano Letivo ${index + 1}`} ({ano.ano_letivo})</span>
-                          <span className="text-sm text-muted-foreground">{ano.escola}</span>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent>
-                        <div className="p-4 border rounded-lg space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-2">
-                              <Label>Ano Letivo</Label>
-                              <Input value={ano.ano_letivo} onChange={(e) => handleHistoricoChange(ano.id, 'ano_letivo', e.target.value)} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Série</Label>
-                              <Input placeholder="Ex: 1º Ano Fundamental" value={ano.serie} onChange={(e) => handleHistoricoChange(ano.id, 'serie', e.target.value)} />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Escola</Label>
-                              <Input placeholder="Nome da escola" value={ano.escola} onChange={(e) => handleHistoricoChange(ano.id, 'escola', e.target.value)} />
-                            </div>
+                      <AccordionItem value={ano.id} key={ano.id}>
+                        <AccordionTrigger>
+                          <div className="flex justify-between w-full pr-4">
+                            <span>{ano.serie || `Ano Letivo ${index + 1}`} ({ano.ano_letivo})</span>
+                            <span className="text-sm text-muted-foreground">{ano.escola}</span>
                           </div>
-                          
-                          <div className="flex items-center space-x-2 pt-2">
-                            <Switch
-                              id={`concluido-${ano.id}`}
-                              checked={ano.concluido}
-                              onCheckedChange={(checked) => handleHistoricoSwitchChange(ano.id, 'concluido', checked)}
-                            />
-                            <Label htmlFor={`concluido-${ano.id}`}>Ano Concluído</Label>
-                          </div>
-
-                          <div className="space-y-2 pt-4 border-t">
-                            <h4 className="font-semibold text-sm">Componentes Curriculares</h4>
-                            {(ano.componentes || []).map((componente) => (
-                              <div key={componente.id} className="grid grid-cols-12 gap-2 items-center">
-                                <Input placeholder="componente" value={componente.nome} className="col-span-3" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nome', e.target.value)} />
-                                <Input placeholder="B1" value={componente.nota_b1} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b1', e.target.value)} />
-                                <Input placeholder="B2" value={componente.nota_b2} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b2', e.target.value)} />
-                                <Input placeholder="B3" value={componente.nota_b3} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b3', e.target.value)} />
-                                <Input placeholder="B4" value={componente.nota_b4} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b4', e.target.value)} />
-                                <Input placeholder="Média" value={componente.media_final} className="col-span-2" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'media_final', e.target.value)} />
-                                <div className="col-span-3 flex justify-end">
-                                  {ano.componentes.length > 1 && (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removeDisciplinaHistorico(ano.id, componente.id)}>
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  )}
-                                </div>
+                        </AccordionTrigger>
+                        <AccordionContent>
+                          <div className="p-4 border rounded-lg space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              <div className="space-y-2">
+                                <Label>Ano Letivo</Label>
+                                <Input value={ano.ano_letivo} onChange={(e) => handleHistoricoChange(ano.id, 'ano_letivo', e.target.value)} />
                               </div>
-                            ))}
-                            <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => addDisciplinaHistorico(ano.id)}>
-                              <Plus className="h-4 w-4 mr-2" />
-                              Adicionar componente
-                            </Button>
+                              <div className="space-y-2">
+                                <Label>Série</Label>
+                                <Input placeholder="Ex: 1º Ano Fundamental" value={ano.serie} onChange={(e) => handleHistoricoChange(ano.id, 'serie', e.target.value)} />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Escola</Label>
+                                <Input placeholder="Nome da escola" value={ano.escola} onChange={(e) => handleHistoricoChange(ano.id, 'escola', e.target.value)} />
+                              </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2 pt-2">
+                              <Switch
+                                id={`concluido-${ano.id}`}
+                                checked={ano.concluido}
+                                onCheckedChange={(checked) => handleHistoricoSwitchChange(ano.id, 'concluido', checked)}
+                              />
+                              <Label htmlFor={`concluido-${ano.id}`}>Ano Concluído</Label>
+                            </div>
+
+                            <div className="space-y-2 pt-4 border-t">
+                              <h4 className="font-semibold text-sm">Componentes Curriculares</h4>
+                              {(ano.componentes || []).map((componente) => (
+                                <div key={componente.id} className="grid grid-cols-12 gap-2 items-center">
+                                  <Input placeholder="componente" value={componente.nome} className="col-span-3" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nome', e.target.value)} />
+                                  <Input placeholder="B1" value={componente.nota_b1} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b1', maskNota(e.target.value))} inputMode="decimal" />
+                                  <Input placeholder="B2" value={componente.nota_b2} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b2', maskNota(e.target.value))} inputMode="decimal" />
+                                  <Input placeholder="B3" value={componente.nota_b3} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b3', maskNota(e.target.value))} inputMode="decimal" />
+                                  <Input placeholder="B4" value={componente.nota_b4} className="col-span-1" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'nota_b4', maskNota(e.target.value))} inputMode="decimal" />
+                                  <Input placeholder="Média" value={componente.media_final} className="col-span-2" onChange={(e) => handleDisciplinaChange(ano.id, componente.id, 'media_final', maskNota(e.target.value))} inputMode="decimal" />
+                                  <div className="col-span-3 flex justify-end">
+                                    {ano.componentes.length > 1 && (
+                                      <Button type="button" variant="ghost" size="icon" onClick={() => removeDisciplinaHistorico(ano.id, componente.id)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                              <Button type="button" variant="outline" size="sm" className="mt-2" onClick={() => addDisciplinaHistorico(ano.id)}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Adicionar componente
+                              </Button>
+                            </div>
+                            <div className="flex justify-end pt-4">
+                              <Button type="button" variant="destructive" size="sm" onClick={() => removeAnoHistorico(ano.id)}>
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remover Ano Letivo
+                              </Button>
+                            </div>
                           </div>
-                          <div className="flex justify-end pt-4">
-                            <Button type="button" variant="destructive" size="sm" onClick={() => removeAnoHistorico(ano.id)}>
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Remover Ano Letivo
-                            </Button>
-                          </div>
-                        </div>
-                      </AccordionContent>
-                    </AccordionItem>
-                  ));
-                })()}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ));
+                  })()}
                 </Accordion>
               </div>
 

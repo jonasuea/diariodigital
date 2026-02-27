@@ -186,12 +186,12 @@ export default function DiarioDigital() {
       action: () => navigate(`/diario-digital/avaliacoes?turmaId=${selectedTurmaId}&componente=${encodeURIComponent(selectedComponente)}`),
     },
     {
-      title: 'Notas',
+      title: 'Notas Parciais',
       description: 'Lançar notas e paralelas',
       icon: GraduationCap,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-50',
-      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/notas?componente=${encodeURIComponent(selectedComponente)}&origem=diario`),
+      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/notas-parciais?componente=${encodeURIComponent(selectedComponente)}&origem=diario`),
     },
   ];
 

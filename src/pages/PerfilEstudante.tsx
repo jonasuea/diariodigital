@@ -30,6 +30,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { TransferenciaDialog } from '@/components/estudantes/TransferenciaDialog';
+import { BoletimDialog } from '@/components/estudantes/BoletimDialog';
 
 
 // Interfaces
@@ -118,6 +120,8 @@ export default function PerfilEstudante() {
   const [activeTab, setActiveTab] = useState('notas');
   const [turmaComponentes, setTurmaComponentes] = useState<any[]>([]);
   const [turmaHistorica, setTurmaHistorica] = useState<{ nome: string; serie: string }>({ nome: '-', serie: '' });
+  const [transferenciaDialogOpen, setTransferenciaDialogOpen] = useState(false);
+  const [boletimDialogOpen, setBoletimDialogOpen] = useState(false);
 
   // helper to display notes with one decimal or blank
   const formatNota = (n?: number | null) => {
@@ -162,12 +166,11 @@ export default function PerfilEstudante() {
       setEstudante({ id: estudanteDoc.id, ...estudanteData, turma_nome, turma_serie });
       setTurmaComponentes(componentes);
 
-      // Carrega os dados da aba ativa inicial
-      if (activeTab === 'notas') {
-        await loadNotasData(id, selectedYear, estudanteData.turma_id, componentes);
-      } else if (activeTab === 'frequencia') {
-        await loadFrequenciaData(id, selectedYear);
-      }
+      // Carrega notas e frequência em paralelo sempre que a página abre
+      await Promise.all([
+        loadNotasData(id, selectedYear, estudanteData.turma_id, componentes),
+        loadFrequenciaData(id, selectedYear),
+      ]);
 
     } catch (error) {
       toast.error('Erro ao carregar dados do estudante');
@@ -242,12 +245,26 @@ export default function PerfilEstudante() {
       }
       setTurmaHistorica(turmaDoAno);
 
+      // Mapa de componente -> professorId via dados da turma (fallback quando a nota não tem professorId)
+      const componenteProfIdMap = new Map<string, string>();
+      if (notasSnapshot.docs.length > 0) {
+        const turmaIdRef = notasSnapshot.docs[0].data().turma_id;
+        if (turmaIdRef && turmasMap.has(turmaIdRef)) {
+          const turmaData = turmasMap.get(turmaIdRef);
+          (turmaData.componentes || []).forEach((c: any) => {
+            if (c.nome && c.professorId) componenteProfIdMap.set(c.nome, c.professorId);
+          });
+        }
+      }
+
       // convert snapshot docs into map by componente name for easy lookup and build primary list
       const notasMap = new Map<string, Nota>();
       const notasLista: Nota[] = [];
       notasSnapshot.docs.forEach(doc => {
         const data = doc.data() as Omit<Nota, 'id' | 'professor_nome'>;
-        const profN = data.professorId ? (professoresMap.get(data.professorId) || 'Não encontrado') : 'N/A';
+        // Usa o professorId da nota ou busca pelo componente na turma
+        const resolvedProfId = data.professorId || componenteProfIdMap.get(data.componente);
+        const profN = resolvedProfId ? (professoresMap.get(resolvedProfId) || 'Não encontrado') : 'N/A';
         const notaObj = { id: doc.id, ...data, professor_nome: profN } as Nota;
         notasMap.set(data.componente, notaObj);
         notasLista.push(notaObj);
@@ -349,6 +366,24 @@ export default function PerfilEstudante() {
     return 'bg-red-100 text-red-900 font-semibold';
   };
 
+  // Calcula a média para exibição: usa media_anual do banco se existir,
+  // caso contrário recalcula dos bimestres para suportar registros antigos.
+  const calcularMediaDisplay = (nota: Nota): number | null => {
+    if (nota.media_anual != null) return nota.media_anual;
+    const { bimestre_1, bimestre_2, bimestre_3, bimestre_4 } = nota;
+    if (bimestre_1 != null && bimestre_2 != null && bimestre_3 != null && bimestre_4 != null) {
+      return Math.round(((bimestre_1 + bimestre_2 + bimestre_3 + bimestre_4) / 4) * 10) / 10;
+    }
+    return null;
+  };
+
+  const getSituacaoDisplay = (nota: Nota): string => {
+    if (nota.situacao && nota.situacao !== 'Cursando') return nota.situacao;
+    const media = calcularMediaDisplay(nota);
+    if (media === null) return 'Cursando';
+    return media >= 6 ? 'Aprovado' : 'Reprovado';
+  };
+
   if (loading) {
     return (
       <AppLayout title="Carregando...">
@@ -376,7 +411,7 @@ export default function PerfilEstudante() {
             <h2 className="text-3xl font-bold tracking-tight">Detalhes do Aluno</h2>
             <p className="text-muted-foreground mt-1">Visualize informações detalhadas, notas e frequência do aluno</p>
           </div>
-          <Button className="bg-blue-500 hover:bg-blue-600">
+          <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => setTransferenciaDialogOpen(true)}>
             <Download className="h-4 w-4 mr-2" />
             Gerar Transferência
           </Button>
@@ -405,10 +440,14 @@ export default function PerfilEstudante() {
                     </Avatar>
                     <h3 className="text-2xl font-bold">{estudante.nome}</h3>
                     <p className="text-sm text-muted-foreground mt-1">Matrícula: {estudante.matricula}</p>
-                    <div className="flex items-center gap-2 mt-4 justify-center">
-                      {turmaHistorica.nome && (
+                    <div className="flex items-center gap-2 mt-4 justify-center flex-wrap">
+                      {estudante.turma_id && estudante.turma_nome && estudante.turma_nome !== '-' ? (
                         <Badge variant="secondary" className="bg-blue-100 text-blue-800 font-semibold text-xs px-3 py-1">
-                          {turmaHistorica.nome}
+                          {estudante.turma_nome}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="bg-orange-100 text-orange-700 font-semibold text-xs px-3 py-1">
+                          Sem turma
                         </Badge>
                       )}
                       <Badge variant="default" className="bg-green-100 text-green-800 font-semibold text-xs px-3 py-1">
@@ -558,22 +597,29 @@ export default function PerfilEstudante() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {notas.length > 0 ? notas.map((nota) => (
-                              <TableRow key={nota.id} className="border-b hover:bg-muted/30">
-                                <TableCell className="font-medium text-sm py-3">{nota.componente}</TableCell>
-                                <TableCell className="text-muted-foreground text-sm py-3">{nota.professor_nome}</TableCell>
-                                <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_1)}`}>{formatNota(nota.bimestre_1) || '-'}</TableCell>
-                                <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_2)}`}>{formatNota(nota.bimestre_2) || '-'}</TableCell>
-                                <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_3)}`}>{formatNota(nota.bimestre_3) || '-'}</TableCell>
-                                <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_4)}`}>{formatNota(nota.bimestre_4) || '-'}</TableCell>
-                                <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.media_anual)}`}>{formatNota(nota.media_anual) || '-'}</TableCell>
-                                <TableCell className="text-center text-sm py-3">
-                                  <Badge variant="default" className="bg-green-100 text-green-800 font-semibold text-xs capitalize">
-                                    {nota.situacao?.toLowerCase() || 'Cursando'}
-                                  </Badge>
-                                </TableCell>
-                              </TableRow>
-                            )) : (
+                            {notas.length > 0 ? notas.map((nota) => {
+                              const mediaDisplay = calcularMediaDisplay(nota);
+                              const situacaoDisplay = getSituacaoDisplay(nota);
+                              return (
+                                <TableRow key={nota.id} className="border-b hover:bg-muted/30">
+                                  <TableCell className="font-medium text-sm py-3">{nota.componente}</TableCell>
+                                  <TableCell className="text-muted-foreground text-sm py-3">{nota.professor_nome}</TableCell>
+                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_1)}`}>{formatNota(nota.bimestre_1) || '-'}</TableCell>
+                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_2)}`}>{formatNota(nota.bimestre_2) || '-'}</TableCell>
+                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_3)}`}>{formatNota(nota.bimestre_3) || '-'}</TableCell>
+                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_4)}`}>{formatNota(nota.bimestre_4) || '-'}</TableCell>
+                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(mediaDisplay)}`}>{formatNota(mediaDisplay) || '-'}</TableCell>
+                                  <TableCell className="text-center text-sm py-3">
+                                    <Badge variant="default" className={`font-semibold text-xs capitalize ${situacaoDisplay === 'Aprovado' ? 'bg-green-100 text-green-800' :
+                                      situacaoDisplay === 'Reprovado' ? 'bg-red-100 text-red-800' :
+                                        'bg-blue-100 text-blue-800'
+                                      }`}>
+                                      {situacaoDisplay}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }) : (
                               <TableRow>
                                 <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">Nenhuma nota registrada para este ano.</TableCell>
                               </TableRow>
@@ -582,7 +628,9 @@ export default function PerfilEstudante() {
                         </Table>
                       </div>
                       <div className="flex justify-end pt-4">
-                        <Button variant="outline" size="sm"><Download className="h-4 w-4 mr-2" />Gerar Boletim</Button>
+                        <Button variant="outline" size="sm" onClick={() => setBoletimDialogOpen(true)}>
+                          <Download className="h-4 w-4 mr-2" />Gerar Boletim
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -650,93 +698,112 @@ export default function PerfilEstudante() {
                   </CardHeader>
                   <CardContent>
                     <Accordion type="multiple" className="w-full space-y-4">
-                      {estudante.historico_academico.map((anoHistorico) => (
-                        <AccordionItem
-                          key={anoHistorico.id}
-                          value={anoHistorico.id}
-                          className="border rounded-lg px-4 bg-muted/20 data-[state=open]:bg-muted/40 transition-colors"
-                        >
-                          <AccordionTrigger className="hover:no-underline py-4">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-left w-full pr-4">
-                              <div className="flex items-center gap-2 min-w-[120px]">
-                                <Calendar className="h-4 w-4 text-muted-foreground mr-1" />
-                                <span className="font-semibold">{anoHistorico.ano_letivo}</span>
-                              </div>
-                              <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm text-muted-foreground">
-                                <span className="flex items-center gap-1.5 line-clamp-1">
-                                  <GraduationCap className="h-4 w-4 shrink-0" />
-                                  {anoHistorico.serie || 'Série não informada'}
-                                </span>
-                                {anoHistorico.escola && (
+                      {estudante.historico_academico.map((anoHistorico) => {
+                        // Para o ano selecionado, usa as notas reais do boletim (já carregadas)
+                        const isAnoAtual = anoHistorico.ano_letivo === selectedYear;
+                        const notasMap = isAnoAtual
+                          ? new Map(notas.map(n => [n.componente, n]))
+                          : new Map();
+
+                        return (
+                          <AccordionItem
+                            key={anoHistorico.id}
+                            value={anoHistorico.id}
+                            className="border rounded-lg px-4 bg-muted/20 data-[state=open]:bg-muted/40 transition-colors"
+                          >
+                            <AccordionTrigger className="hover:no-underline py-4">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 text-left w-full pr-4">
+                                <div className="flex items-center gap-2 min-w-[120px]">
+                                  <Calendar className="h-4 w-4 text-muted-foreground mr-1" />
+                                  <span className="font-semibold">{anoHistorico.ano_letivo}</span>
+                                </div>
+                                <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1.5 line-clamp-1">
-                                    <Home className="h-4 w-4 shrink-0" />
-                                    {anoHistorico.escola}
+                                    <GraduationCap className="h-4 w-4 shrink-0" />
+                                    {anoHistorico.serie || 'Série não informada'}
                                   </span>
-                                )}
-                              </div>
-                              <Badge variant={anoHistorico.concluido ? 'default' : 'secondary'} className={anoHistorico.concluido ? 'bg-success/10 text-success hover:bg-success/20' : ''}>
-                                {anoHistorico.concluido ? 'Concluído' : 'Em andamento'}
-                              </Badge>
-                            </div>
-                          </AccordionTrigger>
-                          <AccordionContent className="pt-2 pb-4">
-                            <div className="border rounded-md overflow-hidden bg-background">
-                              <Table>
-                                <TableHeader>
-                                  <TableRow className="bg-muted/50">
-                                    <TableHead className="font-semibold text-xs h-10">Componente Curricular</TableHead>
-                                    <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">1º Bim</TableHead>
-                                    <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">2º Bim</TableHead>
-                                    <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">3º Bim</TableHead>
-                                    <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">4º Bim</TableHead>
-                                    <TableHead className="text-center font-semibold text-xs h-10 w-20 px-1">Média Final</TableHead>
-                                  </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                  {anoHistorico.componentes && anoHistorico.componentes.length > 0 ? (
-                                    anoHistorico.componentes.map((disciplina) => {
-                                      if (!disciplina.nome) return null;
-
-                                      // Parse grades for coloring if possible
-                                      const mFinal = parseFloat(disciplina.media_final?.replace(',', '.') || '');
-                                      const mediaColorClass = !isNaN(mFinal) ? getNotaColor(mFinal) : '';
-
-                                      return (
-                                        <TableRow key={disciplina.id} className="border-b last:border-0 hover:bg-muted/10">
-                                          <TableCell className="font-medium text-sm py-2">
-                                            {disciplina.nome}
-                                          </TableCell>
-                                          <TableCell className="text-center text-sm py-2 px-1 text-muted-foreground">
-                                            {disciplina.nota_b1 || '-'}
-                                          </TableCell>
-                                          <TableCell className="text-center text-sm py-2 px-1 text-muted-foreground">
-                                            {disciplina.nota_b2 || '-'}
-                                          </TableCell>
-                                          <TableCell className="text-center text-sm py-2 px-1 text-muted-foreground">
-                                            {disciplina.nota_b3 || '-'}
-                                          </TableCell>
-                                          <TableCell className="text-center text-sm py-2 px-1 text-muted-foreground">
-                                            {disciplina.nota_b4 || '-'}
-                                          </TableCell>
-                                          <TableCell className={`text-center font-semibold text-sm py-2 px-1 ${mediaColorClass}`}>
-                                            {disciplina.media_final || '-'}
-                                          </TableCell>
-                                        </TableRow>
-                                      );
-                                    })
-                                  ) : (
-                                    <TableRow>
-                                      <TableCell colSpan={6} className="h-16 text-center text-sm text-muted-foreground">
-                                        Nenhum componente registrado.
-                                      </TableCell>
-                                    </TableRow>
+                                  {anoHistorico.escola && (
+                                    <span className="flex items-center gap-1.5 line-clamp-1">
+                                      <Home className="h-4 w-4 shrink-0" />
+                                      {anoHistorico.escola}
+                                    </span>
                                   )}
-                                </TableBody>
-                              </Table>
-                            </div>
-                          </AccordionContent>
-                        </AccordionItem>
-                      ))}
+                                  {isAnoAtual && (
+                                    <span className="text-xs text-blue-500 font-medium">● notas do boletim</span>
+                                  )}
+                                </div>
+                                <Badge variant={anoHistorico.concluido ? 'default' : 'secondary'} className={anoHistorico.concluido ? 'bg-success/10 text-success hover:bg-success/20' : ''}>
+                                  {anoHistorico.concluido ? 'Concluído' : 'Em andamento'}
+                                </Badge>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2 pb-4">
+                              <div className="border rounded-md overflow-hidden bg-background">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow className="bg-muted/50">
+                                      <TableHead className="font-semibold text-xs h-10">Componente Curricular</TableHead>
+                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">1º Bim</TableHead>
+                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">2º Bim</TableHead>
+                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">3º Bim</TableHead>
+                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">4º Bim</TableHead>
+                                      <TableHead className="text-center font-semibold text-xs h-10 w-20 px-1">Média Final</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  <TableBody>
+                                    {anoHistorico.componentes && anoHistorico.componentes.length > 0 ? (
+                                      anoHistorico.componentes.map((disciplina) => {
+                                        if (!disciplina.nome) return null;
+
+                                        // Para o ano atual, usa notas reais do boletim se disponíveis
+                                        const notaReal = notasMap.get(disciplina.nome);
+                                        const b1 = notaReal ? formatNota(notaReal.bimestre_1) : (disciplina.nota_b1 || '-');
+                                        const b2 = notaReal ? formatNota(notaReal.bimestre_2) : (disciplina.nota_b2 || '-');
+                                        const b3 = notaReal ? formatNota(notaReal.bimestre_3) : (disciplina.nota_b3 || '-');
+                                        const b4 = notaReal ? formatNota(notaReal.bimestre_4) : (disciplina.nota_b4 || '-');
+                                        const mediaNum = notaReal ? calcularMediaDisplay(notaReal) : null;
+                                        const mediaStr = mediaNum != null
+                                          ? formatNota(mediaNum)
+                                          : (disciplina.media_final || '-');
+                                        const mediaColorClass = mediaNum != null ? getNotaColor(mediaNum) : '';
+
+                                        return (
+                                          <TableRow key={disciplina.id} className="border-b last:border-0 hover:bg-muted/10">
+                                            <TableCell className="font-medium text-sm py-2">
+                                              {disciplina.nome}
+                                            </TableCell>
+                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_1) : 'text-muted-foreground'}`}>
+                                              {b1 || '-'}
+                                            </TableCell>
+                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_2) : 'text-muted-foreground'}`}>
+                                              {b2 || '-'}
+                                            </TableCell>
+                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_3) : 'text-muted-foreground'}`}>
+                                              {b3 || '-'}
+                                            </TableCell>
+                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_4) : 'text-muted-foreground'}`}>
+                                              {b4 || '-'}
+                                            </TableCell>
+                                            <TableCell className={`text-center font-semibold text-sm py-2 px-1 ${mediaColorClass}`}>
+                                              {mediaStr}
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      })
+                                    ) : (
+                                      <TableRow>
+                                        <TableCell colSpan={6} className="h-16 text-center text-sm text-muted-foreground">
+                                          Nenhum componente registrado.
+                                        </TableCell>
+                                      </TableRow>
+                                    )}
+                                  </TableBody>
+                                </Table>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      })}
                     </Accordion>
                   </CardContent>
                 </Card>
@@ -746,6 +813,29 @@ export default function PerfilEstudante() {
           </div>
         </div>
       </main>
+
+      {estudante && (
+        <TransferenciaDialog
+          open={transferenciaDialogOpen}
+          onOpenChange={setTransferenciaDialogOpen}
+          estudante={estudante}
+        />
+      )}
+
+      {estudante && (
+        <BoletimDialog
+          open={boletimDialogOpen}
+          onOpenChange={setBoletimDialogOpen}
+          estudanteNome={estudante.nome}
+          estudanteMatricula={estudante.matricula}
+          estudanteNascimento={estudante.data_nascimento || undefined}
+          turmaNome={turmaHistorica.nome}
+          turmaSerie={turmaHistorica.serie}
+          ano={selectedYear}
+          notas={notas}
+          faltasAnuais={faltasAnuais}
+        />
+      )}
     </AppLayout>
   );
 }

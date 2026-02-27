@@ -120,7 +120,7 @@ export default function Notas() {
       );
       const notasSnapshot = await getDocs(notasQuery);
       const notasData: Record<string, Record<string, Nota>> = {};
-      
+
       // ensure ano field exists on each document
       for (const docSnap of notasSnapshot.docs) {
         const data = docSnap.data();
@@ -211,36 +211,90 @@ export default function Notas() {
 
     setSaving(true);
     try {
-      // Iterar sobre todos os estudantes para salvar as notas da componente selecionada
+      const currentYear = new Date().getFullYear();
+      const anoStr = currentYear.toString();
+
       for (const estudanteId of Object.keys(notas)) {
         const nota = notas[estudanteId]?.[componente];
         if (nota) {
           const { id, ...notaData } = nota;
-          // Apenas salvar se houver alguma nota lançada ou se já existir um ID (edição)
           const temNotaLancada = nota.bimestre_1 != null || nota.bimestre_2 != null || nota.bimestre_3 != null || nota.bimestre_4 != null;
-          
+
+          const media = calcularMedia(nota);
+          const situacao = calcularSituacao(media);
+
+          // 1. Salva/atualiza na coleção notas
           if (id) {
-            const notaDocRef = doc(db, 'notas', id);
-            await updateDoc(notaDocRef, {
+            await updateDoc(doc(db, 'notas', id), {
               bimestre_1: nota.bimestre_1,
               bimestre_2: nota.bimestre_2,
               bimestre_3: nota.bimestre_3,
               bimestre_4: nota.bimestre_4,
-              ano: new Date().getFullYear(), // keep year in sync
+              media_anual: media,
+              situacao: situacao,
+              ano: currentYear,
             });
           } else if (temNotaLancada) {
-            // Se for um novo registro, garantir que todos os campos obrigatórios estejam presentes
-            const currentYear = new Date().getFullYear();
             await addDoc(collection(db, 'notas'), {
               ...notaData,
               estudante_id: estudanteId,
               turma_id: turmaId!,
               componente: componente,
+              media_anual: media,
+              situacao: situacao,
               ano: currentYear,
             });
           }
+
+          // 2. Sincroniza as notas no historico_academico do estudante
+          if (temNotaLancada) {
+            try {
+              const estudanteRef = doc(db, 'estudantes', estudanteId);
+              const estudanteSnap = await getDoc(estudanteRef);
+              if (estudanteSnap.exists()) {
+                const dados = estudanteSnap.data();
+                const historico: any[] = dados.historico_academico || [];
+
+                // Encontra a entrada do ano atual no histórico
+                const idxAno = historico.findIndex(h => h.ano_letivo === anoStr);
+                if (idxAno !== -1) {
+                  const entrada = { ...historico[idxAno] };
+                  const comps: any[] = entrada.componentes ? [...entrada.componentes] : [];
+
+                  // Encontra o componente no histórico
+                  const idxComp = comps.findIndex(c => c.nome === componente);
+                  const fmtN = (n: number | null) => n != null ? n.toFixed(1) : '';
+                  const notaHistorico = {
+                    nota_b1: fmtN(nota.bimestre_1),
+                    nota_b2: fmtN(nota.bimestre_2),
+                    nota_b3: fmtN(nota.bimestre_3),
+                    nota_b4: fmtN(nota.bimestre_4),
+                    media_final: media != null ? media.toFixed(1) : '',
+                  };
+
+                  if (idxComp !== -1) {
+                    comps[idxComp] = { ...comps[idxComp], ...notaHistorico };
+                  } else {
+                    // Componente não existe no histórico — adiciona
+                    comps.push({
+                      id: `disc_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+                      nome: componente,
+                      ...notaHistorico,
+                    });
+                  }
+
+                  const novoHistorico = [...historico];
+                  novoHistorico[idxAno] = { ...entrada, componentes: comps };
+                  await updateDoc(estudanteRef, { historico_academico: novoHistorico });
+                }
+              }
+            } catch (histErr) {
+              console.warn('Não foi possível atualizar o histórico do estudante:', histErr);
+            }
+          }
         }
       }
+
       await logActivity(`salvou as notas de "${componente}" para a turma "${turma?.nome}".`);
       toast.success('Notas salvas com sucesso!');
       loadData();
@@ -304,7 +358,7 @@ export default function Notas() {
     toast.success('Boletins gerados com sucesso!');
   }
 
-  const filteredEstudantes = estudantes.filter(a => 
+  const filteredEstudantes = estudantes.filter(a =>
     a.nome.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -430,11 +484,11 @@ export default function Notas() {
                       const mediasDasDisciplinas = Object.values(estudanteNotas)
                         .map(nota => calcularMedia(nota))
                         .filter((media): media is number => media !== null);
-                      
+
                       const mediaGeral = mediasDasDisciplinas.length > 0
                         ? mediasDasDisciplinas.reduce((acc, curr) => acc + curr, 0) / mediasDasDisciplinas.length
                         : null;
-                      
+
                       const situacaoGeral = calcularSituacao(mediaGeral);
 
                       return (
