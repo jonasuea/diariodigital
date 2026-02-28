@@ -93,14 +93,20 @@ function getNotaColor(v: number | null): string {
 }
 
 function maskNota(raw: string): string {
-    let v = raw.replace(',', '.').replace(/[^0-9.]/g, '');
-    const parts = v.split('.');
-    if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
-    if (parts.length === 2 && parts[1].length > 1) v = parts[0] + '.' + parts[1].slice(0, 1);
+    const v = raw.replace(/\D/g, '');
+    if (v === '') return '';
 
-    const num = parseFloat(v);
-    if (!isNaN(num) && num > 10) return '10';
-    return v;
+    if (v.length === 1) {
+        return parseInt(v, 10).toString();
+    }
+
+    const intValStr = v.slice(0, -1);
+    const decVal = v.slice(-1);
+    const intVal = parseInt(intValStr, 10).toString();
+
+    const finalStr = `${intVal}.${decVal}`;
+    if (parseFloat(finalStr) > 10) return '10.0';
+    return finalStr;
 }
 
 const emptyNota = (): NotaParcial => ({ av1: null, av2: null, av3: null, av4: null, media: null });
@@ -252,6 +258,20 @@ export default function NotasParciais() {
             const nota = { ...prev[bim][estudanteId] };
             (nota as any)[field] = masked;
             nota.media = calcMedia(nota);
+            return { ...prev, [bim]: { ...prev[bim], [estudanteId]: nota } };
+        });
+    }
+
+    function handleAvBlur(bim: number, estudanteId: string, field: keyof Pick<NotaParcial, 'av1' | 'av2' | 'av3' | 'av4'>) {
+        setNotas(prev => {
+            const nota = { ...prev[bim][estudanteId] };
+            let val = (nota as any)[field];
+            if (val !== null && val !== '') {
+                let parsed = parseFloat(val);
+                if (!isNaN(parsed)) {
+                    (nota as any)[field] = parsed.toFixed(1);
+                }
+            }
             return { ...prev, [bim]: { ...prev[bim], [estudanteId]: nota } };
         });
     }
@@ -554,6 +574,7 @@ export default function NotasParciais() {
                                                                     <Input
                                                                         value={np[av] != null ? fmtN(np[av]) : ''}
                                                                         onChange={e => handleAvChange(bim, est.id, av, e.target.value)}
+                                                                        onBlur={() => handleAvBlur(bim, est.id, av)}
                                                                         inputMode="decimal"
                                                                         className="h-7 text-center text-sm px-1 bg-white/80 focus:bg-white border-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                                                         placeholder="—"
