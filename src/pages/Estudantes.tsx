@@ -74,6 +74,7 @@ export default function Estudantes() {
         };
       }));
 
+      estudantesData.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       setEstudantes(estudantesData);
     } catch (error) {
       toast.error('Erro ao carregar estudantes');
