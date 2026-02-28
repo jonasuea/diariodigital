@@ -33,10 +33,10 @@ interface Turma {
 
 interface NotaParcial {
     id?: string;        // Firestore doc id
-    av1: number | null;
-    av2: number | null;
-    av3: number | null;
-    av4: number | null;
+    av1: number | string | null;
+    av2: number | string | null;
+    av3: number | string | null;
+    av4: number | string | null;
     media: number | null;
 }
 
@@ -65,15 +65,24 @@ const BIMESTRE_HEADER: Record<number, string> = {
     4: 'bg-orange-100 text-orange-900',
 };
 
+function parseNotaStr(v: number | string | null | undefined): number | null {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') return v;
+    const n = parseFloat(v.toString().replace(',', '.'));
+    return isNaN(n) ? null : n;
+}
+
 function calcMedia(n: NotaParcial): number | null {
-    const vals = [n.av1, n.av2, n.av3, n.av4].filter(v => v != null) as number[];
+    const vals = [n.av1, n.av2, n.av3, n.av4].map(parseNotaStr).filter(v => v != null) as number[];
     if (vals.length === 0) return null;
     const m = vals.reduce((a, b) => a + b, 0) / vals.length;
     return Math.round(m * 10) / 10;
 }
 
-function fmtN(v: number | null | undefined): string {
-    return v != null ? v.toFixed(1) : '';
+function fmtN(v: number | string | null | undefined): string {
+    if (v == null || v === '') return '';
+    if (typeof v === 'string') return v;
+    return v.toFixed(1);
 }
 
 function getNotaColor(v: number | null): string {
@@ -84,18 +93,14 @@ function getNotaColor(v: number | null): string {
 }
 
 function maskNota(raw: string): string {
-    let v = raw.replace(/[^0-9.]/g, '');
+    let v = raw.replace(',', '.').replace(/[^0-9.]/g, '');
     const parts = v.split('.');
     if (parts.length > 2) v = parts[0] + '.' + parts.slice(1).join('');
-    if (parts.length === 2) v = parts[0] + '.' + parts[1].slice(0, 1);
-    const num = parseFloat(v);
-    if (!isNaN(num) && num > 10) v = '10';
-    return v;
-}
+    if (parts.length === 2 && parts[1].length > 1) v = parts[0] + '.' + parts[1].slice(0, 1);
 
-function parseNota(s: string): number | null {
-    const n = parseFloat(s.replace(',', '.'));
-    return isNaN(n) ? null : Math.min(10, Math.max(0, n));
+    const num = parseFloat(v);
+    if (!isNaN(num) && num > 10) return '10';
+    return v;
 }
 
 const emptyNota = (): NotaParcial => ({ av1: null, av2: null, av3: null, av4: null, media: null });
@@ -245,7 +250,7 @@ export default function NotasParciais() {
         const masked = maskNota(raw);
         setNotas(prev => {
             const nota = { ...prev[bim][estudanteId] };
-            (nota as any)[field] = masked === '' ? null : parseNota(masked);
+            (nota as any)[field] = masked;
             nota.media = calcMedia(nota);
             return { ...prev, [bim]: { ...prev[bim], [estudanteId]: nota } };
         });
@@ -268,17 +273,17 @@ export default function NotasParciais() {
                         ano,
                         bimestre: bim,
                         estudante_id: estudanteId,
-                        av1: nota.av1,
-                        av2: nota.av2,
-                        av3: nota.av3,
-                        av4: nota.av4,
+                        av1: parseNotaStr(nota.av1),
+                        av2: parseNotaStr(nota.av2),
+                        av3: parseNotaStr(nota.av3),
+                        av4: parseNotaStr(nota.av4),
                         media,
                         updated_at: serverTimestamp(),
                     };
                     if (nota.id) {
                         await updateDoc(doc(db, 'notas_parciais', nota.id), payload);
                     } else {
-                        const hasData = nota.av1 != null || nota.av2 != null || nota.av3 != null || nota.av4 != null;
+                        const hasData = parseNotaStr(nota.av1) != null || parseNotaStr(nota.av2) != null || parseNotaStr(nota.av3) != null || parseNotaStr(nota.av4) != null;
                         if (hasData) {
                             const ref = await addDoc(collection(db, 'notas_parciais'), { ...payload, created_at: serverTimestamp() });
                             // update local id
