@@ -751,8 +751,37 @@ export default function PerfilEstudante() {
                                     </TableRow>
                                   </TableHeader>
                                   <TableBody>
-                                    {anoHistorico.componentes && anoHistorico.componentes.length > 0 ? (
-                                      anoHistorico.componentes.map((disciplina) => {
+                                    {(() => {
+                                      let displayComponentes = anoHistorico.componentes || [];
+                                      if (isAnoAtual) {
+                                        const compMap = new Map<string, HistoricoDisciplina>();
+                                        displayComponentes.forEach(c => {
+                                          if (c.nome) compMap.set(c.nome, c);
+                                        });
+                                        notasMap.forEach((nota, nome) => {
+                                          if (!compMap.has(nome)) {
+                                            compMap.set(nome, { id: nota.id, nome, nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: '' });
+                                          }
+                                        });
+                                        turmaComponentes.forEach(tc => {
+                                          if (tc.nome && !compMap.has(tc.nome)) {
+                                            compMap.set(tc.nome, { id: `tc_${tc.nome}`, nome: tc.nome, nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: '' });
+                                          }
+                                        });
+                                        displayComponentes = Array.from(compMap.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+                                      }
+
+                                      if (displayComponentes.length === 0) {
+                                        return (
+                                          <TableRow>
+                                            <TableCell colSpan={6} className="h-16 text-center text-sm text-muted-foreground">
+                                              Nenhum componente registrado.
+                                            </TableCell>
+                                          </TableRow>
+                                        );
+                                      }
+
+                                      return displayComponentes.map((disciplina) => {
                                         if (!disciplina.nome) return null;
 
                                         // Para o ano atual, usa notas reais do boletim se disponíveis
@@ -789,14 +818,8 @@ export default function PerfilEstudante() {
                                             </TableCell>
                                           </TableRow>
                                         );
-                                      })
-                                    ) : (
-                                      <TableRow>
-                                        <TableCell colSpan={6} className="h-16 text-center text-sm text-muted-foreground">
-                                          Nenhum componente registrado.
-                                        </TableCell>
-                                      </TableRow>
-                                    )}
+                                      });
+                                    })()}
                                   </TableBody>
                                 </Table>
                               </div>
