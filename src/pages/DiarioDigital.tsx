@@ -59,6 +59,29 @@ export default function DiarioDigital() {
 
   const isGestor = role && role !== 'professor';
 
+  const [loggedProfessorId, setLoggedProfessorId] = useState<string | null>(null);
+
+  // Efeito para buscar o ID real do professor logado pelo e-mail
+  useEffect(() => {
+    if (!user?.email || isGestor) return;
+
+    async function fetchLoggedProfessorId() {
+      try {
+        const profQuery = query(collection(db, 'professores'), where('email', '==', user.email));
+        const profSnapshot = await getDocs(profQuery);
+        if (!profSnapshot.empty) {
+          setLoggedProfessorId(profSnapshot.docs[0].id);
+        } else {
+          console.warn("Nenhum professor encontrado com o e-mail: ", user.email);
+        }
+      } catch (error) {
+        console.error("Erro ao buscar professor logado:", error);
+      }
+    }
+
+    fetchLoggedProfessorId();
+  }, [user, isGestor]);
+
   // Efeito para carregar professores (apenas para gestores)
   useEffect(() => {
     if (isGestor) {
@@ -78,12 +101,12 @@ export default function DiarioDigital() {
 
   // Efeito para carregar turmas baseado no usuário logado (professor) ou selecionado (gestor)
   useEffect(() => {
-    const professorId = isGestor ? selectedProfessorId : user?.uid;
+    const professorId = isGestor ? selectedProfessorId : loggedProfessorId;
 
     if (!professorId) {
       setTurmas([]);
       return;
-    };
+    }
 
     async function fetchTurmas() {
       setLoading(true);
@@ -117,7 +140,7 @@ export default function DiarioDigital() {
     }
 
     fetchTurmas();
-  }, [user, selectedProfessorId, isGestor]);
+  }, [selectedProfessorId, isGestor, loggedProfessorId]);
 
   // useEffect para persistir os filtros no sessionStorage quando forem alterados
   useEffect(() => {
@@ -142,11 +165,11 @@ export default function DiarioDigital() {
     setSelectedTurmaId('');
     setSelectedComponente('');
     setComponentes([]);
-  }, [selectedProfessorId]);
+  }, [selectedProfessorId, loggedProfessorId]);
 
   // Efeito para filtrar componentes quando a turma muda
   useEffect(() => {
-    const professorId = isGestor ? selectedProfessorId : user?.uid;
+    const professorId = isGestor ? selectedProfessorId : loggedProfessorId;
     setSelectedComponente('');
 
     if (selectedTurmaId && professorId) {
@@ -158,7 +181,7 @@ export default function DiarioDigital() {
     } else {
       setComponentes([]);
     }
-  }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, user]);
+  }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, loggedProfessorId]);
 
   const cards = [
     {

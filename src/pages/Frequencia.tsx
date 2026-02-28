@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -53,11 +53,14 @@ export default function Frequencia() {
   const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth());
-  
+
   // Estado para o modal de justificativa
   const [justificativaDialogOpen, setJustificativaDialogOpen] = useState(false);
   const [justificativaText, setJustificativaText] = useState('');
   const [frequenciaParaJustificar, setFrequenciaParaJustificar] = useState<FrequenciaRecord | null>(null);
+
+  // Referência para o dia atual para fazer autoscroll
+  const currentDayRef = useRef<HTMLTableCellElement>(null);
 
   useEffect(() => {
     if (turmaId) {
@@ -104,7 +107,7 @@ export default function Frequencia() {
       // Carrega as frequências para o mês atual e o ano da turma
       const startDate = startOfMonth(new Date(anoTurma, currentMonth));
       const endDate = endOfMonth(new Date(anoTurma, currentMonth));
-      
+
       // Carregar dias letivos
       const diasLetivosQuery = query(
         collection(db, 'dias_letivos'),
@@ -127,7 +130,7 @@ export default function Frequencia() {
           where('data', '>=', format(startDate, 'yyyy-MM-dd')),
           where('data', '<=', format(endDate, 'yyyy-MM-dd'))
         );
-        
+
         const freqSnapshot = await getDocs(freqQuery);
         const freqData: Record<string, FrequenciaRecord> = {};
         freqSnapshot.forEach(doc => {
@@ -144,6 +147,12 @@ export default function Frequencia() {
       console.error(error);
     } finally {
       setLoading(false);
+      // Fazer scroll para o dia de hoje após o carregamento, se existir a referência
+      setTimeout(() => {
+        if (currentDayRef.current) {
+          currentDayRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+      }, 500); // tempo para o render terminar
     }
   }
 
@@ -154,7 +163,7 @@ export default function Frequencia() {
     try {
       const start = startOfMonth(new Date(anoLetivo, currentMonth));
       const end = endOfMonth(new Date(anoLetivo, currentMonth));
-      
+
       // Validação extra para garantir datas válidas
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
         return [];
@@ -174,7 +183,7 @@ export default function Frequencia() {
   const toggleFrequencia = async (estudanteId: string, data: Date) => {
     if (!turmaId) return;
     const dateStr = format(data, 'yyyy-MM-dd');
-    
+
     // Verificar se é dia letivo
     if (!diasLetivos.has(dateStr)) {
       toast.error('Este dia não está marcado como letivo no calendário escolar.');
@@ -206,7 +215,7 @@ export default function Frequencia() {
           ano: turma?.ano || new Date().getFullYear()
         });
       }
-      
+
       await logActivity(`registrou a frequência para o dia ${dateStr} na turma "${turma?.nome}".`);
       // Recarregar dados para garantir sincronização
       loadData();
@@ -315,10 +324,10 @@ export default function Frequencia() {
               </SelectContent>
             </Select>
           </div>
-          
+
           <div className="ml-auto flex items-center gap-2 bg-muted/30 px-3 py-1 rounded-md text-sm text-muted-foreground">
-             <Calendar className="h-4 w-4" />
-             <span>Ano Letivo: {turma?.ano}</span>
+            <Calendar className="h-4 w-4" />
+            <span>Ano Letivo: {turma?.ano}</span>
           </div>
         </div>
 
@@ -356,19 +365,21 @@ export default function Frequencia() {
             </div>
           ) : (
             <div className="overflow-x-auto border rounded-lg">
-              <table className="w-full">
+              <table className="w-full border-collapse">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2 min-w-[200px]">Estudante</th>
-                    {schoolDays.map((dayObj) => {
+                    <th className="text-left p-3 min-w-[200px] sticky left-0 z-10 bg-muted/90 backdrop-blur-sm border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                      Estudante
+                    </th>
+                    {schoolDays.filter(dayObj => diasLetivos.has(format(dayObj.date, 'yyyy-MM-dd'))).map((dayObj) => {
                       const isToday = isSameDay(dayObj.date, new Date());
                       const dateStr = format(dayObj.date, 'yyyy-MM-dd');
-                      const isDiaLetivo = diasLetivos.has(dateStr);
-                      
+
                       return (
-                        <th 
-                          key={dayObj.date.toISOString()} 
-                          className={`p-2 text-center min-w-[50px] ${isToday ? 'bg-blue-100/50 border-x border-blue-200' : ''} ${!isDiaLetivo ? 'bg-gray-100 opacity-50' : ''}`}
+                        <th
+                          key={dayObj.date.toISOString()}
+                          ref={isToday ? currentDayRef : null}
+                          className={`p-2 text-center min-w-[50px] ${isToday ? 'bg-blue-100/50 border-x border-blue-200' : ''}`}
                         >
                           <div className={`text-xs ${isToday ? 'text-blue-700 font-bold' : 'text-muted-foreground'}`}>
                             {dayObj.dayName}
@@ -383,19 +394,20 @@ export default function Frequencia() {
                 </thead>
                 <tbody>
                   {estudantes.map((estudante) => (
-                    <tr key={estudante.id}>
-                      <td className="p-3 border-r">{estudante.nome}</td>
-                      {schoolDays.map(({ date: dayDate }) => {
+                    <tr key={estudante.id} className="hover:bg-muted/30">
+                      <td className="p-3 border-r bg-background sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] font-medium">
+                        {estudante.nome}
+                      </td>
+                      {schoolDays.filter(dayObj => diasLetivos.has(format(dayObj.date, 'yyyy-MM-dd'))).map(({ date: dayDate }) => {
                         const dateStr = format(dayDate, 'yyyy-MM-dd');
                         const key = `${estudante.id}-${dateStr}`;
                         const freq = frequencias[key];
                         const isToday = isSameDay(dayDate, new Date());
-                        const isDiaLetivo = diasLetivos.has(dateStr);
-                        
+
                         return (
-                          <td 
-                            key={dayDate.toISOString()} 
-                            className={`p-2 text-center ${isToday ? 'bg-blue-50/50 border-x border-blue-100' : ''} ${!isDiaLetivo ? 'bg-gray-50' : ''}`}
+                          <td
+                            key={dayDate.toISOString()}
+                            className={`p-2 text-center ${isToday ? 'bg-blue-50/50 border-x border-blue-100' : ''}`}
                           >
                             <div className="flex flex-col items-center">
                               {freq?.status === 'justificado' && freq.justificativa ? (
@@ -404,8 +416,7 @@ export default function Frequencia() {
                                     <TooltipTrigger asChild>
                                       <button
                                         onClick={() => toggleFrequencia(estudante.id, dayDate)}
-                                        className={`transition-transform ${isDiaLetivo ? 'hover:scale-110 cursor-pointer' : 'cursor-not-allowed opacity-30'}`}
-                                        disabled={!isDiaLetivo}
+                                        className="transition-transform hover:scale-110 cursor-pointer"
                                       >
                                         {getStatusIcon(freq.status)}
                                       </button>
@@ -418,16 +429,15 @@ export default function Frequencia() {
                               ) : (
                                 <button
                                   onClick={() => toggleFrequencia(estudante.id, dayDate)}
-                                  className={`transition-transform ${isDiaLetivo ? 'hover:scale-110 cursor-pointer' : 'cursor-not-allowed opacity-30'}`}
-                                  disabled={!isDiaLetivo}
-                                  title={!isDiaLetivo ? "Dia não letivo" : ""}
+                                  className="transition-transform hover:scale-110 cursor-pointer"
+                                  title=""
                                 >
-                                  {getStatusIcon(freq?.status || (isDiaLetivo ? 'presente' : undefined))}
+                                  {getStatusIcon(freq?.status || 'presente')}
                                 </button>
                               )}
-                              
-                              {freq?.status === 'faltou' && isDiaLetivo && (
-                                <button 
+
+                              {freq?.status === 'faltou' && (
+                                <button
                                   onClick={(e) => { e.stopPropagation(); openJustificativaDialog(estudante, format(dayDate, 'yyyy-MM-dd')); }}
                                   className="text-xs text-red-500 cursor-pointer hover:underline"
                                 >
