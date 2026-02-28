@@ -12,8 +12,9 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, orderBy } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay } from 'date-fns';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, subDays, isBefore, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface Estudante {
   id: string;
@@ -43,6 +44,8 @@ export default function Frequencia() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
+  const { role, isGestor, isAdmin } = useUserRole();
+  const isPrivilegedUser = isAdmin || isGestor || role === 'secretario' || role === 'pedagogo';
 
   const [turma, setTurma] = useState<Turma | null>(null);
   const [componente, setComponente] = useState(searchParams.get('componente') || '');
@@ -288,8 +291,8 @@ export default function Frequencia() {
 
   return (
     <AppLayout title={`Frequência - ${turma?.nome || ''}`}>
-      <div className="space-y-6 animate-fade-in">
-        <p className="text-muted-foreground -mt-2">Controle de frequência dos Estudantes - Ano {turma?.ano}</p>
+      <div className="space-y-4 animate-fade-in w-full max-w-full overflow-hidden">
+        <p className="text-muted-foreground -mt-1">Controle de frequência dos Estudantes - Ano {turma?.ano}</p>
 
         <div className="flex flex-wrap items-center gap-4">
           <Button variant="outline" onClick={() => navigate(origem === 'diario' ? '/diario-digital' : '/turmas')} className="gap-2">
@@ -331,7 +334,7 @@ export default function Frequencia() {
           </div>
         </div>
 
-        <div className="bg-card border rounded-lg p-6 space-y-6">
+        <div className="bg-card border rounded-lg p-6 space-y-6 w-full max-w-full overflow-hidden">
           <div className="flex items-center gap-2 mb-4">
             <Calendar className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">
@@ -364,14 +367,25 @@ export default function Frequencia() {
               <p>Por favor, selecione um componente curricular para visualizar ou lançar a frequência.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto border rounded-lg">
-              <table className="w-full border-collapse">
+            <div className="relative w-full max-w-full overflow-x-auto border rounded-lg pb-4 scrollbar-thin scrollbar-thumb-muted-foreground/50 scrollbar-track-transparent">
+              <table className="w-full border-separate border-spacing-0" style={{ minWidth: isPrivilegedUser ? '800px' : '400px' }}>
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3 min-w-[200px] sticky left-0 z-10 bg-muted/90 backdrop-blur-sm border-r shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+                  <tr>
+                    <th className="text-left p-3 min-w-[250px] max-w-[250px] sticky left-0 z-30 bg-muted/95 backdrop-blur-md border-b border-t-0 border-r shadow-[4px_0_12px_-4px_rgba(0,0,0,0.15)]">
                       Estudante
                     </th>
-                    {schoolDays.filter(dayObj => diasLetivos.has(format(dayObj.date, 'yyyy-MM-dd'))).map((dayObj) => {
+                    {schoolDays.filter(dayObj => {
+                      const dateStr = format(dayObj.date, 'yyyy-MM-dd');
+                      if (!diasLetivos.has(dateStr)) return false;
+
+                      // Filtro de 5 dias para professores (ocultar dias mais antigos que hoje - 5)
+                      if (!isPrivilegedUser) {
+                        const limitePassado = startOfDay(subDays(new Date(), 5));
+                        if (isBefore(dayObj.date, limitePassado)) return false;
+                      }
+
+                      return true;
+                    }).map((dayObj) => {
                       const isToday = isSameDay(dayObj.date, new Date());
                       const dateStr = format(dayObj.date, 'yyyy-MM-dd');
 
@@ -379,7 +393,7 @@ export default function Frequencia() {
                         <th
                           key={dayObj.date.toISOString()}
                           ref={isToday ? currentDayRef : null}
-                          className={`p-2 text-center min-w-[50px] ${isToday ? 'bg-blue-100/50 border-x border-blue-200' : ''}`}
+                          className={`p-2 text-center min-w-[50px] border-b border-t-0 ${isToday ? 'bg-blue-100/50 border-x border-blue-200' : ''}`}
                         >
                           <div className={`text-xs ${isToday ? 'text-blue-700 font-bold' : 'text-muted-foreground'}`}>
                             {dayObj.dayName}
@@ -394,11 +408,22 @@ export default function Frequencia() {
                 </thead>
                 <tbody>
                   {estudantes.map((estudante) => (
-                    <tr key={estudante.id} className="hover:bg-muted/30">
-                      <td className="p-3 border-r bg-background sticky left-0 z-10 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)] font-medium">
+                    <tr key={estudante.id} className="hover:bg-gray-200 dark:hover:bg-gray-800 group transition-colors">
+                      <td className="p-3 border-b border-r bg-background sticky left-0 z-20 shadow-[4px_0_12px_-4px_rgba(0,0,0,0.15)] font-medium truncate min-w-[250px] max-w-[250px] group-hover:bg-gray-200 dark:group-hover:bg-gray-800 transition-colors" title={estudante.nome}>
                         {estudante.nome}
                       </td>
-                      {schoolDays.filter(dayObj => diasLetivos.has(format(dayObj.date, 'yyyy-MM-dd'))).map(({ date: dayDate }) => {
+                      {schoolDays.filter(dayObj => {
+                        const dateStr = format(dayObj.date, 'yyyy-MM-dd');
+                        if (!diasLetivos.has(dateStr)) return false;
+
+                        // Filtro de 5 dias para professores (ocultar dias mais antigos que hoje - 5)
+                        if (!isPrivilegedUser) {
+                          const limitePassado = startOfDay(subDays(new Date(), 5));
+                          if (isBefore(dayObj.date, limitePassado)) return false;
+                        }
+
+                        return true;
+                      }).map(({ date: dayDate }) => {
                         const dateStr = format(dayDate, 'yyyy-MM-dd');
                         const key = `${estudante.id}-${dateStr}`;
                         const freq = frequencias[key];
@@ -407,7 +432,7 @@ export default function Frequencia() {
                         return (
                           <td
                             key={dayDate.toISOString()}
-                            className={`p-2 text-center ${isToday ? 'bg-blue-50/50 border-x border-blue-100' : ''}`}
+                            className={`p-2 text-center border-b ${isToday ? 'bg-blue-50/50 border-x border-blue-100' : ''}`}
                           >
                             <div className="flex flex-col items-center">
                               {freq?.status === 'justificado' && freq.justificativa ? (
