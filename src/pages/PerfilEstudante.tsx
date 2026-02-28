@@ -230,45 +230,72 @@ export default function PerfilEstudante() {
 
       // Busca a turma histórica do ano selecionado
       let turmaDoAno = { nome: '-', serie: '' };
+      let compsTurma: any[] = [];
+      const currentYear = String(new Date().getFullYear());
+      let turmaIdResolved = null;
+
       if (notasSnapshot.docs.length > 0) {
         // Pega a primeira nota para obter o turma_id do ano
-        const primeiraNota = notasSnapshot.docs[0].data();
-        const turmaIdDoAno = primeiraNota.turma_id;
-        if (turmaIdDoAno && turmasMap.has(turmaIdDoAno)) {
-          const turmaData = turmasMap.get(turmaIdDoAno);
-          turmaDoAno = { nome: turmaData.nome, serie: turmaData.serie || '' };
-          setTurmaComponentes(turmaData.componentes || []);
-        }
-      } else {
-        // Se não há notas para o ano, reseta componentes
-        setTurmaComponentes([]);
+        turmaIdResolved = notasSnapshot.docs[0].data().turma_id;
+      } else if (ano === currentYear && turmaId) {
+        // Fallback: se não tiver nota mas for o ano atual usa a turma do estudante
+        turmaIdResolved = turmaId;
       }
+
+      const componenteProfIdMap = new Map<string, string>();
+
+      if (turmaIdResolved && turmasMap.has(turmaIdResolved)) {
+        const turmaData = turmasMap.get(turmaIdResolved);
+        turmaDoAno = { nome: turmaData.nome, serie: turmaData.serie || '' };
+        compsTurma = turmaData.componentes || [];
+        compsTurma.forEach((c: any) => {
+          if (c.nome && c.professorId) componenteProfIdMap.set(c.nome, c.professorId);
+        });
+      }
+
+      setTurmaComponentes(compsTurma);
       setTurmaHistorica(turmaDoAno);
 
-      // Mapa de componente -> professorId via dados da turma (fallback quando a nota não tem professorId)
-      const componenteProfIdMap = new Map<string, string>();
-      if (notasSnapshot.docs.length > 0) {
-        const turmaIdRef = notasSnapshot.docs[0].data().turma_id;
-        if (turmaIdRef && turmasMap.has(turmaIdRef)) {
-          const turmaData = turmasMap.get(turmaIdRef);
-          (turmaData.componentes || []).forEach((c: any) => {
-            if (c.nome && c.professorId) componenteProfIdMap.set(c.nome, c.professorId);
-          });
-        }
-      }
-
-      // convert snapshot docs into map by componente name for easy lookup and build primary list
+      // convert snapshot docs into map by componente name for easy lookup
       const notasMap = new Map<string, Nota>();
-      const notasLista: Nota[] = [];
-      notasSnapshot.docs.forEach(doc => {
-        const data = doc.data() as Omit<Nota, 'id' | 'professor_nome'>;
-        // Usa o professorId da nota ou busca pelo componente na turma
+      notasSnapshot.docs.forEach(docSnap => {
+        const data = docSnap.data() as Omit<Nota, 'id' | 'professor_nome'>;
         const resolvedProfId = data.professorId || componenteProfIdMap.get(data.componente);
         const profN = resolvedProfId ? (professoresMap.get(resolvedProfId) || 'Não encontrado') : 'N/A';
-        const notaObj = { id: doc.id, ...data, professor_nome: profN } as Nota;
+        const notaObj = { id: docSnap.id, ...data, professor_nome: profN } as Nota;
         notasMap.set(data.componente, notaObj);
-        notasLista.push(notaObj);
       });
+
+      const notasLista: Nota[] = [];
+      const componentesVistos = new Set<string>();
+
+      // 1. Injeta notas reais
+      notasMap.forEach((nota, comp) => {
+        notasLista.push(nota);
+        componentesVistos.add(comp);
+      });
+
+      // 2. Injeta componentes da turma que ainda não possuem nota criada
+      compsTurma.forEach(c => {
+        if (c.nome && !componentesVistos.has(c.nome)) {
+          const profN = c.professorId ? (professoresMap.get(c.professorId) || 'Não encontrado') : 'N/A';
+          notasLista.push({
+            id: `virtual_${c.nome}`,
+            componente: c.nome,
+            bimestre_1: null,
+            bimestre_2: null,
+            bimestre_3: null,
+            bimestre_4: null,
+            media_anual: null,
+            situacao: 'Cursando',
+            professorId: c.professorId,
+            professor_nome: profN
+          });
+        }
+      });
+
+      // Ordenar alfabeticamente
+      notasLista.sort((a, b) => a.componente.localeCompare(b.componente, 'pt-BR'));
 
       // show only notes that actually exist in the database for the selected year
       // if no notes for this year, display empty state
