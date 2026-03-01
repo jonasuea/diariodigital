@@ -29,6 +29,7 @@ interface FrequenciaRecord {
   data: string;
   status: 'presente' | 'faltou' | 'justificado';
   justificativa?: string;
+  componente?: string;
 }
 
 interface Turma {
@@ -207,29 +208,29 @@ export default function Frequencia() {
     const existingFreq = frequencias[key];
     const hojeOuPassado = isBefore(data, new Date()) || isSameDay(data, new Date());
 
-    // Status atual real (do banco ou implícito)
     const currentStatus = existingFreq ? existingFreq.status : (hojeOuPassado ? 'presente' : null);
+    if (!currentStatus) return;
 
-    if (!currentStatus) return; // Se for dia futuro e não tiver registro, nada faz.
+    const newStatus: 'presente' | 'faltou' = currentStatus === 'faltou' ? 'presente' : 'faltou';
 
-    // Calcula o novo status: presente -> faltou -> presente
-    const newStatus = currentStatus === 'faltou' ? 'presente' : 'faltou';
+    // ✨ Atualização Otimista: atualiza o estado local IMEDIATAMENTE
+    const optimisticFreq: FrequenciaRecord = {
+      ...existingFreq,
+      estudante_id: estudanteId,
+      turma_id: turmaId!,
+      data: dateStr,
+      status: newStatus,
+      componente: componente,
+    };
+    setFrequencias(prev => ({ ...prev, [key]: optimisticFreq }));
 
     try {
-      if (existingFreq) {
-        if (newStatus === 'presente') {
-          // Voltou a ser presente. Poderíamos apagar do banco para limpar as "presenças explícitas", mas 
-          // manter como "presente" garante compatibilidade. No entanto, para não inchar o banco de dados desnecessariamente, vamos deletar o documento.
-          const freqRef = doc(db, 'frequencias', existingFreq.id!);
-          // Excluir ou atualizar? Deletar se voltou para presente economiza espaço e mantém a lógica de presença implícita.
-          await updateDoc(freqRef, { status: newStatus });
-        } else {
-          const freqRef = doc(db, 'frequencias', existingFreq.id!);
-          await updateDoc(freqRef, { status: newStatus });
-        }
+      if (existingFreq?.id) {
+        const freqRef = doc(db, 'frequencias', existingFreq.id);
+        await updateDoc(freqRef, { status: newStatus });
       } else {
-        // Clicando na presença implícita -> Virou falta (porque novoStatus === 'faltou')
-        await addDoc(collection(db, 'frequencias'), {
+        // Criando novo registro de falta
+        const docRef = await addDoc(collection(db, 'frequencias'), {
           estudante_id: estudanteId,
           turma_id: turmaId,
           escola_id: escolaAtivaId,
@@ -238,27 +239,47 @@ export default function Frequencia() {
           componente: componente,
           ano: turma?.ano || new Date().getFullYear()
         });
+        // Atualiza o ID gerado no estado local para edições futuras
+        setFrequencias(prev => ({ ...prev, [key]: { ...optimisticFreq, id: docRef.id } }));
       }
 
-      await logActivity(`registrou a frequência para o dia ${dateStr} na turma "${turma?.nome}".`);
-      // Recarregar dados para garantir sincronização
-      loadData();
+      // Log em background (sem await para não bloquear a UI)
+      logActivity(`registrou a frequência para o dia ${dateStr} na turma "${turma?.nome}".`);
 
     } catch (error) {
       toast.error('Erro ao atualizar frequência');
       console.error(error);
+      // Reverte o estado otimista em caso de erro
+      setFrequencias(prev => {
+        const reverted = { ...prev };
+        if (existingFreq) {
+          reverted[key] = existingFreq;
+        } else {
+          delete reverted[key];
+        }
+        return reverted;
+      });
     }
   };
 
   const handleJustificativa = async () => {
     if (!frequenciaParaJustificar) return;
+    const key = `${frequenciaParaJustificar.estudante_id}-${frequenciaParaJustificar.data}`;
+
+    // Update otimista: atualiza local imediatamente
+    setFrequencias(prev => ({
+      ...prev,
+      [key]: { ...frequenciaParaJustificar, status: 'justificado', justificativa: justificativaText }
+    }));
+    setJustificativaDialogOpen(false);
+    toast.success('Falta justificada com sucesso');
 
     try {
       if (frequenciaParaJustificar.id) {
         const freqRef = doc(db, 'frequencias', frequenciaParaJustificar.id);
         await updateDoc(freqRef, { status: 'justificado', justificativa: justificativaText });
       } else {
-        await addDoc(collection(db, 'frequencias'), {
+        const docRef = await addDoc(collection(db, 'frequencias'), {
           estudante_id: frequenciaParaJustificar.estudante_id,
           turma_id: turmaId!,
           escola_id: escolaAtivaId,
@@ -268,15 +289,21 @@ export default function Frequencia() {
           componente: componente,
           ano: turma?.ano || new Date().getFullYear()
         });
+        // Persiste o ID gerado
+        setFrequencias(prev => ({
+          ...prev,
+          [key]: { ...frequenciaParaJustificar, id: docRef.id, status: 'justificado', justificativa: justificativaText }
+        }));
       }
-
-      await logActivity(`justificou a falta do dia ${frequenciaParaJustificar.data} na turma "${turma?.nome}".`);
-      toast.success('Falta justificada com sucesso');
-      setJustificativaDialogOpen(false);
-      loadData(); // Recarregar dados
+      logActivity(`justificou a falta do dia ${frequenciaParaJustificar.data} na turma "${turma?.nome}".`);
     } catch (error) {
       toast.error('Erro ao salvar justificativa');
       console.error(error);
+      // Reverte o estado em caso de erro
+      setFrequencias(prev => ({
+        ...prev,
+        [key]: frequenciaParaJustificar
+      }));
     }
   };
 
