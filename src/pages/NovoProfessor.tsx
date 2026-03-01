@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -50,6 +51,7 @@ const SERIES = [
 export default function NovoProfessor() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { escolaAtivaId } = useUserRole();
   const isEditing = !!id;
 
   const [loading, setLoading] = useState(false);
@@ -236,9 +238,16 @@ export default function NovoProfessor() {
       nome_lower: formData.nome.toLowerCase(),
       formacoes: formacoes.filter(f => f.curso),
       componente: formData.componentes[0] || formData.componente || 'Geral',
+      escola_id: escolaAtivaId,
     };
 
     try {
+      if (!escolaAtivaId) {
+        toast.error('Nenhuma escola selecionada. Operação cancelada.');
+        setLoading(false);
+        return;
+      }
+
       if (isEditing) {
         if (!id) return;
         const docRef = doc(db, 'professores', id);

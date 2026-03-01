@@ -29,7 +29,7 @@ interface Membro {
 
 export default function EquipeGestora() {
   const navigate = useNavigate();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, escolaAtivaId } = useUserRole();
   const [membros, setMembros] = useState<Membro[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -40,19 +40,23 @@ export default function EquipeGestora() {
 
   useEffect(() => {
     fetchMembros();
-  }, [search]);
+  }, [search, escolaAtivaId]);
 
   async function fetchMembros() {
+    if (!escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      let membrosQuery = query(collection(db, 'equipe_gestora'), orderBy('nome'));
-      
+      let membrosQuery = query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
+
       if (search) {
         // NOTE: Firestore queries are case-sensitive.
         // This search is simplified to query by name only.
-        membrosQuery = query(collection(db, 'equipe_gestora'), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'), orderBy('nome'));
+        membrosQuery = query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'), orderBy('nome'));
       }
-      
+
       const querySnapshot = await getDocs(membrosQuery);
       const membrosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Membro));
       setMembros(membrosData);
@@ -70,7 +74,7 @@ export default function EquipeGestora() {
 
   async function handleDelete() {
     if (!membroToDelete) return;
-    
+
     try {
       await deleteDoc(doc(db, 'equipe_gestora', membroToDelete.id));
       toast.success('Membro excluído com sucesso!');
@@ -129,8 +133,8 @@ export default function EquipeGestora() {
       let errorCount = 0;
       let skippedCount = 0;
 
-      // Otimização: Carregar matrículas existentes
-      const matriculasSnapshot = await getDocs(query(collection(db, 'equipe_gestora'), where('matricula', '!=', '')));
+      // Otimização: Carregar matrículas existentes da escola local
+      const matriculasSnapshot = await getDocs(query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId), where('matricula', '!=', '')));
       const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
       const matriculasInCsv = new Set();
 
@@ -173,6 +177,7 @@ export default function EquipeGestora() {
             biografia: row.biografia?.trim() || '',
             link_lattes: row.link_lattes?.trim() || '',
             formacoes,
+            escola_id: escolaAtivaId,
           };
           await addDoc(collection(db, 'equipe_gestora'), membroData);
           successCount++;
@@ -184,7 +189,7 @@ export default function EquipeGestora() {
       if (successCount > 0) toast.success(`${successCount} membros importados com sucesso!`);
       if (skippedCount > 0) toast.info(`${skippedCount} membros foram ignorados por já terem uma matrícula existente.`);
       if (errorCount > 0) toast.warning(`${errorCount} linhas não puderam ser importadas.`);
-      
+
       fetchMembros();
     } catch (error) {
       toast.error('Ocorreu um erro ao importar o arquivo.');
@@ -196,7 +201,11 @@ export default function EquipeGestora() {
 
   async function handleExportCSV() {
     try {
-      const membrosQuery = query(collection(db, 'equipe_gestora'), orderBy('nome'));
+      if (!escolaAtivaId) {
+        toast.error('Nenhuma escola selecionada para exportar.');
+        return;
+      }
+      const membrosQuery = query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
       const querySnapshot = await getDocs(membrosQuery);
       const membrosData = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -255,8 +264,8 @@ export default function EquipeGestora() {
   };
 
   const columns = [
-    { 
-      key: 'nome', 
+    {
+      key: 'nome',
       header: 'Nome',
       render: (m: Membro) => (
         <div className="flex items-center gap-3">
@@ -269,24 +278,24 @@ export default function EquipeGestora() {
         </div>
       )
     },
-    { 
-      key: 'cargo', 
+    {
+      key: 'cargo',
       header: 'Cargo',
       render: (m: Membro) => (
         <Badge className={getCargoColor(m.cargo)}>{m.cargo}</Badge>
       )
     },
     { key: 'matricula', header: 'Matrícula' },
-    { 
-      key: 'email', 
+    {
+      key: 'email',
       header: 'Email',
       render: (m: Membro) => (
         <a href={`mailto:${m.email}`} className="text-primary hover:underline">{m.email}</a>
       )
     },
     { key: 'telefone', header: 'Telefone', render: (m: Membro) => m.telefone || '-' },
-    { 
-      key: 'status', 
+    {
+      key: 'status',
       header: 'Status',
       render: (m: Membro) => (
         <Badge className={getStatusColor(m.status)}>{m.status}</Badge>
@@ -315,7 +324,7 @@ export default function EquipeGestora() {
     <AppLayout title="Equipe Gestora">
       <div className="space-y-6 animate-fade-in">
         <p className="text-muted-foreground -mt-2">Gerencie os membros da equipe gestora da instituição</p>
-        
+
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -326,7 +335,7 @@ export default function EquipeGestora() {
               className="pl-9"
             />
           </div>
-          
+
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
               <>
@@ -394,7 +403,7 @@ export default function EquipeGestora() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o membro "{membroToDelete?.nome}"? 
+                Tem certeza que deseja excluir o membro "{membroToDelete?.nome}"?
                 Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>

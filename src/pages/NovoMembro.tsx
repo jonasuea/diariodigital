@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,7 @@ const ROLES = ['gestor', 'pedagogo', 'secretario'];
 export default function NovoMembro() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { escolaAtivaId } = useUserRole();
   const isEditing = !!id;
 
   const [loading, setLoading] = useState(false);
@@ -35,7 +37,7 @@ export default function NovoMembro() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [formData, setFormData] = useState({
     foto_url: '',
     nome: '',
@@ -102,7 +104,7 @@ export default function NovoMembro() {
       const fileExt = file.name.split('.').pop();
       const fileName = `membro_${Date.now()}.${fileExt}`;
       const storageRef = ref(storage, `equipe_gestora/fotos/${fileName}`);
-      
+
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
 
@@ -183,25 +185,32 @@ export default function NovoMembro() {
       ...formData,
       nome_lower: formData.nome.toLowerCase(),
       formacoes: formacoes.filter(f => f.curso),
+      escola_id: escolaAtivaId,
     };
 
     try {
+      if (!escolaAtivaId) {
+        toast.error('Nenhuma escola selecionada. Operação cancelada.');
+        setLoading(false);
+        return;
+      }
+
       if (isEditing) {
         if (!id) return;
         const docRef = doc(db, 'equipe_gestora', id);
         await updateDoc(docRef, payload);
-        
+
         // Atualiza o e-mail em user_roles se tiver mudado
         const userRoleRef = doc(db, 'user_roles', id);
         const userRoleSnap = await getDoc(userRoleRef);
         if (userRoleSnap.exists()) {
-            const currentRole = userRoleSnap.data().role;
-            const currentEmail = userRoleSnap.data().email;
-            if (currentRole !== formData.role || currentEmail !== formData.email) {
-                await updateDoc(userRoleRef, { role: formData.role, email: formData.email });
-            }
+          const currentRole = userRoleSnap.data().role;
+          const currentEmail = userRoleSnap.data().email;
+          if (currentRole !== formData.role || currentEmail !== formData.email) {
+            await updateDoc(userRoleRef, { role: formData.role, email: formData.email });
+          }
         }
-        
+
         await logActivity(`atualizou o cadastro do membro da equipe "${formData.nome}".`);
         toast.success('Membro atualizado com sucesso!');
       } else {
@@ -209,21 +218,22 @@ export default function NovoMembro() {
         await setDoc(doc(db, 'user_roles', docRef.id), {
           email: formData.email,
           role: formData.role,
-          status: 'pending'
+          status: 'pending',
+          escola_id: escolaAtivaId,
         });
         await logActivity(`cadastrou o novo membro da equipe "${formData.nome}".`);
         toast.success('Membro cadastrado com sucesso! Acesse a página de "Usuários" para definir o acesso.');
       }
       navigate('/equipe-gestora');
     } catch (error: any) {
-        if (error.code === 'permission-denied') {
-            toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
-        } else if (error.message.includes('matricula') || error.message.includes('email')) {
-            toast.error('Matrícula ou email já cadastrados');
-        } else {
-            toast.error('Erro ao salvar membro');
-        }
-        console.error(error);
+      if (error.code === 'permission-denied') {
+        toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
+      } else if (error.message.includes('matricula') || error.message.includes('email')) {
+        toast.error('Matrícula ou email já cadastrados');
+      } else {
+        toast.error('Erro ao salvar membro');
+      }
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -270,9 +280,9 @@ export default function NovoMembro() {
                     className="hidden"
                     onChange={handlePhotoUpload}
                   />
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     size="sm"
                     onClick={() => photoInputRef.current?.click()}
                     disabled={uploadingPhoto}
@@ -425,9 +435,9 @@ export default function NovoMembro() {
                     {formData.arquivo_url ? (
                       <div className="flex items-center gap-2 p-2 border rounded-lg bg-muted/50">
                         <FileText className="h-5 w-5 text-primary" />
-                        <a 
-                          href={formData.arquivo_url} 
-                          target="_blank" 
+                        <a
+                          href={formData.arquivo_url}
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="text-sm text-primary hover:underline flex-1 truncate"
                         >
@@ -438,10 +448,10 @@ export default function NovoMembro() {
                         </Button>
                       </div>
                     ) : (
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm" 
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
                         className="gap-2"
                         onClick={() => pdfInputRef.current?.click()}
                         disabled={uploadingPdf}
@@ -463,7 +473,7 @@ export default function NovoMembro() {
                     Adicionar Formação
                   </Button>
                 </div>
-                
+
                 {formacoes.map((formacao, index) => (
                   <div key={formacao.id} className="space-y-4 p-4 border rounded-lg relative">
                     <div className="flex items-center justify-between">

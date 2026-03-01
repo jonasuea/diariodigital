@@ -25,7 +25,7 @@ interface Estudante {
 
 export default function Estudantes() {
   const navigate = useNavigate();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, escolaAtivaId } = useUserRole();
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -36,26 +36,56 @@ export default function Estudantes() {
 
   useEffect(() => {
     fetchEstudantes();
-  }, [search]);
+  }, [search, escolaAtivaId]);
 
   async function fetchEstudantes() {
+    if (!escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      let estudantesQuery;
-
+      // Query 1: Estudantes matriculados na escola ativa
+      let q1, q2;
       if (search) {
         const searchLower = search.toLowerCase();
-        estudantesQuery = query(collection(db, 'estudantes'),
+        q1 = query(
+          collection(db, 'estudantes'),
+          where('escola_id', '==', escolaAtivaId),
+          where('nome_lower', '>=', searchLower),
+          where('nome_lower', '<=', searchLower + '\uf8ff'),
+          orderBy('nome_lower')
+        );
+        // Query 2: Transferidos SEM escola (disponíveis para matrícula)
+        q2 = query(
+          collection(db, 'estudantes'),
+          where('status', '==', 'Transferido'),
+          where('escola_id', '==', ''),
           where('nome_lower', '>=', searchLower),
           where('nome_lower', '<=', searchLower + '\uf8ff'),
           orderBy('nome_lower')
         );
       } else {
-        estudantesQuery = query(collection(db, 'estudantes'), orderBy('nome'));
+        q1 = query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
+        // Query 2: Transferidos SEM escola (disponíveis para matrícula)
+        q2 = query(
+          collection(db, 'estudantes'),
+          where('status', '==', 'Transferido'),
+          where('escola_id', '==', ''),
+        );
       }
 
-      const querySnapshot = await getDocs(estudantesQuery);
-      const estudantesData = await Promise.all(querySnapshot.docs.map(async (estudanteDoc) => {
+      const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+
+      // Une os resultados eliminando duplicatas pelo ID
+      const seenIds = new Set<string>();
+      const allDocs = [...snap1.docs, ...snap2.docs].filter(d => {
+        if (seenIds.has(d.id)) return false;
+        seenIds.add(d.id);
+        return true;
+      });
+
+      const estudantesData = await Promise.all(allDocs.map(async (estudanteDoc) => {
         const estudanteData = estudanteDoc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
         let turma_nome: string | undefined = '-';
 
@@ -225,8 +255,8 @@ export default function Estudantes() {
       let errorCount = 0;
       let errorMessages: string[] = [];
 
-      // Otimização: Carregar todas as matrículas existentes para a memória
-      const matriculasSnapshot = await getDocs(query(collection(db, 'estudantes'), where('matricula', '!=', '')));
+      // Otimização: Carregar todas as matrículas existentes para a memória do tenant ativo
+      const matriculasSnapshot = await getDocs(query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), where('matricula', '!=', '')));
       const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
       const matriculasInCsv = new Set();
 
@@ -341,6 +371,7 @@ export default function Estudantes() {
             cpf: row.cpf ? row.cpf.toString().trim() : null,
             // Programas Sociais
             bolsa_familia: row.bolsa_familia ? Boolean(row.bolsa_familia) : false,
+            numero_nis: row.bolsa_familia && row.numero_nis ? row.numero_nis.toString().trim() : '',
             // Censo e SUS
             censo_escola: row.censo_escola ? Boolean(row.censo_escola) : false,
             id_censo: (row.censo_escola ? Boolean(row.censo_escola) : false) && row.id_censo ? row.id_censo.toString().trim() : null,
@@ -350,10 +381,12 @@ export default function Estudantes() {
               const validOptions = ['Não', '1ª Dose', '2ª Dose', '3ª Dose', '4ª Dose', '5ª Dose'];
               return validOptions.includes(vacinacaoValue) ? vacinacaoValue : 'Não';
             })(),
-            // Saúde
+            // Saudável
             estudante_pcd: row.estudante_pcd ? Boolean(row.estudante_pcd) : false,
             estudante_aee: row.estudante_aee ? Boolean(row.estudante_aee) : false,
+            cid_aee: row.estudante_aee && row.cid_aee ? row.cid_aee.toString().trim() : '',
             dieta_restritiva: row.dieta_restritiva ? Boolean(row.dieta_restritiva) : false,
+            restricoes_alimentares: row.dieta_restritiva && row.restricoes_alimentares ? row.restricoes_alimentares.toString().split(',').map((s: string) => s.trim()) : [],
             // Informações Escolares
             largura_farda: row.largura_farda ? row.largura_farda.toString().trim() : null,
             altura_farda: row.altura_farda ? row.altura_farda.toString().trim() : null,
@@ -382,6 +415,7 @@ export default function Estudantes() {
             // Outros
             ano,
             turma_id: row.turma_id ? row.turma_id.toString().trim() : null,
+            escola_id: escolaAtivaId,
           };
 
           await addDoc(collection(db, 'estudantes'), estudanteData);
@@ -461,8 +495,11 @@ export default function Estudantes() {
           uf: estudanteData.uf || '',
           rg: estudanteData.rg || '',
           cpf: estudanteData.cpf || '',
+          contato: estudanteData.contato || '',
+          email: estudanteData.email || '',
           // Programas Sociais
           bolsa_familia: estudanteData.bolsa_familia || false,
+          numero_nis: estudanteData.numero_nis || '',
           // Censo e SUS
           censo_escola: estudanteData.censo_escola || false,
           id_censo: estudanteData.id_censo || '',
@@ -471,7 +508,9 @@ export default function Estudantes() {
           // Saúde
           estudante_pcd: estudanteData.estudante_pcd || false,
           estudante_aee: estudanteData.estudante_aee || false,
+          cid_aee: estudanteData.cid_aee || '',
           dieta_restritiva: estudanteData.dieta_restritiva || false,
+          restricoes_alimentares: estudanteData.restricoes_alimentares ? estudanteData.restricoes_alimentares.join(', ') : '',
           // Informações Escolares
           largura_farda: estudanteData.largura_farda || '',
           altura_farda: estudanteData.altura_farda || '',
@@ -490,6 +529,13 @@ export default function Estudantes() {
           pai_contato: estudanteData.pai_contato || '',
           pai_rg: estudanteData.pai_rg || '',
           pai_cpf: estudanteData.pai_cpf || '',
+          // Informações do Responsável
+          responsavel_relacao: estudanteData.responsavel_relacao || '',
+          responsavel_nome: estudanteData.responsavel_nome || '',
+          responsavel_rg: estudanteData.responsavel_rg || '',
+          responsavel_contato: estudanteData.responsavel_contato || '',
+          responsavel_email: estudanteData.responsavel_email || '',
+          responsavel_cpf: estudanteData.responsavel_cpf || '',
           // Endereço
           endereco: estudanteData.endereco || '',
           endereco_numero: estudanteData.endereco_numero || '',

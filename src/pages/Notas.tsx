@@ -14,6 +14,7 @@ import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface Estudante {
   id: string;
@@ -69,6 +70,7 @@ export default function Notas() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
   const [searchParams] = useSearchParams();
+  const { escolaAtivaId } = useUserRole();
 
   const [turma, setTurma] = useState<Turma | null>(null);
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
@@ -82,8 +84,8 @@ export default function Notas() {
   const [boletimDialogOpen, setBoletimDialogOpen] = useState(false);
   const [boletimTemplate, setBoletimTemplate] = useState(DEFAULT_BOLETIM_TEMPLATE);
 
-  const isComponenteFixo = !!searchParams.get('componente');
   const origem = searchParams.get('origem');
+  const isComponenteFixo = origem === 'diario';
 
   const componentesDaTurma = turma?.componentes?.filter(c => c.professorId) || [];
 
@@ -91,10 +93,13 @@ export default function Notas() {
     if (turmaId) {
       loadData();
     }
-  }, [turmaId]);
+  }, [turmaId, escolaAtivaId]);
 
   async function loadData() {
-    if (!turmaId) return;
+    if (!turmaId || !escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     try {
@@ -106,7 +111,7 @@ export default function Notas() {
       }
 
       // Load Estudantes da turma
-      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', turmaId), where('status', 'in', ['Ativo', 'Frequentando']), orderBy('nome'));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), where('turma_id', '==', turmaId), where('status', 'in', ['Ativo', 'Frequentando']), orderBy('nome'));
       const estudantesSnapshot = await getDocs(estudantesQuery);
       const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
       setEstudantes(estudantesData.sort((a, b) => a.nome.localeCompare(b.nome)));
@@ -115,6 +120,7 @@ export default function Notas() {
       const currentYear = new Date().getFullYear();
       const notasQuery = query(
         collection(db, 'notas'),
+        where('escola_id', '==', escolaAtivaId),
         where('turma_id', '==', turmaId),
         where('ano', '==', currentYear)
       );
@@ -239,6 +245,7 @@ export default function Notas() {
               ...notaData,
               estudante_id: estudanteId,
               turma_id: turmaId!,
+              escola_id: escolaAtivaId,
               componente: componente,
               media_anual: media,
               situacao: situacao,
@@ -509,7 +516,7 @@ export default function Notas() {
                         </tr>
                       );
                     } else {
-                      const nota = notas[estudante.id]?.[componente] || {};
+                      const nota = notas[estudante.id]?.[componente];
                       const media = calcularMedia(nota);
                       const situacao = calcularSituacao(media);
                       return (

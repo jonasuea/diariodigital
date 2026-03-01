@@ -29,7 +29,7 @@ interface Evento {
 }
 
 export default function Calendario() {
-  const { role } = useUserRole();
+  const { role, escolaAtivaId } = useUserRole();
   const isAdminOrGestor = role === 'admin' || role === 'gestor';
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
@@ -51,14 +51,20 @@ export default function Calendario() {
   });
 
   useEffect(() => {
-    fetchEventos();
-    fetchDiasLetivos();
-  }, [currentMonth]);
+    if (escolaAtivaId) {
+      fetchEventos();
+      fetchDiasLetivos();
+    }
+  }, [currentMonth, escolaAtivaId]);
 
   async function fetchEventos() {
     setLoading(true);
+    if (!escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
     try {
-      const q = query(collection(db, 'eventos'), orderBy('data', 'asc'));
+      const q = query(collection(db, 'eventos'), where('escola_id', '==', escolaAtivaId), orderBy('data', 'asc'));
       const querySnapshot = await getDocs(q);
       const eventosData = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -78,23 +84,25 @@ export default function Calendario() {
   }
 
   async function fetchDiasLetivos() {
+    if (!escolaAtivaId) return;
     try {
       const start = startOfMonth(currentMonth);
       const end = endOfMonth(currentMonth);
-      
+
       const q = query(
         collection(db, 'dias_letivos'),
+        where('escola_id', '==', escolaAtivaId),
         orderBy('data', 'asc')
       );
-      
+
       const querySnapshot = await getDocs(q);
       const dias = new Set<string>();
-      
+
       // Filtrar client-side para simplificar, ou ajustar a query
       querySnapshot.forEach(doc => {
         dias.add(doc.data().data);
       });
-      
+
       setDiasLetivos(dias);
     } catch (error) {
       console.error("Erro ao carregar dias letivos:", error);
@@ -113,12 +121,12 @@ export default function Calendario() {
     try {
       if (isLetivo) {
         // Remover dia letivo
-        const q = query(collection(db, 'dias_letivos'), where('data', '==', dateStr));
+        const q = query(collection(db, 'dias_letivos'), where('escola_id', '==', escolaAtivaId), where('data', '==', dateStr));
         const snapshot = await getDocs(q);
         snapshot.forEach(async (doc) => {
           await deleteDoc(doc.ref);
         });
-        
+
         const newDias = new Set(diasLetivos);
         newDias.delete(dateStr);
         setDiasLetivos(newDias);
@@ -127,11 +135,12 @@ export default function Calendario() {
       } else {
         // Adicionar dia letivo
         await addDoc(collection(db, 'dias_letivos'), {
+          escola_id: escolaAtivaId,
           data: dateStr,
           criado_em: new Date(),
           criado_por: 'sistema' // Idealmente o ID do utilizador
         });
-        
+
         const newDias = new Set(diasLetivos);
         newDias.add(dateStr);
         setDiasLetivos(newDias);
@@ -146,7 +155,7 @@ export default function Calendario() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
+
     const payload = {
       titulo: formData.titulo,
       data: parseISO(formData.data),
@@ -154,6 +163,7 @@ export default function Calendario() {
       hora_inicio: formData.hora_inicio,
       hora_fim: formData.hora_fim,
       local: formData.local || null,
+      escola_id: escolaAtivaId,
     };
 
     try {
@@ -172,7 +182,7 @@ export default function Calendario() {
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     if (!eventoToEdit) return;
-    
+
     const payload = {
       titulo: formData.titulo,
       data: parseISO(formData.data),
@@ -229,7 +239,7 @@ export default function Calendario() {
     if (date) {
       setSelectedDate(date);
       setFormData(prev => ({ ...prev, data: format(date, 'yyyy-MM-dd') }));
-      
+
       // Se for duplo clique ou uma ação explícita, alternar dia letivo
       // Mas o componente Calendar do shadcn/ui não suporta onDoubleClick facilmente
       // Vamos adicionar um botão explícito para isso na interface
@@ -266,11 +276,11 @@ export default function Calendario() {
     setDeleteDialogOpen(true);
   }
 
-  const eventosNaDataSelecionada = eventos.filter(e => 
+  const eventosNaDataSelecionada = eventos.filter(e =>
     isSameDay(e.data.toDate(), selectedDate)
   );
 
-  const eventosDoMes = eventos.filter(e => 
+  const eventosDoMes = eventos.filter(e =>
     isSameMonth(e.data.toDate(), currentMonth)
   );
 
@@ -281,7 +291,7 @@ export default function Calendario() {
     <AppLayout title="Calendário Escolar">
       <div className="space-y-6 animate-fade-in">
         <p className="text-muted-foreground -mt-2">Gerencie eventos e defina os dias letivos</p>
-        
+
         <div className="flex justify-end gap-2">
           {isAdminOrGestor && (
             <div className="bg-green-100 text-green-800 text-xs px-3 py-1 rounded flex items-center">
@@ -352,8 +362,8 @@ export default function Calendario() {
               <CardTitle className="text-lg flex justify-between items-center">
                 <span>{format(selectedDate, "d 'de' MMMM 'de' yyyy", { locale: ptBR })}</span>
                 {isAdminOrGestor && (
-                  <Button 
-                    variant={diasLetivos.has(format(selectedDate, 'yyyy-MM-dd')) ? "destructive" : "outline"} 
+                  <Button
+                    variant={diasLetivos.has(format(selectedDate, 'yyyy-MM-dd')) ? "destructive" : "outline"}
                     size="sm"
                     onClick={() => toggleDiaLetivo(selectedDate)}
                     className={diasLetivos.has(format(selectedDate, 'yyyy-MM-dd')) ? "" : "border-green-600 text-green-600 hover:bg-green-50"}
@@ -391,8 +401,8 @@ export default function Calendario() {
               ) : (
                 <div className="space-y-3">
                   {eventosNaDataSelecionada.map((evento) => (
-                    <div 
-                      key={evento.id} 
+                    <div
+                      key={evento.id}
                       className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                     >
                       <div className="flex items-start justify-between">
@@ -402,7 +412,7 @@ export default function Calendario() {
                             <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                               <Clock className="h-3.5 w-3.5" />
                               <span>
-                                {evento.hora_inicio && evento.hora_fim 
+                                {evento.hora_inicio && evento.hora_fim
                                   ? `${evento.hora_inicio} - ${evento.hora_fim}`
                                   : evento.hora_inicio || evento.hora_fim}
                               </span>
@@ -448,8 +458,8 @@ export default function Calendario() {
             ) : (
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 {eventosDoMes.map((evento) => (
-                  <div 
-                    key={evento.id} 
+                  <div
+                    key={evento.id}
                     className="p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
                   >
                     <div className="flex items-start justify-between">
@@ -463,7 +473,7 @@ export default function Calendario() {
                           <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
                             <Clock className="h-3.5 w-3.5" />
                             <span>
-                              {evento.hora_inicio && evento.hora_fim 
+                              {evento.hora_inicio && evento.hora_fim
                                 ? `${evento.hora_inicio} - ${evento.hora_fim}`
                                 : evento.hora_inicio || evento.hora_fim}
                             </span>

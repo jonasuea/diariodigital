@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2, Upload, Camera } from 'lucide-react';
 import { toast } from 'sonner';
@@ -13,12 +14,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { db, storage } from '@/lib/firebase';
 import { logActivity } from '@/lib/logger';
-import { doc, getDoc, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function Configuracoes() {
   const { user } = useAuth();
-  const { role } = useUserRole();
+  const { role, escolaAtivaId } = useUserRole();
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
   const [isInstalacoesOpen, setIsInstalacoesOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,24 +27,26 @@ export default function Configuracoes() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [escolaConfig, setEscolaConfig] = useState({
+    inep: '',
     nome: 'Escola Municipal Nome da Escola',
     email: 'contato@escolanome.edu.br',
-    telefone: '(11) 3456-7890',
+    telefone: '(11) 0000-0000',
+    zona: '',
     endereco: 'Rua das Flores, 123 - São Paulo',
     horarioFuncionamento: 'Segunda a Sexta, 7h às 18h',
   });
 
   const [instalacoes, setInstalacoes] = useState({
-    salasAula: 12,
-    laboratorios: 3,
-    banheiros: 6,
-    cantina: 1,
-    biblioteca: 1,
-    quadras: 2,
-    secretaria: 1,
-    salaProfessores: 1,
+    salasAula: 0,
+    laboratorios: 0,
+    banheiros: 0,
+    cantina: 0,
+    biblioteca: 0,
+    quadras: 0,
+    secretaria: 0,
+    salaProfessores: 0,
   });
 
   const [preferencias, setPreferencias] = useState({
@@ -91,18 +94,45 @@ export default function Configuracoes() {
     async function loadConfig() {
       setLoading(true);
       try {
-        // Carregar configurações da escola
+        // Carregar configurações do sistema (preferências)
         const configDocRef = doc(db, 'configuracoes', 'escola');
         const configDocSnap = await getDoc(configDocRef);
 
         if (configDocSnap.exists()) {
           const data = configDocSnap.data();
-          if (data.escolaConfig) setEscolaConfig(data.escolaConfig);
-          if (data.instalacoes) setInstalacoes(data.instalacoes);
           if (data.preferencias) {
             setPreferencias(data.preferencias);
-            // Sincronizar com o localStorage ao carregar
             localStorage.setItem('telaCheiaPadrao', JSON.stringify(data.preferencias.telaCheiaPadrao || false));
+          }
+        }
+
+        // Carregar dados reais da escola atual
+        if (escolaAtivaId) {
+          const escolaDocRef = doc(db, 'escolas', escolaAtivaId);
+          const escolaSnap = await getDoc(escolaDocRef);
+          if (escolaSnap.exists()) {
+            const d = escolaSnap.data();
+            setEscolaConfig(prev => ({
+              ...prev,
+              inep: d.inep || prev.inep,
+              nome: d.nome || prev.nome,
+              email: d.email || prev.email,
+              telefone: d.telefone || prev.telefone,
+              zona: d.zona || prev.zona,
+              endereco: d.endereco || prev.endereco,
+              horarioFuncionamento: d.horario_funcionamento || prev.horarioFuncionamento,
+            }));
+            setInstalacoes(prev => ({
+              ...prev,
+              salasAula: parseInt(d.salas_aula) || prev.salasAula,
+              laboratorios: parseInt(d.laboratorios) || prev.laboratorios,
+              banheiros: parseInt(d.banheiros) || prev.banheiros,
+              cantina: parseInt(d.cantina) || prev.cantina,
+              biblioteca: parseInt(d.biblioteca) || prev.biblioteca,
+              quadras: parseInt(d.quadras) || prev.quadras,
+              secretaria: parseInt(d.secretaria) || prev.secretaria,
+              salaProfessores: parseInt(d.salaProfessores) || prev.salaProfessores,
+            }));
           }
         }
 
@@ -131,12 +161,21 @@ export default function Configuracoes() {
     }
 
     loadConfig();
-  }, [user, role]);
+  }, [user, role, escolaAtivaId]);
 
   const handleSaveEscola = async () => {
+    if (!escolaAtivaId) return;
     try {
-      const docRef = doc(db, 'configuracoes', 'escola');
-      await setDoc(docRef, { escolaConfig }, { merge: true });
+      const docRef = doc(db, 'escolas', escolaAtivaId);
+      await setDoc(docRef, {
+        inep: escolaConfig.inep,
+        nome: escolaConfig.nome,
+        email: escolaConfig.email,
+        telefone: escolaConfig.telefone,
+        zona: escolaConfig.zona,
+        endereco: escolaConfig.endereco,
+        horario_funcionamento: escolaConfig.horarioFuncionamento
+      }, { merge: true });
       await logActivity('atualizou as informações da escola.');
       toast.success('Informações da escola salvas com sucesso!');
     } catch (error) {
@@ -146,9 +185,19 @@ export default function Configuracoes() {
   };
 
   const handleSaveInstalacoes = async () => {
+    if (!escolaAtivaId) return;
     try {
-      const docRef = doc(db, 'configuracoes', 'escola');
-      await setDoc(docRef, { instalacoes }, { merge: true });
+      const docRef = doc(db, 'escolas', escolaAtivaId);
+      await setDoc(docRef, {
+        salas_aula: instalacoes.salasAula.toString(),
+        laboratorios: instalacoes.laboratorios.toString(),
+        banheiros: instalacoes.banheiros.toString(),
+        cantina: instalacoes.cantina.toString(),
+        biblioteca: instalacoes.biblioteca.toString(),
+        quadras: instalacoes.quadras.toString(),
+        secretaria: instalacoes.secretaria.toString(),
+        salaProfessores: instalacoes.salaProfessores.toString(),
+      }, { merge: true });
       await logActivity('atualizou as informações das instalações da escola.');
       toast.success('Instalações atualizadas com sucesso!');
       setIsInstalacoesOpen(false);
@@ -157,7 +206,7 @@ export default function Configuracoes() {
       console.error(error);
     }
   };
-  
+
   const handleSavePreferencias = async (newPreferencias: typeof preferencias) => {
     setPreferencias(newPreferencias);
     // Salvar no localStorage para persistência imediata no navegador
@@ -219,7 +268,7 @@ export default function Configuracoes() {
       const fileExt = file.name.split('.').pop();
       const fileName = `user_${user?.uid}_${Date.now()}.${fileExt}`;
       const storageRef = ref(storage, `usuarios/fotos/${fileName}`);
-      
+
       await uploadBytes(storageRef, file);
       const photoURL = await getDownloadURL(storageRef);
 
@@ -265,7 +314,7 @@ export default function Configuracoes() {
             batchWrites = 0;
           }
         });
-        
+
         if (batchWrites > 0) {
           await batch.commit();
         }
@@ -287,34 +336,90 @@ export default function Configuracoes() {
 
   const handleMigrateData = async () => {
     setIsMigrating(true);
-    toast.info('Iniciando a migração de dados de "estudantes" para "estudantes". Não feche esta página.');
+    toast.info('Iniciando a injeção do INEP "13034243" nos registros antigos. Aguarde...');
 
     try {
-      const estudantesRef = collection(db, 'estudantes');
-      const estudantesSnapshot = await getDocs(estudantesRef);
-
-      if (estudantesSnapshot.empty) {
-        toast.info('A coleção "estudantes" já está vazia. Nenhuma migração é necessária.');
-        return;
-      }
-
-      const batch = writeBatch(db);
+      const collections = ['estudantes', 'professores', 'turmas', 'equipe_gestora', 'user_roles', 'frequencias', 'dias_letivos'];
       let count = 0;
 
-      estudantesSnapshot.forEach(docSnapshot => {
-        const data = docSnapshot.data();
-        const newDocRef = doc(db, 'estudantes', docSnapshot.id);
-        batch.set(newDocRef, data);
-        count++;
-      });
+      for (const coll of collections) {
+        const snapshot = await getDocs(collection(db, coll));
+        let batch = writeBatch(db);
+        let opsInBatch = 0;
 
-      await batch.commit();
-      toast.success(`${count} registros de estudantes foram migrados com sucesso!`);
-      toast.warning('Atenção: A coleção antiga "estudantes" não foi excluída. Por favor, verifique os dados e, se tudo estiver correto, apague-a manualmente no console do Firebase.');
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          if (!data.escola_id) {
+            batch.update(docSnap.ref, { escola_id: '13034243' });
+            opsInBatch++;
+            count++;
+          }
 
+          if (opsInBatch >= 490) {
+            batch.commit();
+            batch = writeBatch(db);
+            opsInBatch = 0;
+          }
+        });
+
+        if (opsInBatch > 0) {
+          await batch.commit();
+        }
+      }
+
+      toast.success(`${count} registros atualizados com o INEP 13034243!`);
+      await logActivity('executou o script de migração do tenant para 13034243.');
     } catch (error) {
       console.error("Erro ao migrar dados:", error);
-      toast.error('Ocorreu um erro durante a migração. Verifique o console para mais detalhes.');
+      toast.error('Ocorreu um erro durante a migração. Verifique o console.');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
+  const handleLimparTransferidos = async () => {
+    const confirmado = window.confirm(
+      'Isso irá limpar o escola_id de todos os estudantes com status "Transferido" que ainda possuem uma escola vinculada, tornando-os disponíveis para rematrícula em qualquer unidade. Deseja continuar?'
+    );
+    if (!confirmado) return;
+
+    setIsMigrating(true);
+    toast.info('Limpando escola dos estudantes Transferidos. Aguarde...');
+
+    try {
+      const snapshot = await getDocs(
+        query(collection(db, 'estudantes'), where('status', '==', 'Transferido'))
+      );
+
+      let count = 0;
+      let batch = writeBatch(db);
+      let opsInBatch = 0;
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data() as any;
+        // Apenas limpa os que têm uma escola vinculada (não-vazia)
+        if (data.escola_id && data.escola_id !== '') {
+          batch.update(docSnap.ref, { escola_id: '', turma_id: null });
+          opsInBatch++;
+          count++;
+        }
+
+        if (opsInBatch >= 490) {
+          batch.commit();
+          batch = writeBatch(db);
+          opsInBatch = 0;
+        }
+      });
+
+      if (opsInBatch > 0) {
+        await batch.commit();
+      }
+
+      toast.success(`${count} estudante(s) transferido(s) tiveram sua escola removida com sucesso!`);
+      await logActivity(`executou o script de limpeza de escola de ${count} estudante(s) transferido(s).`);
+    } catch (error) {
+      console.error('Erro ao limpar transferidos:', error);
+      toast.error('Ocorreu um erro. Verifique o console.');
     } finally {
       setIsMigrating(false);
     }
@@ -346,6 +451,17 @@ export default function Configuracoes() {
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">INEP</Label>
+                    <div className="flex items-center gap-2">
+                      <Building className="h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={escolaConfig.inep}
+                        disabled
+                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0 cursor-not-allowed opacity-70"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
                     <Label className="text-xs text-muted-foreground">Nome da Escola</Label>
                     <div className="flex items-center gap-2">
                       <School className="h-4 w-4 text-muted-foreground" />
@@ -357,7 +473,7 @@ export default function Configuracoes() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Email</Label>
+                    <Label className="text-xs text-muted-foreground">E-mail</Label>
                     <div className="flex items-center gap-2">
                       <Mail className="h-4 w-4 text-muted-foreground" />
                       <Input
@@ -376,6 +492,22 @@ export default function Configuracoes() {
                         onChange={(e) => setEscolaConfig({ ...escolaConfig, telefone: e.target.value })}
                         className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
                       />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Zona (Urbana/Rural)</Label>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <Select value={escolaConfig.zona} onValueChange={(value) => setEscolaConfig({ ...escolaConfig, zona: value })}>
+                        <SelectTrigger className="border-0 bg-transparent p-0 h-auto font-medium focus:ring-0 w-full text-left">
+                          <SelectValue placeholder="Selecione a Zona" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Urbana">Urbana</SelectItem>
+                          <SelectItem value="Rural - Várzea">Rural - Várzea</SelectItem>
+                          <SelectItem value="Rural - Terra Firme">Rural - Terra Firme</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                   <div className="space-y-1">
@@ -531,7 +663,7 @@ export default function Configuracoes() {
                       {profileData.nome.substring(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
-                  <button 
+                  <button
                     onClick={() => photoInputRef.current?.click()}
                     disabled={uploadingPhoto}
                     className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
@@ -602,9 +734,9 @@ export default function Configuracoes() {
                       <p className="text-sm text-muted-foreground mb-2 mt-4">
                         Se a busca por nome não encontrar registros antigos, clique no botão abaixo para sincronizar os dados.
                       </p>
-                      <Button 
-                        className="w-full" 
-                        onClick={handleSyncSearchData} 
+                      <Button
+                        className="w-full"
+                        onClick={handleSyncSearchData}
                         disabled={isSyncing || isMigrating}
                       >
                         {isSyncing ? (
@@ -613,6 +745,34 @@ export default function Configuracoes() {
                           <Wrench className="h-4 w-4 mr-2" />
                         )}
                         {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados de Busca'}
+                      </Button>
+
+                      <Button
+                        className="w-full mt-4"
+                        variant="destructive"
+                        onClick={handleMigrateData}
+                        disabled={isSyncing || isMigrating}
+                      >
+                        {isMigrating ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Wrench className="h-4 w-4 mr-2" />
+                        )}
+                        {isMigrating ? 'Migrando...' : 'Injetar INEP 13034243 nos dados antigos'}
+                      </Button>
+
+                      <Button
+                        className="w-full mt-4"
+                        variant="outline"
+                        onClick={handleLimparTransferidos}
+                        disabled={isSyncing || isMigrating}
+                      >
+                        {isMigrating ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Wrench className="h-4 w-4 mr-2" />
+                        )}
+                        {isMigrating ? 'Limpando...' : 'Limpar Escola dos Transferidos'}
                       </Button>
                     </div>
                   </div>

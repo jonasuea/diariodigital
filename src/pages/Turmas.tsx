@@ -15,6 +15,7 @@ import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface ComponenteCurricular {
   nome: string;
@@ -89,6 +90,7 @@ export default function Turmas() {
   const [novaAlocacao, setNovaAlocacao] = useState({ professorId: '', nome: '' });
 
   const { user } = useAuth();
+  const { escolaAtivaId } = useUserRole();
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -108,13 +110,17 @@ export default function Turmas() {
   useEffect(() => {
     fetchTurmas();
     fetchProfessores();
-  }, [search, anoFiltro]);
+  }, [search, anoFiltro, escolaAtivaId]);
 
   async function fetchTurmas() {
+    if (!escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      // Otimização: Carregar todos os professores de uma vez
-      const profsQuery = query(collection(db, 'professores'), where('ativo', '==', true));
+      // Otimização: Carregar todos os professores de uma vez da mesma escola
+      const profsQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('ativo', '==', true));
       const profsSnapshot = await getDocs(profsQuery);
       const profsMap = new Map<string, string>();
       profsSnapshot.forEach(doc => profsMap.set(doc.id, doc.data().nome));
@@ -122,12 +128,14 @@ export default function Turmas() {
 
       let turmasQuery = query(
         collection(db, 'turmas'),
+        where('escola_id', '==', escolaAtivaId),
         where('ano', '==', parseInt(anoFiltro))
       );
 
       if (search) {
         turmasQuery = query(
           collection(db, 'turmas'),
+          where('escola_id', '==', escolaAtivaId),
           where('ano', '==', parseInt(anoFiltro)),
           where('nome', '>=', search),
           where('nome', '<=', search + '\uf8ff')
@@ -166,8 +174,9 @@ export default function Turmas() {
   }
 
   async function fetchProfessores() {
+    if (!escolaAtivaId) return;
     try {
-      const q = query(collection(db, 'professores'), where('ativo', '==', true), orderBy('nome'));
+      const q = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('ativo', '==', true), orderBy('nome'));
       const querySnapshot = await getDocs(q);
       setProfessores(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
     } catch (error) {
@@ -183,8 +192,13 @@ export default function Turmas() {
       return;
     }
 
+    if (!escolaAtivaId) {
+      toast.error("Nenhuma escola selecionada. Operação cancelada.");
+      return;
+    }
+
     // O payload não precisa de ajustes, pois o formData já está sem professor_id
-    const payload = { ...formData };
+    const payload = { ...formData, escola_id: escolaAtivaId };
 
     try {
       if (editingTurma) {

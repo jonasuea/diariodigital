@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { collection, getCountFromServer, getDocs, limit, orderBy, query, Timestamp, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { format, formatDistanceToNow, getDay, parseISO, startOfMonth, startOfWeek } from 'date-fns';
+import { format, formatDistanceToNow, getDay, parseISO, startOfMonth, startOfWeek, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -28,6 +28,7 @@ import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -56,7 +57,7 @@ interface DashboardStats {
 
 interface FrequenciaData {
   dia: string;
-  presencas: number;
+  taxaFaltas: number;
 }
 
 interface NotasBimestraisData {
@@ -82,6 +83,7 @@ function StatCard({ title, value, icon: Icon, onClick }: { title: string, value:
 
 export default function Painel() {
   const navigate = useNavigate();
+  const { escolaAtivaId } = useUserRole();
   const [stats, setStats] = useState<DashboardStats>({
     totalEstudantes: 0,
     totalTurmas: 0,
@@ -99,6 +101,10 @@ export default function Painel() {
 
   useEffect(() => {
     async function fetchAllData() {
+      if (!escolaAtivaId) {
+        setLoading(false);
+        return;
+      }
       setLoading(true);
       try {
         await Promise.all([
@@ -115,25 +121,26 @@ export default function Painel() {
       }
     }
     fetchAllData();
-  }, []);
+  }, [escolaAtivaId]);
 
   useEffect(() => {
     fetchFrequenciaData(periodoFrequencia);
-  }, [periodoFrequencia]);
+  }, [periodoFrequencia, escolaAtivaId]);
 
   async function fetchStatsAndEvents() {
+    if (!escolaAtivaId) return;
     try {
       const hojeDate = new Date();
       hojeDate.setHours(0, 0, 0, 0);
       const hojeStr = format(hojeDate, 'yyyy-MM-dd');
 
       const [estudantesSnap, turmasSnap, profsSnap, notasRes, eventosTimestampRes, eventosStringRes] = await Promise.all([
-        getCountFromServer(collection(db, 'estudantes')),
-        getCountFromServer(collection(db, 'turmas')),
-        getCountFromServer(collection(db, 'professores')),
-        getDocs(collection(db, 'notas')),
-        getDocs(query(collection(db, 'eventos'), where('data', '>=', hojeDate), orderBy('data', 'asc'))),
-        getDocs(query(collection(db, 'eventos'), where('data', '>=', hojeStr), orderBy('data', 'asc')))
+        getCountFromServer(query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId))),
+        getCountFromServer(query(collection(db, 'turmas'), where('escola_id', '==', escolaAtivaId))),
+        getCountFromServer(query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId))),
+        getDocs(query(collection(db, 'notas'), where('escola_id', '==', escolaAtivaId))),
+        getDocs(query(collection(db, 'eventos'), where('escola_id', '==', escolaAtivaId), where('data', '>=', hojeDate), orderBy('data', 'asc'))),
+        getDocs(query(collection(db, 'eventos'), where('escola_id', '==', escolaAtivaId), where('data', '>=', hojeStr), orderBy('data', 'asc')))
       ]);
 
       const eventosMap = new Map<string, Evento>();
@@ -153,7 +160,7 @@ export default function Painel() {
       const eventosData = Array.from(eventosMap.values())
         .sort((a, b) => a.data.toMillis() - b.data.toMillis())
         .slice(0, 5);
-      
+
       let mediaNotas: number | null = null;
       const notasData = notasRes.docs.map(doc => doc.data());
       if (notasData.length > 0) {
@@ -207,32 +214,50 @@ export default function Painel() {
 
       if (periodo === 'mes') {
         dataInicio = startOfMonth(hoje);
+      } else if (periodo === 'ano') {
+        dataInicio = subYears(hoje, 1);
       } else { // semana
         dataInicio = startOfWeek(hoje, { weekStartsOn: 1 }); // Monday
       }
 
       const q = query(
-        collection(db, 'frequencias'), 
-        where('data', '>=', format(dataInicio, 'yyyy-MM-dd')), 
+        collection(db, 'frequencias'),
+        where('escola_id', '==', escolaAtivaId),
+        where('data', '>=', format(dataInicio, 'yyyy-MM-dd')),
         where('data', '<=', format(dataFim, 'yyyy-MM-dd'))
       );
 
       const querySnapshot = await getDocs(q);
       const frequencias = querySnapshot.docs.map(doc => doc.data());
 
-      const diasAgrupados: { [key: number]: number } = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-      
+      // Busca o total de alunos na escola que possuem turma para usar como denominador diário
+      const estudantesSnapshot = await getDocs(query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId)));
+      const totalAlunosEscola = estudantesSnapshot.docs.filter(doc => {
+        const t = doc.data().turma_id;
+        return t !== null && t !== undefined && t !== '';
+      }).length;
+
+      const diasAgrupados: { [key: number]: { faltas: number } } = { 0: { faltas: 0 }, 1: { faltas: 0 }, 2: { faltas: 0 }, 3: { faltas: 0 }, 4: { faltas: 0 }, 5: { faltas: 0 }, 6: { faltas: 0 } };
+
       frequencias.forEach(f => {
-        if (f.status === 'presente') {
-          const diaSemana = getDay(parseISO(f.data));
-          diasAgrupados[diaSemana]++;
+        const diaSemana = getDay(parseISO(f.data));
+        if (diasAgrupados[diaSemana]) {
+          if (f.status === 'faltou') {
+            diasAgrupados[diaSemana].faltas++;
+          }
         }
       });
 
-      const dadosGrafico: FrequenciaData[] = [1, 2, 3, 4, 5].map(dia => ({
-        dia: DIAS_SEMANA_CHART[dia],
-        presencas: diasAgrupados[dia] || 0,
-      }));
+      const dadosGrafico: FrequenciaData[] = [1, 2, 3, 4, 5].map(dia => {
+        const faltas = diasAgrupados[dia].faltas;
+        // Total base de alunos * 1 turma (Na visão macro do painel, assume-se totalAlunosEscola como faltas totais possíveis no dia)
+        // Isso é uma aproximação razoável dada a nova regra que não salva as presenças.
+        const percentualFaltas = totalAlunosEscola > 0 ? Math.round((faltas / totalAlunosEscola) * 100) : 0;
+        return {
+          dia: DIAS_SEMANA_CHART[dia],
+          taxaFaltas: percentualFaltas,
+        };
+      });
 
       setFrequenciaData(dadosGrafico);
     } catch (error) {
@@ -242,8 +267,10 @@ export default function Painel() {
   }
 
   async function fetchNotasBimestraisData() {
+    if (!escolaAtivaId) return;
     try {
-      const notasSnapshot = await getDocs(collection(db, 'notas'));
+      // NOTE: Here I also added escola_id to filter the grades
+      const notasSnapshot = await getDocs(query(collection(db, 'notas'), where('escola_id', '==', escolaAtivaId)));
       const notasData = notasSnapshot.docs.map(doc => doc.data());
 
       const bimestres: { [key: string]: { soma: number; count: number } } = {
@@ -329,12 +356,13 @@ export default function Painel() {
                 </TabsList>
                 {activeChartTab === 'frequencia' && (
                   <Select value={periodoFrequencia} onValueChange={setPeriodoFrequencia}>
-                    <SelectTrigger className="w-[120px]">
+                    <SelectTrigger className="w-[150px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="semana">Esta Semana</SelectItem>
                       <SelectItem value="mes">Este Mês</SelectItem>
+                      <SelectItem value="ano">Último Ano</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -344,15 +372,16 @@ export default function Painel() {
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={frequenciaData}>
                       <XAxis dataKey="dia" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
-                      <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
                       <RechartsTooltip
+                        formatter={(value: number) => [`${value}%`, 'Taxa de Faltas']}
                         contentStyle={{
                           backgroundColor: 'hsl(var(--card))',
                           borderColor: 'hsl(var(--border))',
                           borderRadius: 'var(--radius)',
                         }}
                       />
-                      <Bar dataKey="presencas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="taxaFaltas" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </CardContent>

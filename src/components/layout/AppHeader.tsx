@@ -7,9 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useState, useEffect } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase'; 
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, documentId } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 
 interface AppHeaderProps {
@@ -32,9 +33,11 @@ interface UserProfile {
 
 export function AppHeader({ title }: AppHeaderProps) {
   const { user } = useAuth();
-  const { role } = useUserRole();
+  const { role, escolaAtivaId, setEscolaAtivaId, isAdmin, permittedEscolas } = useUserRole();
   const { toggleSidebar, isMobile } = useSidebar();
   const navigate = useNavigate();
+
+  const [escolasDisponiveis, setEscolasDisponiveis] = useState<{ id: string, nome: string }[]>([]);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -43,6 +46,36 @@ export function AppHeader({ title }: AppHeaderProps) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
+
+  useEffect(() => {
+    async function loadEscolas() {
+      if (isAdmin || (permittedEscolas && permittedEscolas.length > 1)) {
+        try {
+          let escolasQuery;
+          if (isAdmin) {
+            escolasQuery = query(collection(db, 'escolas'));
+          } else {
+            escolasQuery = query(collection(db, 'escolas'), where(documentId(), 'in', permittedEscolas));
+          }
+
+          const escolasSnap = await getDocs(escolasQuery);
+          const lista = escolasSnap.docs.map(doc => ({ id: doc.id, nome: (doc.data() as any).nome }));
+          setEscolasDisponiveis(lista);
+
+          // Se não houver escola selecionada ainda, autoseleciona a primeira
+          if (!escolaAtivaId && lista.length > 0) {
+            setEscolaAtivaId(lista[0].id);
+            sessionStorage.setItem('escolaAtivaId', lista[0].id);
+          }
+        } catch (error) {
+          console.error("Erro ao carregar escolas no header:", error);
+        }
+      } else {
+        setEscolasDisponiveis([]);
+      }
+    }
+    loadEscolas();
+  }, [isAdmin, permittedEscolas, escolaAtivaId, setEscolaAtivaId]);
 
   useEffect(() => {
     async function fetchProfile() {
@@ -55,28 +88,28 @@ export function AppHeader({ title }: AppHeaderProps) {
         let profileData: UserProfile | null = null;
 
         if (['gestor', 'pedagogo', 'secretario', 'professor'].includes(role)) {
-            const collectionName = role === 'professor' ? 'professores' : 'equipe_gestora';
-            const q = query(collection(db, collectionName), where('email', '==', user.email));
-            const querySnapshot = await getDocs(q);
-            
-            if (!querySnapshot.empty) {
-              const data = querySnapshot.docs[0].data();
-              profileData = {
-                nome: data.nome,
-                foto_url: data.foto_url || undefined,
-              };
-            }
+          const collectionName = role === 'professor' ? 'professores' : 'equipe_gestora';
+          const q = query(collection(db, collectionName), where('email', '==', user.email));
+          const querySnapshot = await getDocs(q);
+
+          if (!querySnapshot.empty) {
+            const data = querySnapshot.docs[0].data();
+            profileData = {
+              nome: data.nome,
+              foto_url: data.foto_url || undefined,
+            };
+          }
         }
 
         if (!profileData) {
-            const profileDocRef = doc(db, 'profiles', user.uid);
-            const profileDoc = await getDoc(profileDocRef);
-            if (profileDoc.exists()) {
-              const data = profileDoc.data();
-              profileData = { nome: data.nome, foto_url: data.foto_url || undefined };
-            }
+          const profileDocRef = doc(db, 'profiles', user.uid);
+          const profileDoc = await getDoc(profileDocRef);
+          if (profileDoc.exists()) {
+            const data = profileDoc.data();
+            profileData = { nome: data.nome, foto_url: data.foto_url || undefined };
+          }
         }
-        
+
         setUserProfile(profileData || { nome: user.displayName || user.email || 'Usuário', foto_url: user.photoURL || undefined });
       } catch (error) {
         console.error("Erro ao carregar perfil no header:", error);
@@ -96,7 +129,7 @@ export function AppHeader({ title }: AppHeaderProps) {
       setIsSearching(true);
 
       const searchLower = debouncedSearchQuery.toLowerCase();
-      
+
       try {
         const [estudantesSnap, profsSnap, gestoresSnap] = await Promise.all([
           getDocs(query(collection(db, 'estudantes'), where('nome_lower', '>=', searchLower), where('nome_lower', '<=', searchLower + '\uf8ff'), limit(5))),
@@ -158,7 +191,7 @@ export function AppHeader({ title }: AppHeaderProps) {
       default: return null;
     }
   };
-  
+
   const getInitials = (name: string | null | undefined) => {
     if (!name) return 'U';
     const parts = name.split(' ');
@@ -194,6 +227,33 @@ export function AppHeader({ title }: AppHeaderProps) {
 
       <div className="flex-1" />
 
+      {(isAdmin || (permittedEscolas && permittedEscolas.length > 1)) && (
+        <div className="w-[300px] lg:w-[400px] hidden md:block mr-2">
+          <Select
+            value={escolaAtivaId || undefined}
+            onValueChange={(val) => {
+              setEscolaAtivaId(val);
+              sessionStorage.setItem('escolaAtivaId', val);
+              window.location.reload(); // Força recarregamento contextual
+            }}
+          >
+            <SelectTrigger className="h-9">
+              <div className="flex items-center gap-2 truncate">
+                <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                <span className="truncate">
+                  {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || 'Selecione uma Escola'}
+                </span>
+              </div>
+            </SelectTrigger>
+            <SelectContent>
+              {escolasDisponiveis.map(esc => (
+                <SelectItem key={esc.id} value={esc.id}>{esc.nome}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
         <PopoverTrigger asChild>
           <div className="relative">
@@ -220,8 +280,8 @@ export function AppHeader({ title }: AppHeaderProps) {
           ) : searchResults.length > 0 ? (
             <div className="py-2">
               {searchResults.map(result => (
-                <div 
-                  key={result.id} 
+                <div
+                  key={result.id}
                   className="flex items-center gap-3 px-3 py-2 hover:bg-muted cursor-pointer"
                   onClick={() => handleResultClick(result)}
                 >

@@ -35,7 +35,7 @@ interface Professor {
 
 export default function Professores() {
   const navigate = useNavigate();
-  const { isAdmin } = useUserRole();
+  const { isAdmin, escolaAtivaId } = useUserRole();
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -46,20 +46,24 @@ export default function Professores() {
 
   useEffect(() => {
     fetchProfessores();
-  }, [search]);
+  }, [search, escolaAtivaId]);
 
   async function fetchProfessores() {
+    if (!escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
-      let professoresQuery = query(collection(db, 'professores'), orderBy('nome'));
-      
+      let professoresQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
+
       if (search) {
         // NOTE: Firestore queries are case-sensitive. For case-insensitive search,
         // you'd typically store a lowercase version of the fields.
         // This search is simplified to query by name only.
-        professoresQuery = query(collection(db, 'professores'), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'), orderBy('nome'));
+        professoresQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'), orderBy('nome'));
       }
-      
+
       const querySnapshot = await getDocs(professoresQuery);
       const professoresData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor));
       setProfessores(professoresData);
@@ -77,7 +81,7 @@ export default function Professores() {
 
   async function handleDelete() {
     if (!professorToDelete) return;
-    
+
     try {
       await deleteDoc(doc(db, 'professores', professorToDelete.id));
       toast.success('Professor excluído com sucesso!');
@@ -126,7 +130,7 @@ export default function Professores() {
         console.error('Erros de parsing do CSV:', result.errors);
         return;
       }
-      
+
       const requiredColumns = ['nome', 'email'];
       const fileColumns = result.meta.fields.map(f => f.toLowerCase().trim());
       const missingColumns = requiredColumns.filter(col => !fileColumns.includes(col));
@@ -141,8 +145,8 @@ export default function Professores() {
       let errorCount = 0;
       let skippedCount = 0;
 
-      // Otimização: Carregar matrículas existentes
-      const matriculasSnapshot = await getDocs(query(collection(db, 'professores'), where('matricula', '!=', '')));
+      // Otimização: Carregar matrículas existentes do tenant
+      const matriculasSnapshot = await getDocs(query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('matricula', '!=', '')));
       const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
       const matriculasInCsv = new Set();
 
@@ -188,6 +192,7 @@ export default function Professores() {
             formacoes,
             ativo: row.ativo ? (row.ativo.toLowerCase() === 'true' || row.ativo === '1') : true,
             componente: row.componentes ? row.componentes.split(',')[0].trim() : '',
+            escola_id: escolaAtivaId,
           };
           await addDoc(collection(db, 'professores'), professorData);
           successCount++;
@@ -200,7 +205,7 @@ export default function Professores() {
       if (successCount > 0) toast.success(`${successCount} professores importados com sucesso!`);
       if (skippedCount > 0) toast.info(`${skippedCount} professores foram ignorados por já terem uma matrícula existente.`);
       if (errorCount > 0) toast.warning(`${errorCount} linhas não puderam ser importadas. Verifique a consola para mais detalhes.`);
-      
+
       fetchProfessores();
     } catch (error) {
       toast.error('Ocorreu um erro ao importar o arquivo.');
@@ -213,7 +218,11 @@ export default function Professores() {
 
   async function handleExportCSV() {
     try {
-      const professoresQuery = query(collection(db, 'professores'), orderBy('nome'));
+      if (!escolaAtivaId) {
+        toast.error('Nenhuma escola selecionada para exportar.');
+        return;
+      }
+      const professoresQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
       const querySnapshot = await getDocs(professoresQuery);
       const professoresData = querySnapshot.docs.map(doc => {
         const data = doc.data();
@@ -232,6 +241,13 @@ export default function Professores() {
           series: (data.series || []).join(','),
           formacoes: JSON.stringify(data.formacoes || []),
           ativo: data.ativo ?? true,
+          componente: data.componente || '',
+          logradouro: data.logradouro || '',
+          numero: data.numero || '',
+          bairro: data.bairro || '',
+          cep: data.cep || '',
+          foto_url: data.foto_url || '',
+          arquivo_url: data.arquivo_url || '',
         };
       });
 
@@ -267,8 +283,8 @@ export default function Professores() {
     { key: 'matricula', header: 'Matrícula' },
     { key: 'email', header: 'E-mail' },
     { key: 'telefone', header: 'Telefone', render: (p: Professor) => p.telefone || '-' },
-    { 
-      key: 'status', 
+    {
+      key: 'status',
       header: 'Status',
       render: (p: Professor) => (
         <Badge className={getStatusColor(p.status_funcional)}>
@@ -299,7 +315,7 @@ export default function Professores() {
     <AppLayout title="Professores">
       <div className="space-y-6 animate-fade-in">
         <p className="text-muted-foreground -mt-2">Gerencie o corpo docente da instituição</p>
-        
+
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -310,7 +326,7 @@ export default function Professores() {
               className="pl-9"
             />
           </div>
-          
+
           <div className="flex gap-2">
             {isAdmin && (
               <>
@@ -381,7 +397,7 @@ export default function Professores() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o professor "{professorToDelete?.nome}"? 
+                Tem certeza que deseja excluir o professor "{professorToDelete?.nome}"?
                 Esta ação não pode ser desfeita.
               </AlertDialogDescription>
             </AlertDialogHeader>

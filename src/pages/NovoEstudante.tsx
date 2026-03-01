@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useUserRole } from '@/hooks/useUserRole';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ArrowLeft, User, Save, X, Upload, Plus, Trash2 } from 'lucide-react';
 import { db, storage } from '@/lib/firebase';
@@ -27,10 +29,33 @@ const MOVIMENTACAO_OPTIONS = ['Matrícula', 'Transferência Entrada', 'Transfer�
 const STATUS_OPTIONS = ['Frequentando', 'Transferido', 'Desistente', 'Concluído'];
 const VACINACAO_OPTIONS = ['Não', '1ª Dose', '2ª Dose', '3ª Dose', '4ª Dose', '5ª Dose'];
 
+const RESTRICOES_OPTIONS = [
+  'Glutem', 'Lactose', 'Proteina', 'Proteina do Ovo', 'Diabetes', 'Hipertensão'
+];
+
 interface Turma {
   id: string;
   nome: string;
   serie: string;
+}
+
+interface HistoricoDisciplina {
+  id: string;
+  nome: string;
+  nota_b1: string;
+  nota_b2: string;
+  nota_b3: string;
+  nota_b4: string;
+  media_final: string;
+}
+
+interface HistoricoAnual {
+  id: string;
+  ano_letivo: string;
+  serie: string;
+  escola: string;
+  concluido: boolean;
+  componentes: HistoricoDisciplina[];
 }
 
 const initialState = {
@@ -58,6 +83,7 @@ const initialState = {
   email: '',
   // Programas Sociais
   bolsa_familia: false,
+  numero_nis: '',
   // Censo e SUS
   censo_escola: false,
   id_censo: '',
@@ -66,7 +92,9 @@ const initialState = {
   // Saúde
   estudante_pcd: false,
   estudante_aee: false,
+  cid_aee: '',
   dieta_restritiva: false,
+  restricoes_alimentares: [] as string[],
   // Informações Escolares
   largura_farda: '',
   altura_farda: '',
@@ -108,6 +136,7 @@ const initialState = {
 export default function NovoEstudante() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const { escolaAtivaId } = useUserRole();
   const isEditing = !!id;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -162,8 +191,12 @@ export default function NovoEstudante() {
 
   useEffect(() => {
     async function carregarDependencias() {
+      if (!escolaAtivaId) return;
+
       try {
-        const querySnapshot = await getDocs(collection(db, 'turmas'));
+        const querySnapshot = await getDocs(
+          query(collection(db, 'turmas'), where('escola_id', '==', escolaAtivaId))
+        );
         const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
         setTurmas(turmasData.sort((a, b) => a.nome.localeCompare(b.nome)));
       } catch (error) {
@@ -174,7 +207,7 @@ export default function NovoEstudante() {
       }
     }
     carregarDependencias();
-  }, []);
+  }, [escolaAtivaId]);
 
   useEffect(() => {
     // Garante que os dados do estudante só são carregados depois de as turmas estarem disponíveis
@@ -250,6 +283,7 @@ export default function NovoEstudante() {
           ...initialState,
           ...estudanteData,
           historico_academico: historico,
+          restricoes_alimentares: estudanteData.restricoes_alimentares || [],
           turma_id: estudanteData.turma_id || null,
           responsavel_relacao: estudanteData.responsavel_relacao || '',
           responsavel_nome: estudanteData.responsavel_nome || '',
@@ -313,6 +347,15 @@ export default function NovoEstudante() {
       console.log(`Campo '${field}' atualizado para:`, value);
       return newFormData;
     });
+  };
+
+  const toggleRestricaoAlimentar = (restricao: string) => {
+    setFormData(prev => ({
+      ...prev,
+      restricoes_alimentares: (prev.restricoes_alimentares || []).includes(restricao)
+        ? prev.restricoes_alimentares.filter(r => r !== restricao)
+        : [...(prev.restricoes_alimentares || []), restricao]
+    }));
   };
 
   // Funções para gerenciar o Histórico Acadêmico
@@ -449,8 +492,14 @@ export default function NovoEstudante() {
     setLoading(true);
 
     try {
+      if (!escolaAtivaId) {
+        toast.error('Nenhuma escola selecionada. Não é possível cadastrar estudante.');
+        setLoading(false);
+        return;
+      }
+
       // Verificar a unicidade da matrícula
-      const q = query(collection(db, 'estudantes'), where('matricula', '==', formData.matricula));
+      const q = query(collection(db, 'estudantes'), where('matricula', '==', formData.matricula), where('escola_id', '==', escolaAtivaId));
       const querySnapshot = await getDocs(q);
 
       let isDuplicate = false;
@@ -531,7 +580,11 @@ export default function NovoEstudante() {
       const finalFormData = {
         ...formData,
         historico_academico: historicoAtualizado,
-        nome_lower: formData.nome.toLowerCase()
+        nome_lower: formData.nome.toLowerCase(),
+        // Transferidos ficam sem escola para poder ser rematriculado em qualquer unidade
+        escola_id: formData.status === 'Transferido' ? '' : escolaAtivaId,
+        // Tambem remove a turma ao transferir
+        turma_id: formData.status === 'Transferido' ? null : formData.turma_id,
       };
 
       if (isEditing && id) {
@@ -770,6 +823,12 @@ export default function NovoEstudante() {
                   <Label htmlFor="bolsa_familia">Recebe Bolsa Família?</Label>
                   <Switch id="bolsa_familia" checked={formData.bolsa_familia} onCheckedChange={(v) => handleChange('bolsa_familia', v)} />
                 </div>
+                {formData.bolsa_familia && (
+                  <div className="space-y-2">
+                    <Label htmlFor="numero_nis">Número do NIS*</Label>
+                    <Input id="numero_nis" placeholder="Número de Identificação Social" value={formData.numero_nis} onChange={(e) => handleChange('numero_nis', e.target.value)} required={formData.bolsa_familia} />
+                  </div>
+                )}
               </div>
 
               {/* Censo e SUS */}
@@ -821,10 +880,33 @@ export default function NovoEstudante() {
                     <Switch id="estudante_aee" checked={formData.estudante_aee} onCheckedChange={(v) => handleChange('estudante_aee', v)} />
                   </div>
                 </div>
+                {formData.estudante_aee && (
+                  <div className="space-y-2">
+                    <Label htmlFor="cid_aee">CID (Classificação Internacional de Doenças)*</Label>
+                    <Input id="cid_aee" placeholder="Ex: CID 10 + F 84" value={formData.cid_aee} onChange={(e) => handleChange('cid_aee', e.target.value)} required={formData.estudante_aee} />
+                  </div>
+                )}
                 <div className="flex items-center justify-between p-4 border rounded-lg md:w-1/2">
                   <Label htmlFor="dieta_restritiva">O estudante tem dieta restritiva?</Label>
                   <Switch id="dieta_restritiva" checked={formData.dieta_restritiva} onCheckedChange={(v) => handleChange('dieta_restritiva', v)} />
                 </div>
+                {formData.dieta_restritiva && (
+                  <div className="space-y-3 p-4 border rounded-lg">
+                    <Label className="font-semibold">Selecione as restrições:</Label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mt-2">
+                      {RESTRICOES_OPTIONS.map((restricao) => (
+                        <div key={restricao} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`restricao-${restricao}`}
+                            checked={(formData.restricoes_alimentares || []).includes(restricao)}
+                            onCheckedChange={() => toggleRestricaoAlimentar(restricao)}
+                          />
+                          <Label htmlFor={`restricao-${restricao}`} className="font-normal">{restricao}</Label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Informações Escolares */}

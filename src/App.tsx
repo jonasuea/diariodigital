@@ -10,6 +10,8 @@ import Auth from "./pages/Auth";
 import Painel from "./pages/Painel";
 import Estudantes from "./pages/Estudantes";
 import NovoEstudante from "./pages/NovoEstudante";
+import Escolas from "./pages/Escolas";
+import NovaEscola from "./pages/NovaEscola";
 import Professores from "./pages/Professores";
 import NovoProfessor from "./pages/NovoProfessor";
 import Turmas from "./pages/Turmas";
@@ -43,6 +45,10 @@ const router = createBrowserRouter([
   { path: "/manutencao", element: <Manutencao /> },
 
   { path: "/painel", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Painel /></ProtectedRoute> },
+
+  { path: "/escolas", element: <ProtectedRoute allowedRoles={['admin']}><Escolas /></ProtectedRoute> },
+  { path: "/escolas/nova", element: <ProtectedRoute allowedRoles={['admin']}><NovaEscola /></ProtectedRoute> },
+  { path: "/escolas/:id/editar", element: <ProtectedRoute allowedRoles={['admin']}><NovaEscola /></ProtectedRoute> },
 
   { path: "/estudantes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Estudantes /></ProtectedRoute> },
   { path: "/estudantes/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },

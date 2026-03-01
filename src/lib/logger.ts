@@ -15,12 +15,16 @@ export async function logActivity(action: string) {
     return;
   }
 
+  // Lê o escola_id ativo da sessão (gravado pelo useUserRole)
+  const escolaId = sessionStorage.getItem('escolaAtivaId') || '';
+
   try {
     await addDoc(collection(db, 'activity_log'), {
       user_id: user.uid,
       user_name: user.displayName || user.email,
       action: action,
-      created_at: serverTimestamp(), // Usa o timestamp do servidor para consistência
+      escola_id: escolaId,
+      created_at: serverTimestamp(),
     });
   } catch (error) {
     console.error("Erro ao registrar atividade no log:", error);

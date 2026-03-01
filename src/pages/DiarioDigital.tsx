@@ -32,7 +32,7 @@ interface Turma {
 export default function DiarioDigital() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { role, loading: roleLoading } = useUserRole();
+  const { role, escolaAtivaId, loading: roleLoading } = useUserRole();
 
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
@@ -63,11 +63,11 @@ export default function DiarioDigital() {
 
   // Efeito para buscar o ID real do professor logado pelo e-mail
   useEffect(() => {
-    if (!user?.email || isGestor) return;
+    if (!user?.email || isGestor || !escolaAtivaId) return;
 
     async function fetchLoggedProfessorId() {
       try {
-        const profQuery = query(collection(db, 'professores'), where('email', '==', user.email));
+        const profQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('email', '==', user.email));
         const profSnapshot = await getDocs(profQuery);
         if (!profSnapshot.empty) {
           setLoggedProfessorId(profSnapshot.docs[0].id);
@@ -84,10 +84,10 @@ export default function DiarioDigital() {
 
   // Efeito para carregar professores (apenas para gestores)
   useEffect(() => {
-    if (isGestor) {
+    if (isGestor && escolaAtivaId) {
       async function fetchProfessores() {
         try {
-          const profQuery = query(collection(db, 'professores'), where('ativo', '==', true), orderBy('nome'));
+          const profQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('ativo', '==', true), orderBy('nome'));
           const profSnapshot = await getDocs(profQuery);
           setProfessores(profSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
         } catch (error) {
@@ -103,8 +103,9 @@ export default function DiarioDigital() {
   useEffect(() => {
     const professorId = isGestor ? selectedProfessorId : loggedProfessorId;
 
-    if (!professorId) {
+    if (!professorId || !escolaAtivaId) {
       setTurmas([]);
+      setLoading(false);
       return;
     }
 
@@ -113,6 +114,7 @@ export default function DiarioDigital() {
       try {
         const turmasQuery = query(
           collection(db, 'turmas'),
+          where('escola_id', '==', escolaAtivaId),
           where('ano', '==', new Date().getFullYear()),
           where('professoresIds', 'array-contains', professorId)
         );

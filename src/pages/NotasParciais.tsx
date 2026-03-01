@@ -129,7 +129,7 @@ export default function NotasParciais() {
     const [unlocking, setUnlocking] = useState<number | null>(null);
     const [bimestresLocked, setBimestresLocked] = useState<Set<number>>(new Set());
 
-    const { role } = useUserRole();
+    const { role, escolaAtivaId } = useUserRole();
     const ROLES_GESTAO = ['admin', 'gestor', 'pedagogo', 'secretario'];
     const podeDesbloquear = role ? ROLES_GESTAO.includes(role) : false;
     const isProfessor = role === 'professor';
@@ -137,7 +137,7 @@ export default function NotasParciais() {
     // notas[bimestre][estudanteId] = NotaParcial
     const [notas, setNotas] = useState<NotasState>({ 1: {}, 2: {}, 3: {}, 4: {} });
 
-    const isComponenteFixo = !!searchParams.get('componente');
+    const isComponenteFixo = searchParams.get('origem') === 'diario';
     const ano = new Date().getFullYear();
     const componentesDaTurma = turma?.componentes?.filter(c => c.professorId) || [];
 
@@ -166,6 +166,7 @@ export default function NotasParciais() {
         try {
             await setDoc(doc(db, 'notas_parciais_config', configId), {
                 turma_id: turmaId,
+                escola_id: escolaAtivaId,
                 componente,
                 ano,
                 bimestres_bloqueados: Array.from(locked),
@@ -178,7 +179,10 @@ export default function NotasParciais() {
     // ── Load ──────────────────────────────────────────────────────────────────
 
     const loadData = useCallback(async () => {
-        if (!turmaId) return;
+        if (!turmaId || !escolaAtivaId) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
             const turmaSnap = await getDoc(doc(db, 'turmas', turmaId));
@@ -187,7 +191,7 @@ export default function NotasParciais() {
             setTurma(turmaData);
 
             const estudantesSnap = await getDocs(
-                query(collection(db, 'estudantes'), where('turma_id', '==', turmaId))
+                query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), where('turma_id', '==', turmaId))
             );
             const lista = estudantesSnap.docs
                 .map(d => ({ id: d.id, ...d.data() } as Estudante))
@@ -199,15 +203,16 @@ export default function NotasParciais() {
         } finally {
             setLoading(false);
         }
-    }, [turmaId, navigate]);
+    }, [turmaId, navigate, escolaAtivaId]);
 
     const loadNotasParciais = useCallback(async () => {
-        if (!turmaId || !componente || estudantes.length === 0) return;
+        if (!turmaId || !componente || estudantes.length === 0 || !escolaAtivaId) return;
 
         try {
             const snap = await getDocs(
                 query(
                     collection(db, 'notas_parciais'),
+                    where('escola_id', '==', escolaAtivaId),
                     where('turma_id', '==', turmaId),
                     where('componente', '==', componente),
                     where('ano', '==', ano),
@@ -242,7 +247,7 @@ export default function NotasParciais() {
         } catch (err) {
             console.error('Erro ao carregar notas parciais:', err);
         }
-    }, [turmaId, componente, ano, estudantes]);
+    }, [turmaId, componente, ano, estudantes, escolaAtivaId]);
 
     useEffect(() => { loadData(); }, [loadData]);
     useEffect(() => { loadNotasParciais(); }, [loadNotasParciais]);
@@ -289,6 +294,7 @@ export default function NotasParciais() {
                     const media = calcMedia(nota);
                     const payload = {
                         turma_id: turmaId,
+                        escola_id: escolaAtivaId,
                         componente,
                         ano,
                         bimestre: bim,
@@ -344,6 +350,7 @@ export default function NotasParciais() {
                     const notasSnap = await getDocs(
                         query(
                             collection(db, 'notas'),
+                            where('escola_id', '==', escolaAtivaId),
                             where('estudante_id', '==', estudanteId),
                             where('turma_id', '==', turmaId),
                             where('componente', '==', componente),
@@ -358,6 +365,7 @@ export default function NotasParciais() {
                         await addDoc(collection(db, 'notas'), {
                             estudante_id: estudanteId,
                             turma_id: turmaId,
+                            escola_id: escolaAtivaId,
                             componente,
                             ano,
                             bimestre_1: bim === 1 ? media : null,

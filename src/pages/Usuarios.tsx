@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { UserCog } from 'lucide-react';
 import { Key, UserCheck, UserX, Trash2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -21,6 +22,7 @@ interface Usuario {
   email: string;
   role: string;
   status: 'ativo' | 'inativo';
+  escolas?: string[];
 }
 
 export default function Usuarios() {
@@ -31,16 +33,23 @@ export default function Usuarios() {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [usuarioToAssign, setUsuarioToAssign] = useState<Usuario | null>(null);
   const [selectedRole, setSelectedRole] = useState<string>('');
+  const [escolasDisponiveis, setEscolasDisponiveis] = useState<{ id: string, nome: string }[]>([]);
+  const [selectedEscolas, setSelectedEscolas] = useState<string[]>([]);
   const { role: currentUserRole } = useUserRole();
 
   useEffect(() => {
+    async function loadEscolas() {
+      const snap = await getDocs(collection(db, 'escolas'));
+      setEscolasDisponiveis(snap.docs.map(doc => ({ id: doc.id, nome: doc.data().nome })));
+    }
+    loadEscolas();
     fetchUsuarios();
   }, []);
 
   async function fetchUsuarios() {
     setLoading(true);
     try {
-            // 1. Buscar todos os perfis primeiro, que é a fonte da verdade para usuários existentes.
+      // 1. Buscar todos os perfis primeiro, que é a fonte da verdade para usuários existentes.
       const profilesSnapshot = await getDocs(collection(db, 'profiles'));
       const profilesData = profilesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() as { nome: string, email?: string } }));
       const userIds = profilesData.map(p => p.id);
@@ -56,7 +65,7 @@ export default function Usuarios() {
           const q = query(collection(db, 'user_roles'), where('__name__', 'in', chunk));
           rolesPromises.push(getDocs(q));
         }
-        
+
         const rolesSnapshots = await Promise.all(rolesPromises);
         rolesSnapshots.forEach(snapshot => {
           snapshot.docs.forEach(doc => {
@@ -75,12 +84,10 @@ export default function Usuarios() {
         return {
           id: profile.id,
           nome: profile.nome || 'Nome não encontrado',
-          // O email no perfil pode não existir, então buscamos do auth se possível, mas aqui não temos acesso.
-          // Mantemos a lógica original, mas o ideal seria ter o email no profile.
           email: profile.email || userRole?.email || 'E-mail não encontrado',
           role: role,
-          // Um usuário sem status definido deve ser considerado 'inativo' por segurança.
           status: status as 'ativo' | 'inativo',
+          escolas: userRole?.escolas || (userRole?.escola_id ? [userRole.escola_id] : []),
         };
       });
 
@@ -140,17 +147,33 @@ export default function Usuarios() {
   async function handleAssignRole() {
     if (!usuarioToAssign || !selectedRole) return;
 
+    // Força a validação de pelo menos uma escola se não for admin
+    if (selectedRole !== 'admin' && selectedEscolas.length === 0) {
+      toast.error('Selecione pelo menos uma escola para este usuário.');
+      return;
+    }
+
     try {
-      await setDoc(doc(db, 'user_roles', usuarioToAssign.id), { 
+      const payload: any = {
         role: selectedRole,
         status: 'ativo' // Ativar ao atribuir perfil
-      }, { merge: true });
+      };
+
+      if (selectedRole !== 'admin') {
+        payload.escolas = selectedEscolas;
+        payload.escola_id = selectedEscolas[0]; // fallback legado
+      }
+
+      await setDoc(doc(db, 'user_roles', usuarioToAssign.id), payload, { merge: true });
       await logActivity(`atribuiu o perfil "${selectedRole}" para o usuário "${usuarioToAssign.nome}".`);
-      setUsuarios(prev => prev.map(u => (u.id === usuarioToAssign.id ? { ...u, role: selectedRole, status: 'ativo' } : u)));
-      toast.success(`Perfil "${selectedRole}" atribuído e usuário ativado com sucesso!`);
+
+      setUsuarios(prev => prev.map(u => (u.id === usuarioToAssign.id ? { ...u, role: selectedRole, status: 'ativo', escolas: selectedEscolas } : u)));
+
+      toast.success(`Perfil "${selectedRole}" atribuído com sucesso!`);
       setAssignDialogOpen(false);
       setUsuarioToAssign(null);
       setSelectedRole('');
+      setSelectedEscolas([]);
     } catch (error) {
       console.error('Erro ao atribuir perfil:', error);
       toast.error('Erro ao atribuir perfil');
@@ -219,6 +242,7 @@ export default function Usuarios() {
                 onClick={() => {
                   setUsuarioToAssign(item);
                   setSelectedRole(item.role);
+                  setSelectedEscolas(item.escolas || []);
                   setAssignDialogOpen(true);
                 }}
                 title={canAct ? "Atribuir/Alterar perfil" : "Permissão negada"}
@@ -285,7 +309,7 @@ export default function Usuarios() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir Usuário</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir o usuário "{usuarioToDelete?.nome}"? 
+              Tem certeza que deseja excluir o usuário "{usuarioToDelete?.nome}"?
               Isso removerá o acesso ao sistema, mas não excluirá dados de estudantes ou funcionários.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -307,7 +331,7 @@ export default function Usuarios() {
               perfil, o usuário será ativado e poderá acessar o sistema.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <Select value={selectedRole} onValueChange={setSelectedRole}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione um perfil" />
@@ -321,6 +345,32 @@ export default function Usuarios() {
                 <SelectItem value="estudante">Estudante</SelectItem>
               </SelectContent>
             </Select>
+
+            {selectedRole && selectedRole !== 'admin' && (
+              <div className="space-y-2 border rounded-md p-3">
+                <p className="text-sm font-medium mb-2">Escolas Vinculadas</p>
+                <div className="max-h-40 overflow-y-auto space-y-3">
+                  {escolasDisponiveis.map(escola => (
+                    <div key={escola.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`escola-${escola.id}`}
+                        checked={selectedEscolas.includes(escola.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedEscolas([...selectedEscolas, escola.id]);
+                          } else {
+                            setSelectedEscolas(selectedEscolas.filter(id => id !== escola.id));
+                          }
+                        }}
+                      />
+                      <label htmlFor={`escola-${escola.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 whitespace-nowrap truncate w-full cursor-pointer">
+                        {escola.nome}
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>

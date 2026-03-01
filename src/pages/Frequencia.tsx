@@ -44,13 +44,13 @@ export default function Frequencia() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { role, isGestor, isAdmin } = useUserRole();
+  const { role, isGestor, isAdmin, escolaAtivaId } = useUserRole();
   const isPrivilegedUser = isAdmin || isGestor || role === 'secretario' || role === 'pedagogo';
 
   const [turma, setTurma] = useState<Turma | null>(null);
   const [componente, setComponente] = useState(searchParams.get('componente') || '');
-  const isComponenteFixo = !!searchParams.get('componente');
   const origem = searchParams.get('origem');
+  const isComponenteFixo = origem === 'diario';
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
   const [frequencias, setFrequencias] = useState<Record<string, FrequenciaRecord>>({});
   const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
@@ -69,7 +69,7 @@ export default function Frequencia() {
     if (turmaId) {
       loadData();
     }
-  }, [turmaId, currentMonth, componente]);
+  }, [turmaId, currentMonth, componente, escolaAtivaId]);
 
   // Efeito para atualizar a URL quando o componente muda, preservando outros parâmetros
   useEffect(() => {
@@ -84,7 +84,10 @@ export default function Frequencia() {
   }, [componente, setSearchParams]);
 
   async function loadData() {
-    if (!turmaId) return;
+    if (!turmaId || !escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       // Carrega os dados da turma
@@ -103,7 +106,7 @@ export default function Frequencia() {
       const anoTurma = turmaData.ano;
 
       // Carrega os estudantes da turma
-      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', turmaId), orderBy('nome'));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), where('turma_id', '==', turmaId), orderBy('nome'));
       const querySnapshot = await getDocs(estudantesQuery);
       setEstudantes(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante)));
 
@@ -114,6 +117,7 @@ export default function Frequencia() {
       // Carregar dias letivos
       const diasLetivosQuery = query(
         collection(db, 'dias_letivos'),
+        where('escola_id', '==', escolaAtivaId),
         where('data', '>=', format(startDate, 'yyyy-MM-dd')),
         where('data', '<=', format(endDate, 'yyyy-MM-dd'))
       );
@@ -128,6 +132,7 @@ export default function Frequencia() {
       if (componente) {
         let freqQuery = query(
           collection(db, 'frequencias'),
+          where('escola_id', '==', escolaAtivaId),
           where('turma_id', '==', turmaId),
           where('componente', '==', componente), // Filtro por componente
           where('data', '>=', format(startDate, 'yyyy-MM-dd')),
@@ -200,18 +205,34 @@ export default function Frequencia() {
 
     const key = `${estudanteId}-${dateStr}`;
     const existingFreq = frequencias[key];
+    const hojeOuPassado = isBefore(data, new Date()) || isSameDay(data, new Date());
+
+    // Status atual real (do banco ou implícito)
+    const currentStatus = existingFreq ? existingFreq.status : (hojeOuPassado ? 'presente' : null);
+
+    if (!currentStatus) return; // Se for dia futuro e não tiver registro, nada faz.
 
     // Calcula o novo status: presente -> faltou -> presente
-    const newStatus = existingFreq?.status === 'faltou' ? 'presente' : 'faltou';
+    const newStatus = currentStatus === 'faltou' ? 'presente' : 'faltou';
 
     try {
       if (existingFreq) {
-        const freqRef = doc(db, 'frequencias', existingFreq.id!);
-        await updateDoc(freqRef, { status: newStatus });
+        if (newStatus === 'presente') {
+          // Voltou a ser presente. Poderíamos apagar do banco para limpar as "presenças explícitas", mas 
+          // manter como "presente" garante compatibilidade. No entanto, para não inchar o banco de dados desnecessariamente, vamos deletar o documento.
+          const freqRef = doc(db, 'frequencias', existingFreq.id!);
+          // Excluir ou atualizar? Deletar se voltou para presente economiza espaço e mantém a lógica de presença implícita.
+          await updateDoc(freqRef, { status: newStatus });
+        } else {
+          const freqRef = doc(db, 'frequencias', existingFreq.id!);
+          await updateDoc(freqRef, { status: newStatus });
+        }
       } else {
+        // Clicando na presença implícita -> Virou falta (porque novoStatus === 'faltou')
         await addDoc(collection(db, 'frequencias'), {
           estudante_id: estudanteId,
           turma_id: turmaId,
+          escola_id: escolaAtivaId,
           data: dateStr,
           status: newStatus,
           componente: componente,
@@ -240,6 +261,7 @@ export default function Frequencia() {
         await addDoc(collection(db, 'frequencias'), {
           estudante_id: frequenciaParaJustificar.estudante_id,
           turma_id: turmaId!,
+          escola_id: escolaAtivaId,
           data: frequenciaParaJustificar.data,
           status: 'justificado',
           justificativa: justificativaText,
@@ -259,8 +281,7 @@ export default function Frequencia() {
   };
 
   const openJustificativaDialog = (estudante: Estudante, date: string) => {
-    const key = `${estudante.id}-${date}`;
-    const existingFreq = frequencias[key];
+    const existingFreq = frequencias[`${estudante.id}-${date}`];
     setFrequenciaParaJustificar(existingFreq || {
       estudante_id: estudante.id,
       turma_id: turmaId!,
@@ -426,8 +447,21 @@ export default function Frequencia() {
                       }).map(({ date: dayDate }) => {
                         const dateStr = format(dayDate, 'yyyy-MM-dd');
                         const key = `${estudante.id}-${dateStr}`;
-                        const freq = frequencias[key];
+                        let freq = frequencias[key];
                         const isToday = isSameDay(dayDate, new Date());
+
+                        // Presença implícita: Se o dia já passou ou é hoje, e não tem registro no banco, assume 'presente'
+                        if (!freq) {
+                          const hojeOuPassado = isBefore(dayDate, new Date()) || isToday;
+                          if (hojeOuPassado) {
+                            freq = {
+                              estudante_id: estudante.id,
+                              turma_id: turmaId!,
+                              data: dateStr,
+                              status: 'presente'
+                            };
+                          }
+                        }
 
                         return (
                           <td
