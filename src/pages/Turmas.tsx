@@ -583,96 +583,191 @@ export default function Turmas() {
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
         ) : (
-          <div className="border rounded-lg overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-muted/50">
-                <tr>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Turma</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Monitores/Professores</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Período</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Vagas</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Estudantes</th>
-                  <th className="text-left p-4 font-medium text-muted-foreground">Ano</th>
-                  <th className="text-right p-4 font-medium text-muted-foreground">Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {turmas.map((turma) => (
-                  <tr key={turma.id} className="border-t hover:bg-muted/30">
-                    <td className="p-4">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer font-medium hover:text-primary transition-colors select-none"
-                        onClick={() => toggleExpand(turma.id)}
-                      >
-                        {turma.nome}
-                        {expandedTurmas[turma.id] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </div>
-
-
-                    </td>
-                    <td className="p-4">
-                      {turma.monitoresIds && turma.monitoresIds.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {turma.monitoresIds.map(monitorId => {
-                            const pName = professores.find(p => p.id === monitorId)?.nome;
-                            return pName ? (
-                              <span key={monitorId} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                                {pName}
-                              </span>
-                            ) : null;
-                          })}
+          <div className="space-y-4">
+            {/* Visualização Mobile: Cards */}
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+              {turmas.map((turma) => (
+                <Card key={turma.id} className="overflow-hidden border-border/60 shadow-sm">
+                  <CardContent className="p-4 space-y-3">
+                    {/* Linha 1: Turma | Monitores/Professores | Período */}
+                    <div className="flex justify-between items-start gap-2">
+                      <div className="flex-1">
+                        <div
+                          className="flex items-center gap-1.5 font-bold text-lg text-primary cursor-pointer"
+                          onClick={() => toggleExpand(turma.id)}
+                        >
+                          {turma.nome}
+                          {expandedTurmas[turma.id] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground italic">Sem monitores</span>
-                      )}
-
-                      {expandedTurmas[turma.id] && (
-                        <div className="mt-4 p-3 bg-muted/40 rounded-md text-sm border min-w-[250px]">
-                          <strong className="block mb-2 text-foreground/80">Professores e Componentes:</strong>
-                          {turma.componentes && turma.componentes.length > 0 ? (
-                            <ul className="list-disc list-inside space-y-1">
-                              {turma.componentes.map(d => (
-                                <li key={d.nome} className="text-muted-foreground">
-                                  <span className="font-medium text-foreground">{d.nome}:</span> {d.professorNome}
-                                </li>
-                              ))}
-                            </ul>
+                        <div className="mt-1">
+                          {turma.monitoresIds && turma.monitoresIds.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {turma.monitoresIds.map(monitorId => {
+                                const pName = professores.find(p => p.id === monitorId)?.nome;
+                                return pName ? (
+                                  <span key={monitorId} className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800">
+                                    {pName}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
                           ) : (
-                            <span className="text-muted-foreground italic">Nenhum professor/componente alocado</span>
+                            <span className="text-[10px] text-muted-foreground italic">Sem monitores</span>
                           )}
                         </div>
-                      )}
-                    </td>
-                    <td className="p-4">{turma.turno}</td>
-                    <td className="p-4">{turma.capacidade - (turma.estudantes_count || 0)}</td>
-                    <td className="p-4">{turma.estudantes_count}</td>
-                    <td className="p-4">{turma.ano}</td>
-                    <td className="p-4">
-                      <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEnturmarDialog(turma)} title="Enturmar Estudantes">
+                      </div>
+                      <div className="text-right">
+                        <span className="text-xs font-semibold px-2 py-1 bg-muted rounded-full">
+                          {turma.turno}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Detalhes Expandidos (Professores/Componentes) */}
+                    {expandedTurmas[turma.id] && (
+                      <div className="p-3 bg-muted/40 rounded-md text-xs border animate-in fade-in slide-in-from-top-1">
+                        <strong className="block mb-2 text-foreground/80">Professores e Componentes:</strong>
+                        {turma.componentes && turma.componentes.length > 0 ? (
+                          <ul className="space-y-1">
+                            {turma.componentes.map(d => (
+                              <li key={d.nome} className="text-muted-foreground">
+                                <span className="font-medium text-foreground">{d.nome}:</span> {d.professorNome}
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <span className="text-muted-foreground italic">Nenhum professor alocado</span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Linha 2: Vagas | Estudantes | Ano | Ações */}
+                    <div className="flex flex-wrap justify-between items-center gap-2 pt-3 border-t">
+                      <div className="flex gap-3 text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+                        <div>
+                          Vagas: <span className="text-foreground">{turma.capacidade - (turma.estudantes_count || 0)}</span>
+                        </div>
+                        <div>
+                          Estudantes: <span className="text-foreground">{turma.estudantes_count}</span>
+                        </div>
+                        <div>
+                          Ano: <span className="text-foreground">{turma.ano}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEnturmarDialog(turma)} title="Enturmar">
                           <Users className="h-4 w-4 text-blue-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => openAlocarDialog(turma)} title="Alocar Professores">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openAlocarDialog(turma)} title="Alocar">
                           <BookOpen className="h-4 w-4 text-green-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas Bimestrais">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas">
                           <ClipboardList className="h-4 w-4 text-yellow-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/frequencia`)} title="Frequência">
-                          <Calendar className="h-4 w-4 text-gray-500" />
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => openEdit(turma)} title="Editar Turma">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(turma)} title="Editar">
                           <Pencil className="h-4 w-4 text-orange-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => openDeleteDialog(turma)} title="Excluir Turma" className="text-destructive hover:text-destructive">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDeleteDialog(turma)} title="Excluir">
                           <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </div>
-                    </td>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Visualização Desktop: Tabela */}
+            <div className="hidden md:block border rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Turma</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Monitores/Professores</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Período</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Vagas</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Estudantes</th>
+                    <th className="text-left p-4 font-medium text-muted-foreground">Ano</th>
+                    <th className="text-right p-4 font-medium text-muted-foreground">Ações</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {turmas.map((turma) => (
+                    <tr key={turma.id} className="border-t hover:bg-muted/30">
+                      <td className="p-4">
+                        <div
+                          className="flex items-center gap-2 cursor-pointer font-medium hover:text-primary transition-colors select-none"
+                          onClick={() => toggleExpand(turma.id)}
+                        >
+                          {turma.nome}
+                          {expandedTurmas[turma.id] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        {turma.monitoresIds && turma.monitoresIds.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {turma.monitoresIds.map(monitorId => {
+                              const pName = professores.find(p => p.id === monitorId)?.nome;
+                              return pName ? (
+                                <span key={monitorId} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                                  {pName}
+                                </span>
+                              ) : null;
+                            })}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-muted-foreground italic">Sem monitores</span>
+                        )}
+
+                        {expandedTurmas[turma.id] && (
+                          <div className="mt-4 p-3 bg-muted/40 rounded-md text-sm border min-w-[250px]">
+                            <strong className="block mb-2 text-foreground/80">Professores e Componentes:</strong>
+                            {turma.componentes && turma.componentes.length > 0 ? (
+                              <ul className="list-disc list-inside space-y-1">
+                                {turma.componentes.map(d => (
+                                  <li key={d.nome} className="text-muted-foreground">
+                                    <span className="font-medium text-foreground">{d.nome}:</span> {d.professorNome}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <span className="text-muted-foreground italic">Nenhum professor/componente alocado</span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-4">{turma.turno}</td>
+                      <td className="p-4">{turma.capacidade - (turma.estudantes_count || 0)}</td>
+                      <td className="p-4">{turma.estudantes_count}</td>
+                      <td className="p-4">{turma.ano}</td>
+                      <td className="p-4">
+                        <div className="flex justify-end gap-2">
+                          <Button variant="outline" size="sm" onClick={() => openEnturmarDialog(turma)} title="Enturmar Estudantes">
+                            <Users className="h-4 w-4 text-blue-500" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => openAlocarDialog(turma)} title="Alocar Professores">
+                            <BookOpen className="h-4 w-4 text-green-500" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas Bimestrais">
+                            <ClipboardList className="h-4 w-4 text-yellow-500" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/frequencia`)} title="Frequência">
+                            <Calendar className="h-4 w-4 text-gray-500" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => openEdit(turma)} title="Editar Turma">
+                            <Pencil className="h-4 w-4 text-orange-500" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => openDeleteDialog(turma)} title="Excluir Turma" className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>

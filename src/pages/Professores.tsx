@@ -327,7 +327,7 @@ export default function Professores() {
             />
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {isAdmin && (
               <>
                 <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
@@ -347,7 +347,9 @@ export default function Professores() {
           </div>
         </div>
 
-        <DataTable columns={columns} data={professores} loading={loading} emptyMessage="Nenhum professor encontrado" />
+        <div className="mobile-safe-area">
+          <DataTable columns={columns} data={professores} loading={loading} emptyMessage="Nenhum professor encontrado" />
+        </div>
 
         {/* Dialog de Importação CSV */}
         <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>

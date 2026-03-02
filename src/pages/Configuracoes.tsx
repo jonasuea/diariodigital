@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -27,6 +27,10 @@ export default function Configuracoes() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const APP_VERSION = "0.0.4"; // VersÃ£o local atual do cÃ³digo
+
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+  const [newVersionAvailable, setNewVersionAvailable] = useState<{ version: string, notes: string } | null>(null);
 
   const [escolaConfig, setEscolaConfig] = useState({
     inep: '',
@@ -35,8 +39,8 @@ export default function Configuracoes() {
     email: 'contato@escolanome.edu.br',
     telefone: '(11) 0000-0000',
     zona: '',
-    endereco: 'Rua das Flores, 123 - São Paulo',
-    horarioFuncionamento: 'Segunda a Sexta, 7h às 18h',
+    endereco: 'Rua das Flores, 123 - SÃ£o Paulo',
+    horarioFuncionamento: 'Segunda a Sexta, 7h Ã s 18h',
   });
 
   const [instalacoes, setInstalacoes] = useState({
@@ -68,7 +72,7 @@ export default function Configuracoes() {
   });
 
   useEffect(() => {
-    // Lógica para entrar ou sair do modo de tela cheia
+    // LÃ³gica para entrar ou sair do modo de tela cheia
     const toggleFullScreen = async () => {
       if (preferencias.telaCheiaPadrao) {
         if (document.fullscreenElement === null) {
@@ -95,7 +99,7 @@ export default function Configuracoes() {
     async function loadConfig() {
       setLoading(true);
       try {
-        // Carregar configurações do sistema (preferências)
+        // Carregar configuraÃ§Ãµes do sistema (preferÃªncias)
         const configDocRef = doc(db, 'configuracoes', 'escola');
         const configDocSnap = await getDoc(configDocRef);
 
@@ -138,7 +142,7 @@ export default function Configuracoes() {
           }
         }
 
-        // Carregar perfil do usuário
+        // Carregar perfil do usuÃ¡rio
         if (user) {
           const profileDocRef = doc(db, 'profiles', user.uid);
           const profileDocSnap = await getDoc(profileDocRef);
@@ -155,7 +159,7 @@ export default function Configuracoes() {
           }
         }
       } catch (error) {
-        toast.error('Erro ao carregar configurações');
+        toast.error('Erro ao carregar configuraÃ§Ãµes');
         console.error(error);
       } finally {
         setLoading(false);
@@ -179,10 +183,10 @@ export default function Configuracoes() {
         endereco: escolaConfig.endereco,
         horario_funcionamento: escolaConfig.horarioFuncionamento
       }, { merge: true });
-      await logActivity('atualizou as informações da escola.');
-      toast.success('Informações da escola salvas com sucesso!');
+      await logActivity('atualizou as informaÃ§Ãµes da escola.');
+      toast.success('InformaÃ§Ãµes da escola salvas com sucesso!');
     } catch (error) {
-      toast.error('Erro ao salvar informações da escola');
+      toast.error('Erro ao salvar informaÃ§Ãµes da escola');
       console.error(error);
     }
   };
@@ -201,43 +205,43 @@ export default function Configuracoes() {
         secretaria: instalacoes.secretaria.toString(),
         salaProfessores: instalacoes.salaProfessores.toString(),
       }, { merge: true });
-      await logActivity('atualizou as informações das instalações da escola.');
-      toast.success('Instalações atualizadas com sucesso!');
+      await logActivity('atualizou as informaÃ§Ãµes das instalaÃ§Ãµes da escola.');
+      toast.success('InstalaÃ§Ãµes atualizadas com sucesso!');
       setIsInstalacoesOpen(false);
     } catch (error) {
-      toast.error('Erro ao salvar instalações');
+      toast.error('Erro ao salvar instalaÃ§Ãµes');
       console.error(error);
     }
   };
 
   const handleSavePreferencias = async (newPreferencias: typeof preferencias) => {
     setPreferencias(newPreferencias);
-    // Salvar no localStorage para persistência imediata no navegador
+    // Salvar no localStorage para persistÃªncia imediata no navegador
     localStorage.setItem('telaCheiaPadrao', JSON.stringify(newPreferencias.telaCheiaPadrao));
     try {
       const docRef = doc(db, 'configuracoes', 'escola');
       await setDoc(docRef, { preferencias: newPreferencias }, { merge: true });
-      await logActivity('atualizou as preferências do sistema.');
-      toast.success('Preferências salvas com sucesso!');
+      await logActivity('atualizou as preferÃªncias do sistema.');
+      toast.success('PreferÃªncias salvas com sucesso!');
     } catch (error) {
-      toast.error('Erro ao salvar preferências');
+      toast.error('Erro ao salvar preferÃªncias');
       console.error(error);
     }
   };
 
   const handleSaveProfile = async () => {
     if (profileData.novaSenha && profileData.novaSenha !== profileData.confirmarSenha) {
-      toast.error('As senhas não coincidem');
+      toast.error('As senhas nÃ£o coincidem');
       return;
     }
 
     if (!user) {
-      toast.error('Usuário não autenticado.');
+      toast.error('UsuÃ¡rio nÃ£o autenticado.');
       return;
     }
 
     try {
-      // TODO: Implementar atualização de senha usando a função do AuthContext
+      // TODO: Implementar atualizaÃ§Ã£o de senha usando a funÃ§Ã£o do AuthContext
       // if (profileData.novaSenha) { ... }
 
       const profileDocRef = doc(db, 'profiles', user.uid);
@@ -247,7 +251,7 @@ export default function Configuracoes() {
       };
       await setDoc(profileDocRef, dataToUpdate, { merge: true });
 
-      await logActivity('atualizou as informações do seu perfil.');
+      await logActivity('atualizou as informaÃ§Ãµes do seu perfil.');
       toast.success('Perfil atualizado com sucesso!');
       setIsEditProfileOpen(false);
       setProfileData(prev => ({ ...prev, novaSenha: '', confirmarSenha: '' }));
@@ -292,7 +296,7 @@ export default function Configuracoes() {
 
   const handleSyncSearchData = async () => {
     setIsSyncing(true);
-    toast.info('Iniciando a sincronização dos dados de busca. Isso pode levar alguns minutos...');
+    toast.info('Iniciando a sincronizaÃ§Ã£o dos dados de busca. Isso pode levar alguns minutos...');
 
     try {
       const collectionsToSync = ['estudantes', 'professores', 'equipe-gestora'];
@@ -326,12 +330,12 @@ export default function Configuracoes() {
       if (updatedCount > 0) {
         toast.success(`${updatedCount} registros foram atualizados com sucesso!`);
       } else {
-        toast.success('Todos os registros já estão sincronizados.');
+        toast.success('Todos os registros jÃ¡ estÃ£o sincronizados.');
       }
 
     } catch (error) {
       console.error("Erro ao sincronizar dados:", error);
-      toast.error('Ocorreu um erro durante a sincronização.');
+      toast.error('Ocorreu um erro durante a sincronizaÃ§Ã£o.');
     } finally {
       setIsSyncing(false);
     }
@@ -339,7 +343,7 @@ export default function Configuracoes() {
 
   const handleMigrateData = async () => {
     setIsMigrating(true);
-    toast.info('Iniciando a injeção do INEP "13034243" nos registros antigos. Aguarde...');
+    toast.info('Iniciando a injeÃ§Ã£o do INEP "13034243" nos registros antigos. Aguarde...');
 
     try {
       const collections = ['estudantes', 'professores', 'turmas', 'equipe_gestora', 'user_roles', 'frequencias', 'dias_letivos'];
@@ -371,10 +375,10 @@ export default function Configuracoes() {
       }
 
       toast.success(`${count} registros atualizados com o INEP 13034243!`);
-      await logActivity('executou o script de migração do tenant para 13034243.');
+      await logActivity('executou o script de migraÃ§Ã£o do tenant para 13034243.');
     } catch (error) {
       console.error("Erro ao migrar dados:", error);
-      toast.error('Ocorreu um erro durante a migração. Verifique o console.');
+      toast.error('Ocorreu um erro durante a migraÃ§Ã£o. Verifique o console.');
     } finally {
       setIsMigrating(false);
     }
@@ -382,7 +386,7 @@ export default function Configuracoes() {
 
   const handleLimparTransferidos = async () => {
     const confirmado = window.confirm(
-      'Isso irá limpar o escola_id de todos os estudantes com status "Transferido" que ainda possuem uma escola vinculada, tornando-os disponíveis para rematrícula em qualquer unidade. Deseja continuar?'
+      'Isso irÃ¡ limpar o escola_id de todos os estudantes com status "Transferido" que ainda possuem uma escola vinculada, tornando-os disponÃ­veis para rematrÃ­cula em qualquer unidade. Deseja continuar?'
     );
     if (!confirmado) return;
 
@@ -400,7 +404,7 @@ export default function Configuracoes() {
 
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as any;
-        // Apenas limpa os que têm uma escola vinculada (não-vazia)
+        // Apenas limpa os que tÃªm uma escola vinculada (nÃ£o-vazia)
         if (data.escola_id && data.escola_id !== '') {
           batch.update(docSnap.ref, { escola_id: '', turma_id: null });
           opsInBatch++;
@@ -430,7 +434,7 @@ export default function Configuracoes() {
 
   const handleCriarUsuariosFaltantes = async () => {
     const confirmado = window.confirm(
-      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃO sejam um usuário terão um usuário criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vários minutos. Você tem certeza que quer rodar isso?'
+      'Isso irÃ¡ checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃƒO sejam um usuÃ¡rio terÃ£o um usuÃ¡rio criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vÃ¡rios minutos. VocÃª tem certeza que quer rodar isso?'
     );
     if (!confirmado) return;
 
@@ -438,11 +442,11 @@ export default function Configuracoes() {
     toast.info('Buscando cadastros e criando acessos no Firebase... Pode demorar.');
 
     try {
-      // Importações dinâmicas necessárias para criar Secondary App no Firebase Auth
+      // ImportaÃ§Ãµes dinÃ¢micas necessÃ¡rias para criar Secondary App no Firebase Auth
       const { initializeApp, getApps } = await import('firebase/app');
       const { getAuth, createUserWithEmailAndPassword } = await import('firebase/auth');
 
-      // Configuração copiada do environment
+      // ConfiguraÃ§Ã£o copiada do environment
       const firebaseConfig = {
         apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
         authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -452,7 +456,7 @@ export default function Configuracoes() {
         appId: import.meta.env.VITE_FIREBASE_APP_ID,
       };
 
-      // Inicia um app secundário para não deslogar o admin atual ()
+      // Inicia um app secundÃ¡rio para nÃ£o deslogar o admin atual ()
       const apps = getApps();
       const secondaryApp = apps.find(app => app.name === 'SecondaryApp') || initializeApp(firebaseConfig, 'SecondaryApp');
       const secondaryAuth = getAuth(secondaryApp);
@@ -483,10 +487,10 @@ export default function Configuracoes() {
           if (email && typeof email === 'string' && email.trim() !== '' && email.includes('@')) {
             const emailLower = email.trim().toLowerCase();
 
-            // Apenas tentaremos criar se não tiver um profile correspondente
+            // Apenas tentaremos criar se nÃ£o tiver um profile correspondente
             if (!existingEmails.has(emailLower)) {
               try {
-                // 1. Cria usuário no Firebase Auth (Auth UI vai logar este usuário localmente no SecondaryAuth)
+                // 1. Cria usuÃ¡rio no Firebase Auth (Auth UI vai logar este usuÃ¡rio localmente no SecondaryAuth)
                 const userCredential = await createUserWithEmailAndPassword(secondaryAuth, emailLower, "EDUCAFACIL2026");
                 const authUid = userCredential.user.uid;
                 existingEmails.add(emailLower);
@@ -518,16 +522,16 @@ export default function Configuracoes() {
                 const originalRef = doc(db, colInfo.name, id);
                 batch.update(originalRef, { usuario_id: authUid });
 
-                // 4. Salva a transação
+                // 4. Salva a transaÃ§Ã£o
                 await batch.commit();
                 createdCount++;
 
-                // Delay curto para evitar bater rate limits muito rápido do Firebase Auth
+                // Delay curto para evitar bater rate limits muito rÃ¡pido do Firebase Auth
                 await new Promise(resolve => setTimeout(resolve, 300));
               } catch (err: any) {
                 console.error(`Erro ao criar Firebase Auth para ${emailLower}:`, err);
                 if (err.code === 'auth/email-already-in-use') {
-                  // Se o auth já existe lá, mas não está no profiles, a gente registra no set pra pular
+                  // Se o auth jÃ¡ existe lÃ¡, mas nÃ£o estÃ¡ no profiles, a gente registra no set pra pular
                   existingEmails.add(emailLower);
                 }
                 errorCount++;
@@ -539,25 +543,61 @@ export default function Configuracoes() {
 
       // Finaliza processo
       if (createdCount > 0) {
-        toast.success(`${createdCount} novos usuários e senhas foram gerados no Firebase Auth!`);
-        await logActivity(`gerou ${createdCount} usuários no Firebase Authentication em lote.`);
+        toast.success(`${createdCount} novos usuÃ¡rios e senhas foram gerados no Firebase Auth!`);
+        await logActivity(`gerou ${createdCount} usuÃ¡rios no Firebase Authentication em lote.`);
       } else if (errorCount === 0) {
-        toast.info("Não havia nenhum usuário novo pendente com e-mail válido para criar.");
+        toast.info("NÃ£o havia nenhum usuÃ¡rio novo pendente com e-mail vÃ¡lido para criar.");
       } else {
-        toast.warning(`Terminou com ${errorCount} falhas de criação. Observe o console.`);
+        toast.warning(`Terminou com ${errorCount} falhas de criaÃ§Ã£o. Observe o console.`);
       }
 
     } catch (error) {
-      console.error('Erro na geração de usuários faltantes:', error);
+      console.error('Erro na geraÃ§Ã£o de usuÃ¡rios faltantes:', error);
       toast.error('Falha ao rodar o script (Verifique o console).');
     } finally {
       setIsMigrating(false);
     }
   };
 
+  const handleCheckUpdate = async () => {
+    setIsCheckingUpdate(true);
+    try {
+      const response = await fetch(`/version.json?t=${Date.now()}`);
+      if (!response.ok) throw new Error('NÃ£o foi possÃ­vel buscar a versÃ£o');
+      const data = await response.json();
+
+      if (data.version !== APP_VERSION) {
+        setNewVersionAvailable({ version: data.version, notes: data.notes });
+        toast.info(`Nova versÃ£o ${data.version} disponÃ­vel!`);
+      } else {
+        toast.success('Seu sistema jÃ¡ estÃ¡ atualizado.');
+        setNewVersionAvailable(null);
+      }
+    } catch (error) {
+      console.error('Erro ao verificar atualizaÃ§Ã£o:', error);
+      toast.error('Erro ao verificar atualizaÃ§Ãµes.');
+    } finally {
+      setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    toast.info('Limpando cache e atualizando... Aguarde.');
+    try {
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro ao limpar cache:', error);
+      window.location.reload();
+    }
+  };
+
   if (loading) {
     return (
-      <AppLayout title="Configurações">
+      <AppLayout title="ConfiguraÃ§Ãµes">
         <div className="flex justify-center items-center h-64">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -566,17 +606,17 @@ export default function Configuracoes() {
   }
 
   return (
-    <AppLayout title="Configurações">
+    <AppLayout title="ConfiguraÃ§Ãµes">
       <div className="space-y-6 animate-fade-in">
-        <p className="text-muted-foreground -mt-2">Gerencie as configurações do sistema</p>
+        <p className="text-muted-foreground -mt-2">Gerencie as configuraÃ§Ãµes do sistema</p>
 
         <div className="grid gap-6 lg:grid-cols-3">
           {/* Coluna principal */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Informações da Escola */}
+            {/* InformaÃ§Ãµes da Escola */}
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Informações da Escola</CardTitle>
+                <CardTitle className="text-lg font-semibold">InformaÃ§Ãµes da Escola</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -603,7 +643,7 @@ export default function Configuracoes() {
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Decreto de Criação</Label>
+                    <Label className="text-xs text-muted-foreground">Decreto de CriaÃ§Ã£o</Label>
                     <div className="flex items-center gap-2">
                       <Loader2 className="h-4 w-4 text-muted-foreground invisible" /> {/* Placeholder for consistent alignment */}
                       <Input
@@ -646,14 +686,14 @@ export default function Configuracoes() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Urbana">Urbana</SelectItem>
-                          <SelectItem value="Rural - Várzea">Rural - Várzea</SelectItem>
+                          <SelectItem value="Rural - VÃ¡rzea">Rural - VÃ¡rzea</SelectItem>
                           <SelectItem value="Rural - Terra Firme">Rural - Terra Firme</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Endereço</Label>
+                    <Label className="text-xs text-muted-foreground">EndereÃ§o</Label>
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <Input
@@ -665,7 +705,7 @@ export default function Configuracoes() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Horário de Funcionamento</Label>
+                  <Label className="text-xs text-muted-foreground">HorÃ¡rio de Funcionamento</Label>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <Input
@@ -676,19 +716,19 @@ export default function Configuracoes() {
                   </div>
                 </div>
                 <Button onClick={handleSaveEscola} className="mt-2">
-                  Salvar Alterações
+                  Salvar AlteraÃ§Ãµes
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Instalações da Escola */}
+            {/* InstalaÃ§Ãµes da Escola */}
             <Card>
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold">Instalações da Escola</CardTitle>
+                  <CardTitle className="text-lg font-semibold">InstalaÃ§Ãµes da Escola</CardTitle>
                   <Button variant="outline" size="sm" onClick={() => setIsInstalacoesOpen(true)}>
                     <Building className="h-4 w-4 mr-2" />
-                    Gerenciar Instalações
+                    Gerenciar InstalaÃ§Ãµes
                   </Button>
                 </div>
               </CardHeader>
@@ -702,7 +742,7 @@ export default function Configuracoes() {
                   </Card>
                   <Card className="bg-muted/50">
                     <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Laboratórios</p>
+                      <p className="text-sm text-muted-foreground">LaboratÃ³rios</p>
                       <p className="text-2xl font-bold">{instalacoes.laboratorios}</p>
                     </CardContent>
                   </Card>
@@ -734,19 +774,19 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
 
-            {/* Preferências do Sistema */}
+            {/* PreferÃªncias do Sistema */}
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Preferências do Sistema</CardTitle>
+                <CardTitle className="text-lg font-semibold">PreferÃªncias do Sistema</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-start gap-3">
                     <Bell className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Notificações</p>
+                      <p className="font-medium">NotificaÃ§Ãµes</p>
                       <p className="text-sm text-muted-foreground">
-                        Receber notificações de eventos e atividades
+                        Receber notificaÃ§Ãµes de eventos e atividades
                       </p>
                     </div>
                   </div>
@@ -759,9 +799,9 @@ export default function Configuracoes() {
                   <div className="flex items-start gap-3">
                     <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
-                      <p className="font-medium">Autenticação em Dois Fatores</p>
+                      <p className="font-medium">AutenticaÃ§Ã£o em Dois Fatores</p>
                       <p className="text-sm text-muted-foreground">
-                        Aumenta a segurança da sua conta
+                        Aumenta a seguranÃ§a da sua conta
                       </p>
                     </div>
                   </div>
@@ -776,7 +816,7 @@ export default function Configuracoes() {
                     <div>
                       <p className="font-medium">Navegador em Tela Cheia</p>
                       <p className="text-sm text-muted-foreground">
-                        O sistema sempre iniciará em modo de tela cheia
+                        O sistema sempre iniciarÃ¡ em modo de tela cheia
                       </p>
                     </div>
                   </div>
@@ -792,10 +832,10 @@ export default function Configuracoes() {
           {/* Sidebar direita */}
           <div className="space-y-6">
 
-            {/* Informações da Conta */}
+            {/* InformaÃ§Ãµes da Conta */}
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Informações da Conta</CardTitle>
+                <CardTitle className="text-lg font-semibold">InformaÃ§Ãµes da Conta</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col items-center text-center">
                 <div className="relative group mb-4">
@@ -829,31 +869,57 @@ export default function Configuracoes() {
               </CardContent>
             </Card>
 
-            {/* Versão do Sistema */}
+            {/* Sistema e VersÃ£o */}
             <Card>
               <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Versão do Sistema</CardTitle>
+                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                  <Wrench className="h-5 w-5" /> VersÃ£o do Sistema
+                </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Versão Atual</span>
-                  <span className="font-medium">1.0.0</span>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between border-b pb-4">
+                  <div>
+                    <p className="font-medium">VersÃ£o do App</p>
+                    <p className="text-sm text-muted-foreground">VersÃ£o Local: v{APP_VERSION}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCheckUpdate}
+                    disabled={isCheckingUpdate}
+                  >
+                    {isCheckingUpdate ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Verificando...
+                      </>
+                    ) : 'Verificar AtualizaÃ§Ãµes'}
+                  </Button>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Última Atualização</span>
-                  <span className="font-medium">30/06/2023</span>
-                </div>
-                <Button variant="outline" className="w-full mt-2">
-                  Verificar Atualizações
-                </Button>
+
+                {newVersionAvailable && (
+                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="font-bold text-primary">Nova VersÃ£o DisponÃ­vel: v{newVersionAvailable.version}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
+                      </div>
+                      <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground italic">
+                      Nota: A atualizaÃ§Ã£o irÃ¡ limpar o cache local e recarregar a pÃ¡gina. Seus dados no Firebase nÃ£o serÃ£o afetados.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Manutenção do Sistema */}
+            {/* ManutenÃ§Ã£o do Sistema */}
             {role === 'admin' && (
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">Manutenção do Sistema</CardTitle>
+                  <CardTitle className="text-lg font-semibold">ManutenÃ§Ã£o do Sistema</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -861,9 +927,9 @@ export default function Configuracoes() {
                       <div className="flex items-start gap-3">
                         <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">Modo de Manutenção</p>
+                          <p className="font-medium">Modo de ManutenÃ§Ã£o</p>
                           <p className="text-sm text-muted-foreground">
-                            Sistema disponível apenas para administradores
+                            Sistema disponÃ­vel apenas para administradores
                           </p>
                         </div>
                       </div>
@@ -874,7 +940,7 @@ export default function Configuracoes() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-2 mt-4">
-                        Se a busca por nome não encontrar registros antigos, clique no botão abaixo para sincronizar os dados.
+                        Se a busca por nome nÃ£o encontrar registros antigos, clique no botÃ£o abaixo para sincronizar os dados.
                       </p>
                       <Button
                         className="w-full"
@@ -928,7 +994,7 @@ export default function Configuracoes() {
                         ) : (
                           <UserCog className="h-4 w-4 mr-2" />
                         )}
-                        {isMigrating ? 'Criando usuários...' : 'Criar Usuários a partir de Cadastros (E-mail)'}
+                        {isMigrating ? 'Criando usuÃ¡rios...' : 'Criar UsuÃ¡rios a partir de Cadastros (E-mail)'}
                       </Button>
                     </div>
                   </div>
@@ -944,7 +1010,7 @@ export default function Configuracoes() {
             <DialogHeader>
               <DialogTitle>Editar Perfil</DialogTitle>
               <DialogDescription>
-                Atualize suas informações pessoais abaixo.
+                Atualize suas informaÃ§Ãµes pessoais abaixo.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
@@ -1002,7 +1068,7 @@ export default function Configuracoes() {
                 <Input
                   id="profile-senha"
                   type="password"
-                  placeholder="Deixe em branco para não alterar"
+                  placeholder="Deixe em branco para nÃ£o alterar"
                   value={profileData.novaSenha}
                   onChange={(e) => setProfileData({ ...profileData, novaSenha: e.target.value })}
                 />
@@ -1022,18 +1088,18 @@ export default function Configuracoes() {
                   Cancelar
                 </Button>
                 <Button onClick={handleSaveProfile}>
-                  Salvar Alterações
+                  Salvar AlteraÃ§Ãµes
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Dialog Gerenciar Instalações */}
+        {/* Dialog Gerenciar InstalaÃ§Ãµes */}
         <Dialog open={isInstalacoesOpen} onOpenChange={setIsInstalacoesOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Gerenciar Instalações da Escola</DialogTitle>
+              <DialogTitle>Gerenciar InstalaÃ§Ãµes da Escola</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -1046,7 +1112,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="laboratorios">Laboratórios</Label>
+                <Label htmlFor="laboratorios">LaboratÃ³rios</Label>
                 <Input
                   id="laboratorios"
                   type="number"
@@ -1114,7 +1180,7 @@ export default function Configuracoes() {
                 Cancelar
               </Button>
               <Button onClick={handleSaveInstalacoes}>
-                Salvar Alterações
+                Salvar AlteraÃ§Ãµes
               </Button>
             </div>
           </DialogContent>

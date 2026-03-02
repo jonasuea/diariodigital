@@ -13,6 +13,8 @@ import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import { logActivity } from '@/lib/logger';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 interface Escola {
     id: string;
@@ -202,25 +204,37 @@ export default function Escolas() {
                     </Button>
                 </div>
 
-                <div className="flex items-center gap-2 mb-4">
+                <div className="flex flex-wrap items-center gap-2 mb-6">
                     <div className="relative flex-1 max-w-sm">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Buscar escolas..."
-                            className="pl-8"
+                            className="pl-10 h-11 md:h-10"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
                 </div>
 
-                <div className="border rounded-lg bg-white">
+                <div className="mobile-safe-area">
                     <DataTable
                         columns={columns}
                         data={escolas}
                         loading={loading}
                         emptyMessage="Nenhuma escola encontrada"
+                        mobileTitleKey="nome"
+                        mobileSubtitleKey="inep"
                     />
+                </div>
+
+                {/* FAB for Nova Escola on Mobile */}
+                <div className="md:hidden fixed bottom-6 right-6 z-50">
+                    <Button
+                        onClick={() => navigate('/escolas/nova')}
+                        className="h-14 w-14 rounded-full shadow-2xl bg-blue-600 hover:bg-blue-700 flex items-center justify-center p-0"
+                    >
+                        <Plus className="h-7 w-7" />
+                    </Button>
                 </div>
 
                 <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>

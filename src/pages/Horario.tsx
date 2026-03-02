@@ -153,7 +153,7 @@ export default function Horario() {
 
   async function handleDelete(horario: Horario) {
     if (!confirm('Deseja realmente excluir este horário?')) return;
-    
+
     try {
       const docRef = doc(db, 'horarios', horario.id);
       await deleteDoc(docRef);
@@ -193,9 +193,9 @@ export default function Horario() {
 
   return (
     <AppLayout title="Horário">
-      <div className="flex gap-6 animate-fade-in">
+      <div className="flex flex-col md:flex-row gap-6 animate-fade-in">
         {/* Sidebar com turmas */}
-        <div className="w-64 flex-shrink-0">
+        <div className="w-full md:w-64 flex-shrink-0">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base">Turmas</CardTitle>
@@ -230,8 +230,10 @@ export default function Horario() {
         <div className="flex-1">
           {selectedTurma ? (
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-4">
-                <CardTitle>Horário da {selectedTurma.nome}</CardTitle>
+              <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4">
+                <CardTitle className="text-xl md:text-2xl font-bold leading-tight">
+                  Horário da {selectedTurma.nome}
+                </CardTitle>
                 <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
                   <DialogTrigger asChild>
                     <Button size="sm">
@@ -336,7 +338,7 @@ export default function Horario() {
                     <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
                   </div>
                 ) : (
-                  <div className="grid grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     {DIAS.map((dia) => (
                       <div key={dia.value} className="space-y-2">
                         <h4 className="font-semibold text-center text-sm py-2 bg-muted rounded-lg">

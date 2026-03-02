@@ -98,11 +98,25 @@
 @layer base {
   * {
     @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html,
+  body {
+    max-width: 100vw;
+    overflow-x: hidden;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px;
+  }
+
+  @screen md {
+    body {
+      font-size: 16px;
+    }
   }
 }
 
@@ -168,6 +182,29 @@
     .no-print {
       display: none !important;
     }
+  }
+
+  /* Responsive Utilities */
+  .mobile-safe-area {
+    @apply px-4 pb-20 md:px-0 md:pb-0;
+  }
+
+  .premium-card-list {
+    @apply grid gap-4 md:block;
+  }
+
+  /* DataTable Mobile Overrides */
+  .md\:hidden .card-action-button {
+    @apply h-11 w-11 rounded-full flex items-center justify-center;
+  }
+
+  /* Compact Forms */
+  .form-group-compact {
+    @apply space-y-1.5 md:space-y-2;
+  }
+
+  .form-label-compact {
+    @apply text-xs font-semibold text-muted-foreground mb-1 block md:text-sm;
   }
 }
 

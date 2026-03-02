@@ -349,14 +349,14 @@ export default function Painel() {
         <div className="grid gap-6 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <Tabs defaultValue="frequencia" onValueChange={setActiveChartTab}>
-              <div className="flex flex-row items-center justify-between px-6 pt-6 pb-4">
-                <TabsList>
-                  <TabsTrigger value="frequencia">Frequência Geral</TabsTrigger>
-                  <TabsTrigger value="notas">Notas Bimestrais</TabsTrigger>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 pt-6 pb-4 gap-4">
+                <TabsList className="w-full sm:w-auto">
+                  <TabsTrigger value="frequencia" className="flex-1 sm:flex-none">Frequência Geral</TabsTrigger>
+                  <TabsTrigger value="notas" className="flex-1 sm:flex-none">Notas Bimestrais</TabsTrigger>
                 </TabsList>
                 {activeChartTab === 'frequencia' && (
                   <Select value={periodoFrequencia} onValueChange={setPeriodoFrequencia}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-full sm:w-[150px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -424,10 +424,10 @@ export default function Painel() {
                 <div className="space-y-3">
                   {proximosEventos.length > 0 ? (
                     proximosEventos.map(evento => (
-                      <div key={evento.id} className="flex items-start gap-2">
-                        <div className="flex-shrink-0 text-center font-semibold bg-muted p-1.0 rounded-md w-5">
-                          <div className="text-xs uppercase text-red-500">{format(evento.data.toDate(), 'MMM', { locale: ptBR })}</div>
-                          <div className="text-lg">{format(evento.data.toDate(), 'dd')}</div>
+                      <div key={evento.id} className="flex items-start gap-3">
+                        <div className="flex-shrink-0 text-center font-semibold bg-muted p-2 rounded-lg min-w-[56px]">
+                          <div className="text-[10px] uppercase text-red-500 font-bold">{format(evento.data.toDate(), 'MMM', { locale: ptBR })}</div>
+                          <div className="text-xl">{format(evento.data.toDate(), 'dd')}</div>
                         </div>
                         <div className="flex-1">
                           <p className="text-sm font-semibold leading-tight">{evento.titulo}</p>

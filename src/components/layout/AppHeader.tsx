@@ -208,7 +208,7 @@ export function AppHeader({ title }: AppHeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-card px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-card px-3 md:px-6">
       {isMobile && (
         <Button
           variant="ghost"
@@ -221,7 +221,7 @@ export function AppHeader({ title }: AppHeaderProps) {
       )}
 
       {title && (
-        <h1 className="text-xl font-semibold text-foreground hidden sm:block">
+        <h1 className="text-lg md:text-xl font-bold text-foreground truncate max-w-[120px] sm:max-w-none">
           {title}
         </h1>
       )}
@@ -294,12 +294,12 @@ export function AppHeader({ title }: AppHeaderProps) {
 
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
         <PopoverTrigger asChild>
-          <div className="relative">
+          <div className="relative flex-1 max-w-[12rem] sm:max-w-none md:max-w-[32rem]">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
-              placeholder="Buscar pessoas..."
-              className="w-40 sm:w-64 lg:w-[32rem] pl-9 bg-secondary border-0 transition-all"
+              placeholder="Buscar..."
+              className="w-full pl-9 bg-secondary border-0 transition-all h-9"
               value={searchQuery}
               onChange={handleSearchChange}
               onFocus={() => {

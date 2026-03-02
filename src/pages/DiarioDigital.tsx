@@ -4,7 +4,8 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { Users, BookOpen, ClipboardList, GraduationCap } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Users, BookOpen, ClipboardList, GraduationCap, Filter } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -235,58 +236,70 @@ export default function DiarioDigital() {
       <div className="space-y-6 animate-fade-in">
         <p className="text-muted-foreground -mt-2">Gestão pedagógica completa</p>
 
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 mb-6">
-              <GraduationCap className="h-5 w-5 text-primary" />
-              <h3 className="font-semibold">Filtros do Diário</h3>
-            </div>
+        <Card className="overflow-hidden border-border/60 shadow-sm">
+          <CardContent className="p-0">
+            <Accordion type="single" collapsible defaultValue={!selectedTurmaId ? "filters" : undefined} className="w-full">
+              <AccordionItem value="filters" className="border-none">
+                <AccordionTrigger className="px-5 py-4 hover:no-underline">
+                  <div className="flex items-center gap-2.5">
+                    <Filter className="h-4 w-4 text-primary" />
+                    <h3 className="font-bold text-sm text-foreground">Filtros do Diário</h3>
+                    {selectedTurmaId && (
+                      <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                        Ativo
+                      </span>
+                    )}
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="px-5 pb-6">
+                  <div className={`grid grid-cols-1 ${isGestor ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 md:gap-6`}>
+                    {isGestor && (
+                      <div className="form-group-compact">
+                        <Label className="form-label-compact">Professor</Label>
+                        <Select value={selectedProfessorId} onValueChange={setSelectedProfessorId}>
+                          <SelectTrigger className="h-10">
+                            <SelectValue placeholder="Selecione um professor" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {professores.map((prof) => (
+                              <SelectItem key={prof.id} value={prof.id}>{prof.nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
 
-            <div className={`grid grid-cols-1 ${isGestor ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
-              {isGestor && (
-                <div className="space-y-2">
-                  <Label>Professor</Label>
-                  <Select value={selectedProfessorId} onValueChange={setSelectedProfessorId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um professor" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {professores.map((prof) => (
-                        <SelectItem key={prof.id} value={prof.id}>{prof.nome}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+                    <div className="form-group-compact">
+                      <Label className="form-label-compact">Turma</Label>
+                      <Select value={selectedTurmaId} onValueChange={setSelectedTurmaId} disabled={loading || turmas.length === 0 || (isGestor && !selectedProfessorId)}>
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder={loading ? "Carregando..." : "Selecione uma turma"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {turmas.map((turma) => (
+                            <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
 
-              <div className="space-y-2">
-                <Label>Turma</Label>
-                <Select value={selectedTurmaId} onValueChange={setSelectedTurmaId} disabled={loading || turmas.length === 0 || (isGestor && !selectedProfessorId)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={loading ? "Carregando..." : "Selecione uma turma"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {turmas.map((turma) => (
-                      <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Componente Curricular</Label>
-                <Select value={selectedComponente} onValueChange={setSelectedComponente} disabled={!selectedTurmaId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={!selectedTurmaId ? "Selecione uma turma" : "Selecione um componente"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {componentes.map((componente) => (
-                      <SelectItem key={componente.nome} value={componente.nome}>{componente.nome}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                    <div className="form-group-compact">
+                      <Label className="form-label-compact">Componente Curricular</Label>
+                      <Select value={selectedComponente} onValueChange={setSelectedComponente} disabled={!selectedTurmaId}>
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder={!selectedTurmaId ? "Selecione uma turma" : "Selecione um componente"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {componentes.map((componente) => (
+                            <SelectItem key={componente.nome} value={componente.nome}>{componente.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </CardContent>
         </Card>
 

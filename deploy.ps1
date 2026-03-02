@@ -9,6 +9,32 @@ param(
     [string]$notes = ""  # Notas opcionais da release
 )
 
+# --- NOVO: ATUALIZAR ARQUIVOS DE VERSÃO AUTOMATICAMENTE ---
+
+# Extrai apenas os números da versão (ex: v0.0.3 -> 0.0.3)
+$versionNumber = $m -replace '^v', ""
+$currentDate = Get-Date -Format "yyyy-MM-dd"
+$defaultNotes = if ($notes -ne "") { $notes } else { "Atualização do sistema." }
+
+Write-Host "Atualizando arquivos de versão para v$versionNumber..." -ForegroundColor Cyan
+
+# 1. Atualizar public/version.json
+$versionJsonPath = "e:\Projetos_App\educafacil\public\version.json"
+$newJson = @{
+    version     = $versionNumber
+    releaseDate = $currentDate
+    notes       = $defaultNotes
+} | ConvertTo-Json
+$newJson | Out-File -FilePath $versionJsonPath -Encoding utf8
+
+# 2. Atualizar src/pages/Configuracoes.tsx
+$configPath = "e:\Projetos_App\educafacil\src\pages\Configuracoes.tsx"
+$configContent = Get-Content $configPath
+$newConfigContent = $configContent -replace 'const APP_VERSION = ".*"; // Versão local atual do código', "const APP_VERSION = `"$versionNumber`"; // Versão local atual do código"
+$newConfigContent | Out-File -FilePath $configPath -Encoding utf8
+
+Write-Host "Arquivos de versão atualizados com sucesso!" -ForegroundColor Cyan
+
 # --- PASSO 1: ATUALIZAR O GITHUB ---
 
 Write-Host "Adicionando todos os arquivos modificados ao Git..." -ForegroundColor Green
