@@ -810,8 +810,8 @@ export default function NovoEstudante() {
                     <Input placeholder="Telefone do estudante" value={formData.contato} onChange={(e) => handleChange('contato', e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input type="email" placeholder="Email do estudante" value={formData.email} onChange={(e) => handleChange('email', e.target.value)} />
+                    <Label>E-mail</Label>
+                    <Input type="email" placeholder="E-mail do estudante" value={formData.email} onChange={(e) => handleChange('email', e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -949,8 +949,8 @@ export default function NovoEstudante() {
                     <Input placeholder="Nome completo da mãe" value={formData.mae_nome} onChange={(e) => handleChange('mae_nome', e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input type="email" placeholder="Email da mãe" value={formData.mae_email} onChange={(e) => handleChange('mae_email', e.target.value)} />
+                    <Label>E-mail</Label>
+                    <Input type="email" placeholder="E-mail da mãe" value={formData.mae_email} onChange={(e) => handleChange('mae_email', e.target.value)} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -978,8 +978,8 @@ export default function NovoEstudante() {
                     <Input placeholder="Nome completo do pai" value={formData.pai_nome} onChange={(e) => handleChange('pai_nome', e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input type="email" placeholder="Email do pai" value={formData.pai_email} onChange={(e) => handleChange('pai_email', e.target.value)} />
+                    <Label>E-mail</Label>
+                    <Input type="email" placeholder="E-mail do pai" value={formData.pai_email} onChange={(e) => handleChange('pai_email', e.target.value)} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1018,8 +1018,8 @@ export default function NovoEstudante() {
                     <Input placeholder="Nome completo do responsável" value={formData.responsavel_nome} onChange={(e) => handleChange('responsavel_nome', e.target.value)} />
                   </div>
                   <div className="space-y-2">
-                    <Label>Email</Label>
-                    <Input type="email" placeholder="Email do responsável" value={formData.responsavel_email} onChange={(e) => handleChange('responsavel_email', e.target.value)} />
+                    <Label>E-mail</Label>
+                    <Input type="email" placeholder="E-mail do responsável" value={formData.responsavel_email} onChange={(e) => handleChange('responsavel_email', e.target.value)} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

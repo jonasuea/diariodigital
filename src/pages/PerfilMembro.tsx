@@ -168,7 +168,7 @@ export default function PerfilMembro() {
               </div>
 
               <div className="w-full mt-6 pt-6 border-t space-y-4 text-left">
-                <InfoItem icon={Mail} label="Email" value={membro.email} />
+                <InfoItem icon={Mail} label="E-mail" value={membro.email} />
                 <InfoItem icon={Phone} label="Telefone" value={membro.telefone} />
                 <InfoItem icon={FileText} label="CPF" value={membro.cpf} />
                 <InfoItem icon={FileText} label="RG" value={membro.rg} />

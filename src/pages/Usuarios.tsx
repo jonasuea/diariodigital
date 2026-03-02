@@ -105,7 +105,7 @@ export default function Usuarios() {
     try {
       await sendPasswordResetEmail(auth, email);
       await logActivity(`solicitou a redefinição de senha para o e-mail "${email}".`);
-      toast.success(`Email de reset enviado para ${email}`);
+      toast.success(`E-mail de reset enviado para ${email}`);
     } catch (error) {
       console.error('Erro ao enviar reset:', error);
       toast.error('Erro ao enviar email de reset');

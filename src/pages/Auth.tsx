@@ -5,7 +5,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GraduationCap, Loader2 } from 'lucide-react';
+import { GraduationCap, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -18,6 +18,7 @@ export default function Auth() {
   const [nome, setNome] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [estudanteId, setEstudanteId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const { role, loading: loadingRole } = useUserRole();
 
@@ -93,7 +94,7 @@ export default function Auth() {
               duration: 6000,
             });
           } else if (error.message.includes('Invalid login credentials')) {
-            toast.error('Email ou senha incorretos');
+            toast.error('E-mail ou senha incorretos');
           } else {
             toast.error('Erro ao fazer login: ' + error.message);
           }
@@ -155,7 +156,7 @@ export default function Auth() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
                 type="email"
@@ -169,16 +170,30 @@ export default function Auth() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
-                className="h-12"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  className="h-12 pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? "Esconder senha" : "Mostrar senha"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
             </div>
 
             <Button
@@ -203,7 +218,7 @@ export default function Auth() {
               onClick={() => setIsLogin(!isLogin)}
               className="font-semibold text-primary hover:underline"
             >
-              {isLogin ? 'Criar conta' : 'Fazer login'}
+              {/*isLogin ? 'Criar conta' : 'Fazer login'*/}
             </button>
           </p>
 

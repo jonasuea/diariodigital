@@ -547,7 +547,7 @@ export default function PerfilEstudante() {
                     <div className="flex items-start gap-3">
                       <Mail className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div>
-                        <p className="text-xs font-medium text-muted-foreground">Email</p>
+                        <p className="text-xs font-medium text-muted-foreground">E-mail</p>
                         <p className="font-medium text-sm">{estudante.email || 'Não informado'}</p>
                       </div>
                     </div>

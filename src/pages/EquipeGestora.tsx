@@ -288,7 +288,7 @@ export default function EquipeGestora() {
     { key: 'matricula', header: 'Matrícula' },
     {
       key: 'email',
-      header: 'Email',
+      header: 'E-mail',
       render: (m: Membro) => (
         <a href={`mailto:${m.email}`} className="text-primary hover:underline">{m.email}</a>
       )

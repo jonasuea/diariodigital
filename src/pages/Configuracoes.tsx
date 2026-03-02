@@ -205,11 +205,11 @@ export default function Configuracoes() {
         secretaria: instalacoes.secretaria.toString(),
         salaProfessores: instalacoes.salaProfessores.toString(),
       }, { merge: true });
-      await logActivity('atualizou as informações das instalaÃ§Ãµes da escola.');
+      await logActivity('atualizou as informações das instalaçÃµes da escola.');
       toast.success('Instalações atualizadas com sucesso!');
       setIsInstalacoesOpen(false);
     } catch (error) {
-      toast.error('Erro ao salvar instalaÃ§Ãµes');
+      toast.error('Erro ao salvar instalaçÃµes');
       console.error(error);
     }
   };
@@ -241,7 +241,7 @@ export default function Configuracoes() {
     }
 
     try {
-      // TODO: Implementar atualizaÃ§Ã£o de senha usando a funÃ§Ã£o do AuthContext
+      // TODO: Implementar atualização de senha usando a função do AuthContext
       // if (profileData.novaSenha) { ... }
 
       const profileDocRef = doc(db, 'profiles', user.uid);
@@ -330,7 +330,7 @@ export default function Configuracoes() {
       if (updatedCount > 0) {
         toast.success(`${updatedCount} registros foram atualizados com sucesso!`);
       } else {
-        toast.success('Todos os registros jÃ¡ estÃ£o sincronizados.');
+        toast.success('Todos os registros já estão sincronizados.');
       }
 
     } catch (error) {
@@ -386,7 +386,7 @@ export default function Configuracoes() {
 
   const handleLimparTransferidos = async () => {
     const confirmado = window.confirm(
-      'Isso irÃ¡ limpar o escola_id de todos os estudantes com status "Transferido" que ainda possuem uma escola vinculada, tornando-os disponíveis para rematrÃ­cula em qualquer unidade. Deseja continuar?'
+      'Isso irá limpar o escola_id de todos os estudantes com status "Transferido" que ainda possuem uma escola vinculada, tornando-os disponíveis para rematrÃ­cula em qualquer unidade. Deseja continuar?'
     );
     if (!confirmado) return;
 
@@ -404,7 +404,7 @@ export default function Configuracoes() {
 
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as any;
-        // Apenas limpa os que tÃªm uma escola vinculada (nÃ£o-vazia)
+        // Apenas limpa os que tÃªm uma escola vinculada (não-vazia)
         if (data.escola_id && data.escola_id !== '') {
           batch.update(docSnap.ref, { escola_id: '', turma_id: null });
           opsInBatch++;
@@ -434,7 +434,7 @@ export default function Configuracoes() {
 
   const handleCriarUsuariosFaltantes = async () => {
     const confirmado = window.confirm(
-      'Isso irÃ¡ checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃƒO sejam um usuário terÃ£o um usuário criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vÃ¡rios minutos. VocÃª tem certeza que quer rodar isso?'
+      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃƒO sejam um usuário terão um usuário criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vários minutos. VocÃª tem certeza que quer rodar isso?'
     );
     if (!confirmado) return;
 
@@ -442,7 +442,7 @@ export default function Configuracoes() {
     toast.info('Buscando cadastros e criando acessos no Firebase... Pode demorar.');
 
     try {
-      // ImportaÃ§Ãµes dinÃ¢micas necessÃ¡rias para criar Secondary App no Firebase Auth
+      // ImportaçÃµes dinÃ¢micas necessárias para criar Secondary App no Firebase Auth
       const { initializeApp, getApps } = await import('firebase/app');
       const { getAuth, createUserWithEmailAndPassword } = await import('firebase/auth');
 
@@ -456,7 +456,7 @@ export default function Configuracoes() {
         appId: import.meta.env.VITE_FIREBASE_APP_ID,
       };
 
-      // Inicia um app secundÃ¡rio para nÃ£o deslogar o admin atual ()
+      // Inicia um app secundário para não deslogar o admin atual ()
       const apps = getApps();
       const secondaryApp = apps.find(app => app.name === 'SecondaryApp') || initializeApp(firebaseConfig, 'SecondaryApp');
       const secondaryAuth = getAuth(secondaryApp);
@@ -487,7 +487,7 @@ export default function Configuracoes() {
           if (email && typeof email === 'string' && email.trim() !== '' && email.includes('@')) {
             const emailLower = email.trim().toLowerCase();
 
-            // Apenas tentaremos criar se nÃ£o tiver um profile correspondente
+            // Apenas tentaremos criar se não tiver um profile correspondente
             if (!existingEmails.has(emailLower)) {
               try {
                 // 1. Cria usuário no Firebase Auth (Auth UI vai logar este usuário localmente no SecondaryAuth)
@@ -522,16 +522,16 @@ export default function Configuracoes() {
                 const originalRef = doc(db, colInfo.name, id);
                 batch.update(originalRef, { usuario_id: authUid });
 
-                // 4. Salva a transaÃ§Ã£o
+                // 4. Salva a transação
                 await batch.commit();
                 createdCount++;
 
-                // Delay curto para evitar bater rate limits muito rÃ¡pido do Firebase Auth
+                // Delay curto para evitar bater rate limits muito rápido do Firebase Auth
                 await new Promise(resolve => setTimeout(resolve, 300));
               } catch (err: any) {
                 console.error(`Erro ao criar Firebase Auth para ${emailLower}:`, err);
                 if (err.code === 'auth/email-already-in-use') {
-                  // Se o auth jÃ¡ existe lÃ¡, mas nÃ£o estÃ¡ no profiles, a gente registra no set pra pular
+                  // Se o auth já existe lá, mas não está no profiles, a gente registra no set pra pular
                   existingEmails.add(emailLower);
                 }
                 errorCount++;
@@ -546,9 +546,9 @@ export default function Configuracoes() {
         toast.success(`${createdCount} novos usuários e senhas foram gerados no Firebase Auth!`);
         await logActivity(`gerou ${createdCount} usuários no Firebase Authentication em lote.`);
       } else if (errorCount === 0) {
-        toast.info("NÃ£o havia nenhum usuário novo pendente com e-mail vÃ¡lido para criar.");
+        toast.info("Não havia nenhum usuário novo pendente com e-mail válido para criar.");
       } else {
-        toast.warning(`Terminou com ${errorCount} falhas de criaÃ§Ã£o. Observe o console.`);
+        toast.warning(`Terminou com ${errorCount} falhas de criação. Observe o console.`);
       }
 
     } catch (error) {
@@ -563,7 +563,7 @@ export default function Configuracoes() {
     setIsCheckingUpdate(true);
     try {
       const response = await fetch(`/version.json?t=${Date.now()}`);
-      if (!response.ok) throw new Error('NÃ£o foi possÃ­vel buscar a versÃ£o');
+      if (!response.ok) throw new Error('Não foi possÃ­vel buscar a versão');
       const data = await response.json();
 
       if (data.version !== APP_VERSION) {
@@ -686,14 +686,14 @@ export default function Configuracoes() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="Urbana">Urbana</SelectItem>
-                          <SelectItem value="Rural - VÃ¡rzea">Rural - VÃ¡rzea</SelectItem>
+                          <SelectItem value="Rural - Várzea">Rural - Várzea</SelectItem>
                           <SelectItem value="Rural - Terra Firme">Rural - Terra Firme</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">EndereÃ§o</Label>
+                    <Label className="text-xs text-muted-foreground">Endereço</Label>
                     <div className="flex items-center gap-2">
                       <MapPin className="h-4 w-4 text-muted-foreground" />
                       <Input
@@ -705,7 +705,7 @@ export default function Configuracoes() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">HorÃ¡rio de Funcionamento</Label>
+                  <Label className="text-xs text-muted-foreground">Horário de Funcionamento</Label>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-muted-foreground" />
                     <Input
@@ -742,7 +742,7 @@ export default function Configuracoes() {
                   </Card>
                   <Card className="bg-muted/50">
                     <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">LaboratÃ³rios</p>
+                      <p className="text-sm text-muted-foreground">Laboratórios</p>
                       <p className="text-2xl font-bold">{instalacoes.laboratorios}</p>
                     </CardContent>
                   </Card>
@@ -901,25 +901,25 @@ export default function Configuracoes() {
                   <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <p className="font-bold text-primary">Nova VersÃ£o DisponÃ­vel: v{newVersionAvailable.version}</p>
+                        <p className="font-bold text-primary">Nova Versão Disponí­vel: v{newVersionAvailable.version}</p>
                         <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
                       </div>
                       <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
                       </Button>
                     </div>
                     <p className="text-[10px] text-muted-foreground italic">
-                      Nota: A atualizaÃ§Ã£o irÃ¡ limpar o cache local e recarregar a página. Seus dados no Firebase nÃ£o serÃ£o afetados.
+                      Nota: A atualização irá limpar o cache local e recarregar a página. Seus dados no Firebase não serão afetados.
                     </p>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* ManutenÃ§Ã£o do Sistema */}
+            {/* Manutenção do Sistema */}
             {role === 'admin' && (
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">ManutenÃ§Ã£o do Sistema</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Manutenção do Sistema</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -927,7 +927,7 @@ export default function Configuracoes() {
                       <div className="flex items-start gap-3">
                         <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">Modo de ManutenÃ§Ã£o</p>
+                          <p className="font-medium">Modo de Manutenção</p>
                           <p className="text-sm text-muted-foreground">
                             Sistema disponível apenas para administradores
                           </p>
@@ -940,7 +940,7 @@ export default function Configuracoes() {
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-2 mt-4">
-                        Se a busca por nome nÃ£o encontrar registros antigos, clique no botÃ£o abaixo para sincronizar os dados.
+                        Se a busca por nome não encontrar registros antigos, clique no botão abaixo para sincronizar os dados.
                       </p>
                       <Button
                         className="w-full"
@@ -994,7 +994,7 @@ export default function Configuracoes() {
                         ) : (
                           <UserCog className="h-4 w-4 mr-2" />
                         )}
-                        {isMigrating ? 'Criando usuários...' : 'Criar UsuÃ¡rios a partir de Cadastros (E-mail)'}
+                        {isMigrating ? 'Criando usuários...' : 'Criar Usuários a partir de Cadastros (E-mail)'}
                       </Button>
                     </div>
                   </div>
@@ -1027,7 +1027,7 @@ export default function Configuracoes() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-email">Email</Label>
+                <Label htmlFor="profile-email">E-mail</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input

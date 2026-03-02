@@ -290,12 +290,12 @@ Armazena informações completas dos Estudantes matriculados.
 | `cartao_sus` | text | Não | Número do cartão SUS |
 | `vacinado_covid` | text | Não | Status vacinação COVID (default: 'Não') |
 | `mae_nome` | text | Não | Nome da mãe |
-| `mae_email` | text | Não | Email da mãe |
+| `mae_email` | text | Não | E-mail da mãe |
 | `mae_contato` | text | Não | Telefone da mãe |
 | `mae_rg` | text | Não | RG da mãe |
 | `mae_cpf` | text | Não | CPF da mãe |
 | `pai_nome` | text | Não | Nome do pai |
-| `pai_email` | text | Não | Email do pai |
+| `pai_email` | text | Não | E-mail do pai |
 | `pai_contato` | text | Não | Telefone do pai |
 | `pai_rg` | text | Não | RG do pai |
 | `pai_cpf` | text | Não | CPF do pai |
@@ -331,7 +331,7 @@ Armazena informações dos professores.
 | `id` | integer (PK) | Sim | Identificador único |
 | `nome` | text | Sim | Nome completo |
 | `matricula` | text | Sim | Número de matrícula funcional |
-| `email` | text | Sim | Email institucional |
+| `email` | text | Sim | E-mail institucional |
 | `componente` | text | Sim | componente principal (legado) |
 | `componentes` | text[] | Não | Array de componentes lecionadas |
 | `series` | text[] | Não | Array de séries que leciona |
@@ -406,7 +406,7 @@ Membros da equipe administrativa da escola.
 | `nome` | text | Sim | Nome completo |
 | `cargo` | text | Sim | Cargo: 'Diretor', 'Vice-Diretor', 'Coordenador', 'Secretário' |
 | `matricula` | text | Sim | Matrícula funcional |
-| `email` | text | Sim | Email institucional |
+| `email` | text | Sim | E-mail institucional |
 | `telefone` | text | Não | Telefone |
 | `status` | text | Não | Status: 'Ativo', 'Inativo' (default: 'Ativo') |
 | `foto_url` | text | Não | URL da foto |
@@ -501,7 +501,7 @@ Tabela de usuários legada.
 |-------|------|-------------|-----------|
 | `id` | integer (PK) | Sim | Identificador único |
 | `nome` | text | Sim | Nome |
-| `email` | text | Sim | Email |
+| `email` | text | Sim | E-mail |
 | `papel` | text | Sim | Papel (default: 'estudante') |
 | `ativo` | boolean | Não | Usuário ativo (default: true) |
 | `created_at` | timestamptz | Não | Data de criação |

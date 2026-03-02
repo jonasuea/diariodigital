@@ -342,11 +342,11 @@ export default function NovoMembro() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email*</Label>
+                    <Label htmlFor="email">E-mail*</Label>
                     <Input
                       id="email"
                       type="email"
-                      placeholder="Email institucional"
+                      placeholder="E-mail institucional"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       required

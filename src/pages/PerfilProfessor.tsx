@@ -223,7 +223,7 @@ export default function PerfilProfessor() {
                   />
                   <InfoItem
                     icon={Mail}
-                    label="Email"
+                    label="E-mail"
                     value={professor.email}
                   />
                   {professor.link_lattes && (
