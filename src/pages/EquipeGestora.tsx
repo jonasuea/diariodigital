@@ -307,13 +307,13 @@ export default function EquipeGestora() {
       render: (m: Membro) => (
         <div className="flex gap-2">
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/equipe-gestora/${m.id}`); }}>
-            <Eye className="h-4 w-4" />
+            <Eye className="h-4 w-4 text-blue-500" />
           </Button>
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/equipe-gestora/${m.id}/editar`); }}>
-            <Pencil className="h-4 w-4" />
+            <Pencil className="h-4 w-4 text-orange-500" />
           </Button>
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(m); }}>
-            <Trash2 className="h-4 w-4 text-destructive" />
+            <Trash2 className="h-4 w-4 text-red-500" />
           </Button>
         </div>
       ),

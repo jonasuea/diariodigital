@@ -110,21 +110,21 @@
   .scrollbar-thin {
     scrollbar-width: thin;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-track {
     background: transparent;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 3px;
   }
-  
+
   .scrollbar-thin::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
   }
@@ -135,7 +135,7 @@
     color: #166534 !important;
     font-weight: 600 !important;
   }
-  
+
   .day-letivo:hover {
     background-color: #bbf7d0 !important;
   }
@@ -161,5 +161,41 @@
 
   .day-justificado:hover {
     background-color: #fde68a !important;
+  }
+
+  /* Ocultar controles ao imprimir */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+}
+
+/* Impressão limpa via clone-to-body */
+@media print {
+
+  /* Esconde tudo exceto o clone de impressão */
+  body>*:not(#print-clone) {
+    display: none !important;
+  }
+
+  /* O clone ocupa a página completa, sem bordas */
+  #print-clone {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 32px;
+    box-sizing: border-box;
+    background: transparent !important;
+    overflow: visible;
+  }
+
+  /* Garante transparência para a marca d'água brilhar */
+  #print-clone,
+  #print-clone *,
+  .print-container,
+  .print-container * {
+    background-color: transparent !important;
   }
 }

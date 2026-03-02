@@ -1,9 +1,9 @@
-import { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { printContainer } from '@/lib/print-utils';
 
 interface Nota {
     id: string;
@@ -54,8 +54,6 @@ export function BoletimDialog({
     estudanteNome, estudanteMatricula, estudanteNascimento,
     turmaNome, turmaSerie, ano, notas, faltasAnuais
 }: BoletimDialogProps) {
-    const printRef = useRef<HTMLDivElement>(null);
-
     const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
     const dataNasc = estudanteNascimento
         ? format(parseISO(estudanteNascimento), 'dd/MM/yyyy', { locale: ptBR })
@@ -69,61 +67,16 @@ export function BoletimDialog({
     const totalFaltasGeral = Object.values(faltasAnuais)
         .reduce((acc, arr) => acc + arr.reduce((a, b) => a + b, 0), 0);
 
-    const handlePrint = () => {
-        const content = printRef.current;
-        if (!content) return;
-        const win = window.open('', '_blank', 'width=900,height=700');
-        if (!win) return;
-        win.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <title>Boletim - ${estudanteNome}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 30px; background: #fff; }
-            .header { text-align: center; border-bottom: 2px solid #1e3a5f; padding-bottom: 12px; margin-bottom: 20px; }
-            .header h1 { font-size: 18px; color: #1e3a5f; text-transform: uppercase; letter-spacing: 1px; }
-            .header h2 { font-size: 13px; color: #555; margin-top: 2px; }
-            .title { text-align: center; font-size: 16px; font-weight: bold; text-transform: uppercase;
-                     background: #1e3a5f; color: white; padding: 6px; margin-bottom: 16px; letter-spacing: 2px; }
-            .student-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; }
-            .field label { font-size: 10px; color: #666; text-transform: uppercase; display: block; }
-            .field span { font-size: 13px; font-weight: 600; }
-            .section-title { font-weight: bold; font-size: 13px; text-transform: uppercase; background: #e8eef5;
-                             border-left: 4px solid #1e3a5f; padding: 5px 8px; margin: 16px 0 8px; }
-            table { width: 100%; border-collapse: collapse; font-size: 11px; }
-            th { background: #1e3a5f; color: white; border: 1px solid #1e3a5f; padding: 5px 6px; text-align: center; }
-            th.left { text-align: left; }
-            td { border: 1px solid #ccc; padding: 4px 6px; text-align: center; }
-            td.left { text-align: left; }
-            .aprovado { color: #15803d; font-weight: bold; }
-            .reprovado { color: #b91c1c; font-weight: bold; }
-            .andamento { color: #92400e; }
-            .falta { color: #b91c1c; font-weight: bold; }
-            .rodape { margin-top: 50px; display: flex; justify-content: space-between; }
-            .ass { text-align: center; width: 200px; }
-            .ass hr { border: none; border-top: 1px solid #333; margin-bottom: 4px; }
-            .ass p { font-size: 11px; }
-            .emissao { text-align: center; margin-top: 30px; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 8px; }
-          </style>
-        </head>
-        <body>${content.innerHTML}</body>
-      </html>`);
-        win.document.close();
-        win.focus();
-        setTimeout(() => { win.print(); win.close(); }, 500);
-    };
+    const handlePrint = () => printContainer();
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
+                <DialogHeader className="no-print">
                     <DialogTitle>Boletim Escolar</DialogTitle>
                 </DialogHeader>
 
-                <div ref={printRef} className="bg-white text-black p-4 text-sm space-y-4">
+                <div className="print-container p-4 bg-white text-black">
 
                     {/* Cabeçalho */}
                     <div className="header text-center border-b-2 border-blue-900 pb-3">
@@ -154,7 +107,7 @@ export function BoletimDialog({
                             <span className="font-semibold text-sm">{turmaNome || '—'}</span>
                         </div>
                         <div className="field">
-                            <label className="text-xs text-gray-500 uppercase block">Série</label>
+                            <label className="text-xs text-gray-500 uppercase block">Classificação</label>
                             <span className="font-semibold text-sm">{turmaSerie || '—'}</span>
                         </div>
                         <div className="field">
@@ -198,8 +151,8 @@ export function BoletimDialog({
                                                 {fmtNota(media)}
                                             </td>
                                             <td className={`border border-gray-300 p-1.5 text-center font-semibold ${sit === 'Aprovado' ? 'text-green-700' :
-                                                    sit === 'Reprovado' ? 'text-red-700' :
-                                                        'text-amber-700'
+                                                sit === 'Reprovado' ? 'text-red-700' :
+                                                    'text-amber-700'
                                                 }`}>
                                                 {sit}
                                             </td>
@@ -286,8 +239,7 @@ export function BoletimDialog({
                         Boletim emitido em {hoje} via sistema EducaFácil.
                     </div>
                 </div>
-
-                <DialogFooter>
+                <DialogFooter className="no-print">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
                     <Button onClick={handlePrint}>
                         <Printer className="h-4 w-4 mr-2" />

@@ -52,7 +52,7 @@ const router = createBrowserRouter([
 
   { path: "/estudantes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Estudantes /></ProtectedRoute> },
   { path: "/estudantes/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
-  { path: "/estudantes/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><PerfilEstudante /></ProtectedRoute> },
+  { path: "/estudantes/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><PerfilEstudante /></ProtectedRoute> },
   { path: "/estudantes/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
 
   { path: "/professores", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Professores /></ProtectedRoute> },

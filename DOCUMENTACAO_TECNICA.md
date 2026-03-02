@@ -356,7 +356,7 @@ Organização de turmas por período letivo.
 |-------|------|-------------|-----------|
 | `id` | integer (PK) | Sim | Identificador único |
 | `nome` | text | Sim | Nome da turma (ex: "5º Ano A") |
-| `serie` | text | Sim | Série (1º ao 9º ano) |
+| `serie` | text | Sim | Classificação (1º ao 9º ano) |
 | `turno` | text | Sim | Turno: 'Manhã', 'Tarde', 'Noite' |
 | `ano` | integer | Sim | Ano letivo (ex: 2024) |
 | `capacidade` | integer | Não | Capacidade máxima (default: 30) |

@@ -1,18 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import { Printer, X, Loader2 } from 'lucide-react';
+import { useUserRole } from '@/hooks/useUserRole';
+import { printContainer } from '@/lib/print-utils';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Turma {
   id: string;
   nome: string;
   serie: string;
+  turno: string;
+  ano: number;
+}
+
+interface Estudante {
+  id: string;
+  nome: string;
+  matricula: string;
+  status?: string;
 }
 
 interface ReportDesempenhoDialogProps {
@@ -21,130 +32,199 @@ interface ReportDesempenhoDialogProps {
 }
 
 export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoDialogProps) {
+  const { escolaAtivaId } = useUserRole();
   const [turmas, setTurmas] = useState<Turma[]>([]);
-  const [selectedTurma, setSelectedTurma] = useState<string>('');
-  const [selectedAno, setSelectedAno] = useState<string>('');
+  const [selectedTurmaId, setSelectedTurmaId] = useState<string>('');
+  const [currentTurma, setCurrentTurma] = useState<Turma | null>(null);
+  const [selectedAno, setSelectedAno] = useState<string>(new Date().getFullYear().toString());
+
+  const [estudantes, setEstudantes] = useState<Estudante[]>([]);
+  const [notas, setNotas] = useState<any[]>([]);
+  const [escolaInfo, setEscolaInfo] = useState({ nome: '', inep: '', decreto: '' });
   const [loading, setLoading] = useState(false);
 
   const anos = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i);
 
   useEffect(() => {
-    fetchTurmas();
-  }, []);
+    if (open && escolaAtivaId) {
+      fetchEscolaInfo();
+    } else if (!open) {
+      setSelectedTurmaId('');
+      setCurrentTurma(null);
+      setEstudantes([]);
+      setNotas([]);
+    }
+  }, [open, escolaAtivaId]);
 
-  const fetchTurmas = async () => {
+  useEffect(() => {
+    if (open && escolaAtivaId && selectedAno) {
+      fetchTurmas(selectedAno);
+    }
+  }, [selectedAno, open, escolaAtivaId]);
+
+  useEffect(() => {
+    if (selectedTurmaId && turmas.length > 0) {
+      const t = turmas.find(t => t.id === selectedTurmaId);
+      if (t) {
+        setCurrentTurma(t);
+        fetchData(t.id, selectedAno);
+      }
+    } else {
+      setCurrentTurma(null);
+      setEstudantes([]);
+      setNotas([]);
+    }
+  }, [selectedTurmaId, selectedAno, turmas]);
+
+  const fetchEscolaInfo = async () => {
+    if (!escolaAtivaId) return;
     try {
-        const q = query(collection(db, 'turmas'), orderBy('nome'));
-        const querySnapshot = await getDocs(q);
-        const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
-        setTurmas(turmasData);
+      const escolaSnap = await getDoc(doc(db, 'escolas', escolaAtivaId));
+      if (escolaSnap.exists()) {
+        const d = escolaSnap.data();
+        setEscolaInfo({
+          nome: d.nome || '',
+          inep: d.inep || '',
+          decreto: d.decreto_criacao || ''
+        });
+      }
     } catch (error) {
-        console.error("Error fetching turmas: ", error);
+      console.error("Error fetching escola info:", error);
     }
   };
 
-  const generatePDF = async () => {
-    if (!selectedTurma || !selectedAno) {
-      toast.error('Selecione a turma e o ano');
-      return;
-    }
+  const fetchTurmas = async (ano: string) => {
+    if (!escolaAtivaId) return;
+    try {
+      const q = query(
+        collection(db, 'turmas'),
+        where('escola_id', '==', escolaAtivaId),
+        where('ano', '==', parseInt(ano)),
+        orderBy('nome')
+      );
+      const querySnapshot = await getDocs(q);
+      const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
+      setTurmas(turmasData);
 
+      if (selectedTurmaId && !turmasData.some(t => t.id === selectedTurmaId)) {
+        setSelectedTurmaId('');
+        setCurrentTurma(null);
+      }
+    } catch (error) {
+      console.error("Error fetching turmas: ", error);
+    }
+  };
+
+  const fetchData = async (turmaId: string, ano: string) => {
     setLoading(true);
     try {
-      const turma = turmas.find(t => t.id === selectedTurma);
-      
-      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', selectedTurma));
+      const estudantesQuery = query(
+        collection(db, 'estudantes'),
+        where('turma_id', '==', turmaId),
+        orderBy('nome')
+      );
       const estudantesSnapshot = await getDocs(estudantesQuery);
-      const Estudantes = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
+      setEstudantes(estudantesData);
 
-      const notasQuery = query(collection(db, 'notas'), where('turma_id', '==', selectedTurma), where('ano', '==', parseInt(selectedAno)));
+      const notasQuery = query(
+        collection(db, 'notas'),
+        where('turma_id', '==', turmaId),
+        where('ano', '==', parseInt(ano))
+      );
       const notasSnapshot = await getDocs(notasQuery);
-      const notas = notasSnapshot.docs.map(doc => doc.data());
+      const notasData = notasSnapshot.docs.map(doc => doc.data());
+      setNotas(notasData);
 
-      const doc = new jsPDF();
-      
-      doc.setFontSize(18);
-      doc.text('Relatório de Desempenho', 105, 20, { align: 'center' });
-      
-      doc.setFontSize(12);
-      doc.text(`Turma: ${turma?.nome || ''} - ${turma?.serie || ''}`, 20, 35);
-      doc.text(`Ano Letivo: ${selectedAno}`, 20, 42);
-      doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 20, 49);
-
-      // Calcular médias por bimestre
-      const mediaBim1 = notas?.length ? (notas.reduce((acc, n) => acc + (n.bimestre_1 || 0), 0) / notas.length).toFixed(1) : '-';
-      const mediaBim2 = notas?.length ? (notas.reduce((acc, n) => acc + (n.bimestre_2 || 0), 0) / notas.length).toFixed(1) : '-';
-      const mediaBim3 = notas?.length ? (notas.reduce((acc, n) => acc + (n.bimestre_3 || 0), 0) / notas.length).toFixed(1) : '-';
-      const mediaBim4 = notas?.length ? (notas.reduce((acc, n) => acc + (n.bimestre_4 || 0), 0) / notas.length).toFixed(1) : '-';
-
-      doc.setFontSize(14);
-      doc.text('Evolução das Médias por Bimestre:', 20, 65);
-      
-      doc.setFontSize(11);
-      doc.text(`1º Bimestre: ${mediaBim1}`, 30, 75);
-      doc.text(`2º Bimestre: ${mediaBim2}`, 30, 82);
-      doc.text(`3º Bimestre: ${mediaBim3}`, 30, 89);
-      doc.text(`4º Bimestre: ${mediaBim4}`, 30, 96);
-
-      if (Estudantes && Estudantes.length > 0) {
-        const tableData = Estudantes.map(estudante => {
-          const estudanteNotas = notas?.filter(n => n.estudante_id === estudante.id) || [];
-          const b1 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_1 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
-          const b2 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_2 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
-          const b3 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_3 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
-          const b4 = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.bimestre_4 || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
-          const media = estudanteNotas.length ? (estudanteNotas.reduce((acc, n) => acc + (n.media_anual || 0), 0) / estudanteNotas.length).toFixed(1) : '-';
-          
-          return [estudante.nome, b1, b2, b3, b4, media];
-        });
-
-        autoTable(doc, {
-          startY: 110,
-          head: [['Estudante', '1º Bim', '2º Bim', '3º Bim', '4º Bim', 'Média']],
-          body: tableData,
-          theme: 'grid',
-          headStyles: { fillColor: [59, 130, 246] },
-        });
-      }
-
-      doc.save(`relatorio-desempenho-${turma?.nome}-${selectedAno}.pdf`);
-      toast.success('Relatório gerado com sucesso!');
-      onOpenChange(false);
     } catch (error) {
-      toast.error('Erro ao gerar relatório');
-      console.error(error)
+      console.error("Error fetching data:", error);
+      toast.error('Erro ao carregar dados');
     } finally {
       setLoading(false);
     }
   };
 
+  const handlePrint = () => {
+    if (!currentTurma || !selectedAno) {
+      toast.error('Preencha os campos para imprimir');
+      return;
+    }
+    if (estudantes.length === 0) {
+      toast.error('Nenhum dado para imprimir');
+      return;
+    }
+    printContainer();
+  };
+
+  const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+  // Calcular os dados do gráfico
+  const bimesters = [1, 2, 3, 4];
+  const chartData = bimesters.map(bim => {
+    let aprovados = 0;
+    let reprovados = 0;
+    let transferidos = 0;
+    let comNotasDoBimestre = 0;
+
+    estudantes.forEach(est => {
+      if (est.status === 'Transferido' || est.status === 'Desistente') {
+        transferidos++;
+        return;
+      }
+
+      const estudanteNotas = notas.filter(n => n.estudante_id === est.id);
+      const notasBim = estudanteNotas.filter(n => n[`bimestre_${bim}`] !== undefined && n[`bimestre_${bim}`] !== null);
+
+      if (notasBim.length > 0) {
+        comNotasDoBimestre++;
+        const media = notasBim.reduce((acc, n) => acc + Number(n[`bimestre_${bim}`]), 0) / notasBim.length;
+        if (media >= 6) {
+          aprovados++;
+        } else {
+          reprovados++;
+        }
+      }
+    });
+
+    return {
+      name: `${bim}º Bimestre`,
+      Aprovados: aprovados,
+      Reprovados: reprovados,
+      Transferidos: transferidos,
+      hasData: comNotasDoBimestre > 0 || transferidos > 0
+    };
+  }).filter(d => d.hasData || d.name === '1º Bimestre'); // Always show at least 1st bimester if empty
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Relatório de Desempenho</DialogTitle>
-        </DialogHeader>
-        
-        <div className="space-y-4 py-4">
-          <div className="flex items-center gap-4">
-            <Label className="w-16">Turma</Label>
-            <Select value={selectedTurma} onValueChange={setSelectedTurma}>
-              <SelectTrigger className="w-28">
-                <SelectValue placeholder="Sele..." />
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0 border-none shadow-2xl print:overflow-visible print:max-h-none print:w-auto print:max-w-none [&>button]:hidden">
+        {/* Controls - Visible only in app, hidden during print */}
+        <div className="p-6 border-b bg-gray-50 no-print flex flex-wrap items-end gap-4">
+          <div className="flex-1 min-w-[200px] max-w-xs">
+            <Label htmlFor="select-turma" className="text-xs font-bold uppercase text-gray-500 mb-1 block">
+              Selecionar Turma
+            </Label>
+            <Select value={selectedTurmaId} onValueChange={setSelectedTurmaId} disabled={turmas.length === 0}>
+              <SelectTrigger id="select-turma">
+                <SelectValue placeholder={turmas.length === 0 ? "Nenhuma turma neste ano" : "Selecione a turma..."} />
               </SelectTrigger>
               <SelectContent>
-                {turmas.map(turma => (
-                  <SelectItem key={turma.id} value={turma.id.toString()}>
-                    {turma.nome}
+                {turmas.map(t => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.nome} - {t.serie}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            
-            <Label className="w-10">Ano</Label>
+          </div>
+
+          <div className="w-32">
+            <Label htmlFor="select-ano" className="text-xs font-bold uppercase text-gray-500 mb-1 block">
+              Ano Letivo
+            </Label>
             <Select value={selectedAno} onValueChange={setSelectedAno}>
-              <SelectTrigger className="w-28">
-                <SelectValue placeholder="Sele..." />
+              <SelectTrigger id="select-ano">
+                <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
                 {anos.map(ano => (
@@ -154,18 +234,204 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
             </Select>
           </div>
 
-          <p className="text-sm text-muted-foreground">
-            O relatório incluirá um gráfico de linhas mostrando o desempenho dos Estudantes por bimestre.
-          </p>
+          {loading && <Loader2 className="h-5 w-5 animate-spin text-primary mb-2 ml-auto" />}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
-          <Button onClick={generatePDF} disabled={loading}>
-            {loading ? 'Gerando...' : 'Gerar Relatório'}
+        <div className="print-container p-8 bg-white text-black">
+          {/* Header */}
+          <div className="border border-black p-4 mb-6">
+            <h1 className="text-center font-bold text-xl uppercase mb-4 border-b border-black pb-2">
+              {escolaInfo.nome || 'NOME DA ESCOLA'}
+            </h1>
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+              <div className="flex border-b border-black pb-1">
+                <span className="font-bold mr-2">INEP:</span>
+                <span>{escolaInfo.inep}</span>
+              </div>
+              <div className="flex border-b border-black pb-1">
+                <span className="font-bold mr-2">DECRETO:</span>
+                <span>{escolaInfo.decreto}</span>
+              </div>
+              <div className="flex border-b border-black pb-1">
+                <span className="font-bold mr-2">SÉRIE:</span>
+                <span>{currentTurma?.serie || '---'}</span>
+              </div>
+              <div className="flex border-b border-black pb-1">
+                <span className="font-bold mr-2">TURMA:</span>
+                <span>{currentTurma?.nome || '---'}</span>
+              </div>
+              <div className="flex border-b border-black pb-1">
+                <span className="font-bold mr-2">TURNO:</span>
+                <span>{currentTurma?.turno || '---'}</span>
+              </div>
+              <div className="flex border-b border-black pb-1">
+                <span className="font-bold mr-2">DATA DE EMISSÃO:</span>
+                <span>{dataAtual}</span>
+              </div>
+            </div>
+            <div className="mt-4 bg-orange-100/50 p-2 border border-black text-center font-bold no-print-bg uppercase">
+              Relatório de Desempenho
+            </div>
+          </div>
+
+          {/* Chart */}
+          {loading ? (
+            <div className="text-center py-10 flex flex-col items-center gap-2">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p>Carregando dados...</p>
+            </div>
+          ) : (
+            <>
+              {(!currentTurma || !selectedAno) ? (
+                <div className="border border-black p-8 text-center text-muted-foreground italic">
+                  Selecione uma turma e ano acima para gerar o relatório.
+                </div>
+              ) : estudantes.length === 0 ? (
+                <div className="border border-black p-4 text-center text-muted-foreground">
+                  Nenhum estudante encontrado nesta turma.
+                </div>
+              ) : (
+                <div className="border border-black p-6">
+                  <h3 className="text-center font-bold text-lg mb-6 uppercase">Desempenho Geral por Bimestre - Quantitativo</h3>
+
+                  {/* Tabela Resumo para facilitar visualização na Impressão */}
+                  <table className="w-full border-collapse border border-black text-sm mb-8">
+                    <thead>
+                      <tr className="bg-gray-50 border border-black">
+                        <th className="border-r border-black p-2 text-center">Bimestre</th>
+                        <th className="border-r border-black p-2 text-center text-green-700">Aprovados (&ge; 6.0)</th>
+                        <th className="border-r border-black p-2 text-center text-red-700">Reprovados (&lt; 6.0)</th>
+                        <th className="border-black p-2 text-center text-orange-700">Transferidos/Desistentes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="border border-black">
+                      {chartData.map((data) => (
+                        <tr key={data.name} className="border-b border-black">
+                          <td className="border-r border-black p-2 text-center font-bold">{data.name}</td>
+                          <td className="border-r border-black p-2 text-center">{data.Aprovados}</td>
+                          <td className="border-r border-black p-2 text-center">{data.Reprovados}</td>
+                          <td className="p-2 text-center">{data.Transferidos}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="h-80 w-full mt-8">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={chartData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis allowDecimals={false} />
+                        <Tooltip />
+                        <Legend />
+                        {/* isAnimationActive={false} is critical for printing SVGs perfectly */}
+                        <Bar dataKey="Aprovados" fill="#16a34a" isAnimationActive={false} />
+                        <Bar dataKey="Reprovados" fill="#dc2626" isAnimationActive={false} />
+                        <Bar dataKey="Transferidos" fill="#ea580c" isAnimationActive={false} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="mt-8 text-right text-xs text-gray-500 last-page-only">
+            Página 1
+          </div>
+        </div>
+
+        {/* Action Buttons (Sticky at bottom) */}
+        <div className="sticky bottom-0 bg-white border-t p-4 flex justify-end gap-3 no-print">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="gap-2">
+            <X className="h-4 w-4" /> Fechar
           </Button>
-        </DialogFooter>
+          <Button onClick={handlePrint} disabled={!currentTurma || !selectedAno || loading || estudantes.length === 0} className="gap-2 bg-blue-600 hover:bg-blue-700">
+            <Printer className="h-4 w-4" /> Imprimir Relatório
+          </Button>
+        </div>
+
+        <style dangerouslySetInnerHTML={{
+          __html: `
+      @media print {
+        @page {
+          size: A4 portrait;
+          margin: 1cm;
+        }
+        body {
+          visibility: hidden !important;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        .print-container {
+          visibility: visible !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          width: 100% !important;
+          height: auto !important;
+          min-height: 0 !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: white !important;
+          display: block !important;
+        }
+        .print-container * {
+          visibility: visible !important;
+        }
+        .no-print, .no-print * {
+          display: none !important;
+          visibility: hidden !important;
+          width: 0 !important;
+          height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border: none !important;
+        }
+        .no-print-bg {
+          background-color: transparent !important;
+        }
+        /* Explicitly hide radix dark overlay and close button */
+        .bg-black\\/80, 
+        [data-state="open"] > div:first-child:not([role="dialog"]),
+        [role="dialog"] > button:last-child {
+          display: none !important;
+        }
+        /* Ensure the dialog portal doesn't hide everything */
+        [data-radix-portal], [role="dialog"] {
+          visibility: visible !important;
+          overflow: visible !important;
+          max-height: none !important;
+          max-width: none !important;
+          height: auto !important;
+          width: 100% !important;
+          position: absolute !important;
+          left: 0 !important;
+          top: 0 !important;
+          transform: none !important;
+          border: none !important;
+          box-shadow: none !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          background: transparent !important;
+        }
+        /* Table fixes for print */
+        table {
+          border-collapse: collapse !important;
+          width: 100% !important;
+          table-layout: auto !important;
+        }
+        th, td {
+          border: 1px solid black !important;
+          color: black !important;
+          word-break: break-word !important;
+        }
+      }
+    `}} />
       </DialogContent>
-    </Dialog>
+    </Dialog >
   );
 }

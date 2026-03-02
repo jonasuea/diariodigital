@@ -1,0 +1,12 @@
+{
+    "name": "educafacil-scripts",
+    "version": "1.0.0",
+    "description": "Scripts administrativos do EducaFácil",
+    "type": "commonjs",
+    "scripts": {
+        "criar-usuarios": "node criarUsuarios.mjs"
+    },
+    "dependencies": {
+        "firebase-admin": "^13.0.0"
+    }
+}

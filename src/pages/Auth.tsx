@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GraduationCap, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export default function Auth() {
   const { user, loading, signIn, signUp } = useAuth();
@@ -14,8 +17,31 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [estudanteId, setEstudanteId] = useState<string | null>(null);
 
-  if (loading) {
+  const { role, loading: loadingRole } = useUserRole();
+
+  useEffect(() => {
+    if (user && role === 'estudante') {
+      const fetchEstudanteId = async () => {
+        try {
+          const q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid));
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            setEstudanteId(snap.docs[0].id);
+          } else {
+            setEstudanteId('fallback');
+          }
+        } catch (e) {
+          console.error(e);
+          setEstudanteId('fallback');
+        }
+      };
+      fetchEstudanteId();
+    }
+  }, [user, role]);
+
+  if (loading || loadingRole) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -24,7 +50,33 @@ export default function Auth() {
   }
 
   if (user) {
-    return <Navigate to="/painel" replace />;
+    if (role === 'estudante') {
+      if (!estudanteId) {
+        return (
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Localizando perfil do estudante...</span>
+          </div>
+        );
+      }
+      if (estudanteId === 'fallback') {
+        return <Navigate to="/calendario" replace />;
+      }
+      return <Navigate to={`/estudantes/${estudanteId}`} replace />;
+    }
+
+    // We only redirect to painel if the role is resolved, to prevent race conditions 
+    // where user is true but role is still null during the first renders
+    if (role) {
+      return <Navigate to="/painel" replace />;
+    }
+
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Verificando permissões...</span>
+      </div>
+    );
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -159,7 +211,7 @@ export default function Auth() {
           <div className="mt-4 p-4 rounded-lg bg-blue-50 text-center text-sm text-blue-700 border border-blue-200">
             <p className="font-semibold">Aplicação em desenvolvimento</p>
             <p>##<strong>Para acessar, fale com o Professor Jonas</strong></p>
-            <p>##<strong>Escola Dom Paulo</strong></p> 
+            <p>##<strong>Escola Dom Paulo</strong></p>
           </div>
 
         </div>

@@ -501,7 +501,7 @@ export default function Turmas() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="serie">Ano/Série</Label>
+                  <Label htmlFor="serie">Classificação</Label>
                   <Select value={formData.serie} onValueChange={(value) => setFormData({ ...formData, serie: value })}>
                     <SelectTrigger>
                       <SelectValue placeholder="Selecionar ano/série" />
@@ -649,29 +649,23 @@ export default function Turmas() {
                     <td className="p-4">{turma.ano}</td>
                     <td className="p-4">
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" size="sm" onClick={() => openEnturmarDialog(turma)}>
-                          <Users className="h-4 w-4 md:mr-1" />
-                          <span className="hidden md:inline">Enturmar</span>
+                        <Button variant="outline" size="sm" onClick={() => openEnturmarDialog(turma)} title="Enturmar Estudantes">
+                          <Users className="h-4 w-4 text-blue-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => openAlocarDialog(turma)}>
-                          <BookOpen className="h-4 w-4 md:mr-1" />
-                          <span className="hidden md:inline">Componentes</span>
+                        <Button variant="outline" size="sm" onClick={() => openAlocarDialog(turma)} title="Alocar Professores">
+                          <BookOpen className="h-4 w-4 text-green-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => openEdit(turma)}>
-                          <Pencil className="h-4 w-4 md:mr-1" />
-                          <span className="hidden md:inline">Editar</span>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas Bimestrais">
+                          <ClipboardList className="h-4 w-4 text-yellow-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/notas`)}>
-                          <ClipboardList className="h-4 w-4 md:mr-1" />
-                          <span className="hidden md:inline">Notas</span>
+                        <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/frequencia`)} title="Frequência">
+                          <Calendar className="h-4 w-4 text-gray-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/frequencia`)}>
-                          <Calendar className="h-4 w-4 md:mr-1" />
-                          <span className="hidden md:inline">Frequência</span>
+                        <Button variant="outline" size="sm" onClick={() => openEdit(turma)} title="Editar Turma">
+                          <Pencil className="h-4 w-4 text-orange-500" />
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => openDeleteDialog(turma)} className="text-destructive hover:text-destructive">
-                          <Trash2 className="h-4 w-4 md:mr-1" />
-                          <span className="hidden md:inline">Apagar</span>
+                        <Button variant="outline" size="sm" onClick={() => openDeleteDialog(turma)} title="Excluir Turma" className="text-destructive hover:text-destructive">
+                          <Trash2 className="h-4 w-4 text-red-500" />
                         </Button>
                       </div>
                     </td>
@@ -779,7 +773,7 @@ export default function Turmas() {
                 <Label>Componente Curricular</Label>
                 <Select value={novaAlocacao.nome} onValueChange={(value) => setNovaAlocacao(prev => ({ ...prev, nome: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o componente" />
+                    <SelectValue placeholder="Selecione the componente" />
                   </SelectTrigger>
                   <SelectContent>
                     {COMPONENTES_CURRICULARES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
@@ -790,7 +784,7 @@ export default function Turmas() {
                 <Label>Professor</Label>
                 <Select value={novaAlocacao.professorId} onValueChange={(value) => setNovaAlocacao(prev => ({ ...prev, professorId: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o professor" />
+                    <SelectValue placeholder="Selecione the professor" />
                   </SelectTrigger>
                   <SelectContent>
                     {professores.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}
@@ -834,17 +828,6 @@ export default function Turmas() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>
-          Cancelar
-        </Button>
-        <Button type="submit">
-          {editingTurma ? 'Salvar' : 'Criar Turma'}
-        </Button>
-      </div>
     </AppLayout>
   );
 }
-
-// Forçar recarregamento do arquivo

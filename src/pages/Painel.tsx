@@ -230,7 +230,7 @@ export default function Painel() {
       const querySnapshot = await getDocs(q);
       const frequencias = querySnapshot.docs.map(doc => doc.data());
 
-      // Busca o total de alunos na escola que possuem turma para usar como denominador diário
+      // Busca o total de estudantes na escola que possuem turma para usar como denominador diário
       const estudantesSnapshot = await getDocs(query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId)));
       const totalAlunosEscola = estudantesSnapshot.docs.filter(doc => {
         const t = doc.data().turma_id;
@@ -250,7 +250,7 @@ export default function Painel() {
 
       const dadosGrafico: FrequenciaData[] = [1, 2, 3, 4, 5].map(dia => {
         const faltas = diasAgrupados[dia].faltas;
-        // Total base de alunos * 1 turma (Na visão macro do painel, assume-se totalAlunosEscola como faltas totais possíveis no dia)
+        // Total base de estudantes * 1 turma (Na visão macro do painel, assume-se totalAlunosEscola como faltas totais possíveis no dia)
         // Isso é uma aproximação razoável dada a nova regra que não salva as presenças.
         const percentualFaltas = totalAlunosEscola > 0 ? Math.round((faltas / totalAlunosEscola) * 100) : 0;
         return {

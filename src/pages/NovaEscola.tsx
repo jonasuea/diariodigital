@@ -18,6 +18,7 @@ const initialState = {
     // Identificação principal
     inep: '',
     nome: '',
+    decreto_criacao: '',
     email: '',
     telefone: '',
     zona: '',
@@ -94,6 +95,7 @@ export default function NovaEscola() {
             const dataToSave = {
                 inep: docId,
                 nome: formData.nome,
+                decreto_criacao: formData.decreto_criacao,
                 email: formData.email,
                 telefone: formData.telefone,
                 zona: formData.zona,
@@ -189,6 +191,15 @@ export default function NovaEscola() {
                                         disabled={isEditing}
                                     />
                                     {isEditing && <p className="text-xs text-muted-foreground">O INEP não pode ser modificado. Em caso de erro, exclua a escola e recadastre.</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="decreto_criacao">Decreto de Criação</Label>
+                                    <Input
+                                        id="decreto_criacao"
+                                        placeholder="Ex: Decreto nº 123/2022"
+                                        value={formData.decreto_criacao}
+                                        onChange={(e) => handleChange('decreto_criacao', e.target.value)}
+                                    />
                                 </div>
                                 <div className="space-y-2 lg:col-span-2">
                                     <Label htmlFor="nome">Nome da Escola*</Label>

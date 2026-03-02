@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { format, isSameDay, isSameMonth, parseISO, startOfMonth, endOfMonth } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Evento {
   id: string;
@@ -26,9 +27,12 @@ interface Evento {
   hora_inicio: string | null;
   hora_fim: string | null;
   local: string | null;
+  criado_por_id?: string | null;
+  criado_por_role?: string | null;
 }
 
 export default function Calendario() {
+  const { user } = useAuth();
   const { role, escolaAtivaId } = useUserRole();
   const isAdminOrGestor = role === 'admin' || role === 'gestor';
   const [eventos, setEventos] = useState<Evento[]>([]);
@@ -66,7 +70,7 @@ export default function Calendario() {
     try {
       const q = query(collection(db, 'eventos'), where('escola_id', '==', escolaAtivaId), orderBy('data', 'asc'));
       const querySnapshot = await getDocs(q);
-      const eventosData = querySnapshot.docs.map(doc => {
+      let eventosData = querySnapshot.docs.map(doc => {
         const data = doc.data();
         // Garante que o campo 'data' seja sempre um Timestamp.
         // Converte de string para Timestamp se for o formato antigo.
@@ -75,6 +79,16 @@ export default function Calendario() {
         }
         return { id: doc.id, ...data } as Evento;
       });
+
+      // Filtragem client-side para estudantes
+      if (role === 'estudante') {
+        eventosData = eventosData.filter(e => {
+          const isSelfCreated = e.criado_por_id === user?.uid;
+          const isStaffCreated = !e.criado_por_role || e.criado_por_role !== 'estudante';
+          return isSelfCreated || isStaffCreated;
+        });
+      }
+
       setEventos(eventosData);
     } catch (error) {
       toast.error('Erro ao carregar eventos');
@@ -164,6 +178,8 @@ export default function Calendario() {
       hora_fim: formData.hora_fim,
       local: formData.local || null,
       escola_id: escolaAtivaId,
+      criado_por_id: user?.uid || null,
+      criado_por_role: role || null,
     };
 
     try {
@@ -425,14 +441,16 @@ export default function Calendario() {
                             </div>
                           )}
                         </div>
-                        <div className="flex gap-1 ml-2">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(evento)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {((role !== 'estudante') || (evento.criado_por_id === user?.uid)) && (
+                          <div className="flex gap-1 ml-2">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(evento)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -486,14 +504,16 @@ export default function Calendario() {
                           </div>
                         )}
                       </div>
-                      <div className="flex gap-1 ml-2 flex-shrink-0">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(evento)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      {((role !== 'estudante') || (evento.criado_por_id === user?.uid)) && (
+                        <div className="flex gap-1 ml-2 flex-shrink-0">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => openDeleteDialog(evento)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

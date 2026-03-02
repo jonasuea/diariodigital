@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2, Upload, Camera } from 'lucide-react';
+import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2, Upload, Camera, UserCog } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -31,6 +31,7 @@ export default function Configuracoes() {
   const [escolaConfig, setEscolaConfig] = useState({
     inep: '',
     nome: 'Escola Municipal Nome da Escola',
+    decretoCriacao: '',
     email: 'contato@escolanome.edu.br',
     telefone: '(11) 0000-0000',
     zona: '',
@@ -116,6 +117,7 @@ export default function Configuracoes() {
               ...prev,
               inep: d.inep || prev.inep,
               nome: d.nome || prev.nome,
+              decretoCriacao: d.decreto_criacao || prev.decretoCriacao,
               email: d.email || prev.email,
               telefone: d.telefone || prev.telefone,
               zona: d.zona || prev.zona,
@@ -170,6 +172,7 @@ export default function Configuracoes() {
       await setDoc(docRef, {
         inep: escolaConfig.inep,
         nome: escolaConfig.nome,
+        decreto_criacao: escolaConfig.decretoCriacao,
         email: escolaConfig.email,
         telefone: escolaConfig.telefone,
         zona: escolaConfig.zona,
@@ -425,6 +428,133 @@ export default function Configuracoes() {
     }
   };
 
+  const handleCriarUsuariosFaltantes = async () => {
+    const confirmado = window.confirm(
+      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃO sejam um usuário terão um usuário criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vários minutos. Você tem certeza que quer rodar isso?'
+    );
+    if (!confirmado) return;
+
+    setIsMigrating(true);
+    toast.info('Buscando cadastros e criando acessos no Firebase... Pode demorar.');
+
+    try {
+      // Importações dinâmicas necessárias para criar Secondary App no Firebase Auth
+      const { initializeApp, getApps } = await import('firebase/app');
+      const { getAuth, createUserWithEmailAndPassword } = await import('firebase/auth');
+
+      // Configuração copiada do environment
+      const firebaseConfig = {
+        apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+        authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+        projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+        storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+        appId: import.meta.env.VITE_FIREBASE_APP_ID,
+      };
+
+      // Inicia um app secundário para não deslogar o admin atual ()
+      const apps = getApps();
+      const secondaryApp = apps.find(app => app.name === 'SecondaryApp') || initializeApp(firebaseConfig, 'SecondaryApp');
+      const secondaryAuth = getAuth(secondaryApp);
+
+      const colecoes = [
+        { name: 'professores', role: 'professor' },
+        { name: 'equipe_gestora', role: 'gestor' },
+        { name: 'estudantes', role: 'estudante' }
+      ];
+
+      let createdCount = 0;
+      let errorCount = 0;
+
+      // Load current profiles emails to skip existing more quickly
+      const profilesSnap = await getDocs(collection(db, 'profiles'));
+      const existingEmails = new Set(profilesSnap.docs.map(d => d.data().email?.toLowerCase()));
+
+      for (const colInfo of colecoes) {
+        // Obter os cadastros
+        const snapshot = await getDocs(collection(db, colInfo.name));
+
+        for (const docSnap of snapshot.docs) {
+          const id = docSnap.id;
+          const email = docSnap.data().email;
+          const nome = docSnap.data().nome;
+          const escola_id = docSnap.data().escola_id || '';
+
+          if (email && typeof email === 'string' && email.trim() !== '' && email.includes('@')) {
+            const emailLower = email.trim().toLowerCase();
+
+            // Apenas tentaremos criar se não tiver um profile correspondente
+            if (!existingEmails.has(emailLower)) {
+              try {
+                // 1. Cria usuário no Firebase Auth (Auth UI vai logar este usuário localmente no SecondaryAuth)
+                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, emailLower, "EDUCAFACIL2026");
+                const authUid = userCredential.user.uid;
+                existingEmails.add(emailLower);
+
+                // 2. Prepara o batch de dados
+                const batch = writeBatch(db);
+
+                // Add profile entry vinculado ao id real do Auth
+                const profileRef = doc(db, 'profiles', authUid);
+                batch.set(profileRef, {
+                  nome: nome || 'Sem nome',
+                  email: emailLower,
+                  telefone: docSnap.data().contato || docSnap.data().telefone || '',
+                  cargo: colInfo.role,
+                  foto_url: docSnap.data().foto_url || ''
+                }, { merge: true });
+
+                // Add robust user role entry
+                const roleRef = doc(db, 'user_roles', authUid);
+                batch.set(roleRef, {
+                  role: colInfo.role,
+                  status: 'ativo',
+                  email: emailLower,
+                  escola_id: escola_id,
+                  escolas: escola_id ? [escola_id] : []
+                }, { merge: true });
+
+                // 3. Atualiza o cadastro original pra linkar com o authUid
+                const originalRef = doc(db, colInfo.name, id);
+                batch.update(originalRef, { usuario_id: authUid });
+
+                // 4. Salva a transação
+                await batch.commit();
+                createdCount++;
+
+                // Delay curto para evitar bater rate limits muito rápido do Firebase Auth
+                await new Promise(resolve => setTimeout(resolve, 300));
+              } catch (err: any) {
+                console.error(`Erro ao criar Firebase Auth para ${emailLower}:`, err);
+                if (err.code === 'auth/email-already-in-use') {
+                  // Se o auth já existe lá, mas não está no profiles, a gente registra no set pra pular
+                  existingEmails.add(emailLower);
+                }
+                errorCount++;
+              }
+            }
+          }
+        }
+      }
+
+      // Finaliza processo
+      if (createdCount > 0) {
+        toast.success(`${createdCount} novos usuários e senhas foram gerados no Firebase Auth!`);
+        await logActivity(`gerou ${createdCount} usuários no Firebase Authentication em lote.`);
+      } else if (errorCount === 0) {
+        toast.info("Não havia nenhum usuário novo pendente com e-mail válido para criar.");
+      } else {
+        toast.warning(`Terminou com ${errorCount} falhas de criação. Observe o console.`);
+      }
+
+    } catch (error) {
+      console.error('Erro na geração de usuários faltantes:', error);
+      toast.error('Falha ao rodar o script (Verifique o console).');
+    } finally {
+      setIsMigrating(false);
+    }
+  };
+
   if (loading) {
     return (
       <AppLayout title="Configurações">
@@ -469,6 +599,18 @@ export default function Configuracoes() {
                         value={escolaConfig.nome}
                         onChange={(e) => setEscolaConfig({ ...escolaConfig, nome: e.target.value })}
                         className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Decreto de Criação</Label>
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 text-muted-foreground invisible" /> {/* Placeholder for consistent alignment */}
+                      <Input
+                        value={escolaConfig.decretoCriacao}
+                        onChange={(e) => setEscolaConfig({ ...escolaConfig, decretoCriacao: e.target.value })}
+                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                        placeholder="Informe o decreto"
                       />
                     </div>
                   </div>
@@ -773,6 +915,20 @@ export default function Configuracoes() {
                           <Wrench className="h-4 w-4 mr-2" />
                         )}
                         {isMigrating ? 'Limpando...' : 'Limpar Escola dos Transferidos'}
+                      </Button>
+
+                      <Button
+                        className="w-full mt-4"
+                        variant="secondary"
+                        onClick={handleCriarUsuariosFaltantes}
+                        disabled={isSyncing || isMigrating}
+                      >
+                        {isMigrating ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <UserCog className="h-4 w-4 mr-2" />
+                        )}
+                        {isMigrating ? 'Criando usuários...' : 'Criar Usuários a partir de Cadastros (E-mail)'}
                       </Button>
                     </div>
                   </div>

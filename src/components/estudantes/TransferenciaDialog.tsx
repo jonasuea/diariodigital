@@ -1,9 +1,9 @@
-import { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { printContainer } from '@/lib/print-utils';
 
 interface HistoricoDisciplina {
     id: string;
@@ -50,7 +50,6 @@ interface TransferenciaDialogProps {
 }
 
 export function TransferenciaDialog({ open, onOpenChange, estudante }: TransferenciaDialogProps) {
-    const printRef = useRef<HTMLDivElement>(null);
 
     const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
@@ -68,67 +67,19 @@ export function TransferenciaDialog({ open, onOpenChange, estudante }: Transfere
         estudante.pai_nome ||
         'Não informado';
 
-    const handlePrint = () => {
-        const printContent = printRef.current;
-        if (!printContent) return;
-
-        const win = window.open('', '_blank', 'width=900,height=700');
-        if (!win) return;
-
-        win.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta charset="UTF-8" />
-          <title>Guia de Transferência - ${estudante.nome}</title>
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            body { font-family: 'Times New Roman', serif; font-size: 13px; color: #111; padding: 40px; background: #fff; }
-            .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 24px; }
-            .header h1 { font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
-            .header h2 { font-size: 13px; font-weight: normal; margin-top: 4px; color: #555; }
-            .title { text-align: center; font-size: 18px; font-weight: bold; text-transform: uppercase; text-decoration: underline; margin: 24px 0; letter-spacing: 2px; }
-            .section { margin-bottom: 20px; }
-            .section-title { font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 10px; color: #333; }
-            .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; }
-            .field { margin-bottom: 6px; }
-            .field-label { font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 0.3px; }
-            .field-value { font-size: 13px; font-weight: 500; border-bottom: 1px dotted #bbb; padding-bottom: 2px; min-height: 20px; }
-            .historico-item { margin-bottom: 16px; padding: 12px; border: 1px solid #ddd; page-break-inside: avoid; }
-            .historico-header { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
-            .historico-badge { display: inline-block; padding: 2px 8px; border: 1px solid #333; font-size: 11px; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; }
-            th { background: #eee; border: 1px solid #ccc; padding: 5px 8px; text-align: center; font-weight: bold; }
-            td { border: 1px solid #ccc; padding: 4px 8px; text-align: center; }
-            td.nome { text-align: left; }
-            .assinatura { margin-top: 60px; display: flex; justify-content: space-between; }
-            .assinatura-linha { text-align: center; }
-            .assinatura-linha hr { width: 220px; border: none; border-top: 1px solid #333; margin: 0 auto 4px; }
-            .assinatura-linha p { font-size: 11px; }
-            .rodape { margin-top: 40px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #eee; padding-top: 12px; }
-          </style>
-        </head>
-        <body>
-          ${printContent.innerHTML}
-        </body>
-      </html>
-    `);
-        win.document.close();
-        win.focus();
-        setTimeout(() => { win.print(); win.close(); }, 500);
-    };
+    const handlePrint = () => printContainer();
 
     const historico = estudante.historico_academico || [];
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
+                <DialogHeader className="no-print">
                     <DialogTitle>Guia de Transferência</DialogTitle>
                 </DialogHeader>
 
                 {/* Documento imprimível */}
-                <div ref={printRef} className="bg-white text-black font-serif p-6 space-y-6 text-sm leading-relaxed">
+                <div className="print-container bg-white text-black font-serif p-6 space-y-6 text-sm leading-relaxed">
 
                     {/* Cabeçalho */}
                     <div className="header text-center border-b-2 border-gray-800 pb-4">
@@ -178,7 +129,7 @@ export function TransferenciaDialog({ open, onOpenChange, estudante }: Transfere
                                         <p className="field-value font-medium border-b border-dotted border-gray-300 pb-0.5">{estudante.turma_nome}</p>
                                     </div>
                                     <div className="field">
-                                        <p className="field-label text-xs text-gray-500 uppercase">Série</p>
+                                        <p className="field-label text-xs text-gray-500 uppercase">Classificação</p>
                                         <p className="field-value font-medium border-b border-dotted border-gray-300 pb-0.5">{estudante.turma_serie || '-'}</p>
                                     </div>
                                 </>
@@ -201,7 +152,7 @@ export function TransferenciaDialog({ open, onOpenChange, estudante }: Transfere
                                     <div key={ano.id} className="historico-item border border-gray-200 rounded p-3">
                                         <div className="historico-header flex items-center gap-4 mb-2 flex-wrap">
                                             <span className="font-bold">{ano.ano_letivo}</span>
-                                            {ano.serie && <span className="text-gray-600">Série: {ano.serie}</span>}
+                                            {ano.serie && <span className="text-gray-600">Classificação: {ano.serie}</span>}
                                             {ano.escola && <span className="text-gray-600">Escola: {ano.escola}</span>}
                                             <span className={`text-xs border px-2 py-0.5 rounded ${ano.concluido ? 'border-green-600 text-green-700' : 'border-gray-400 text-gray-600'}`}>
                                                 {ano.concluido ? 'Concluído' : 'Em andamento'}
@@ -244,7 +195,7 @@ export function TransferenciaDialog({ open, onOpenChange, estudante }: Transfere
                     {/* Texto declaratório */}
                     <div className="section mt-2">
                         <p className="text-justify leading-7">
-                            Declaramos para os devidos fins que o(a) aluno(a) <strong>{estudante.nome}</strong>,
+                            Declaramos para os devidos fins que o(a) estudante <strong>{estudante.nome}</strong>,
                             portador(a) da matrícula <strong>{estudante.matricula}</strong>, esteve regularmente
                             matriculado(a) nesta instituição de ensino, tendo sido transferido(a) em conformidade
                             com a legislação vigente.
@@ -268,8 +219,7 @@ export function TransferenciaDialog({ open, onOpenChange, estudante }: Transfere
                         <p>Documento emitido em {hoje} via sistema EducaFácil.</p>
                     </div>
                 </div>
-
-                <DialogFooter>
+                <DialogFooter className="no-print">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>Fechar</Button>
                     <Button onClick={handlePrint}>
                         <Printer className="h-4 w-4 mr-2" />

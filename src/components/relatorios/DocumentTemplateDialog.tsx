@@ -17,7 +17,7 @@ const VARIABLES = [
   { name: '[RG_estudante]', description: 'RG do estudante' },
   { name: '[CPF_estudante]', description: 'CPF do estudante' },
   { name: '[TURMA]', description: 'Nome da turma' },
-  { name: '[ANO_SERIE]', description: 'Ano/Série' },
+  { name: '[ANO_SERIE]', description: 'Classificação' },
   { name: '[ANO_LETIVO]', description: 'Ano letivo' },
   { name: '[TURNO]', description: 'Turno' },
   { name: '[DATA]', description: 'Data atual' },
@@ -53,9 +53,9 @@ export function DocumentTemplateDialog({ open, onOpenChange, title, defaultTempl
             Edite o modelo do documento. Use variáveis como [NOME_estudante], [TURMA], [DATA] etc. Este modelo será usado para impressão em papel timbrado.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-4">
-          <Textarea 
+          <Textarea
             value={template}
             onChange={(e) => setTemplate(e.target.value)}
             className="min-h-[300px] font-mono text-sm"
@@ -93,20 +93,6 @@ Declaro para os devidos fins que o(a) estudante(a) [NOME_estudante], portador(a)
 _________________________________
 [NOME_DIRETOR]
 Diretor(a)`,
-
-  termoMatricula: `TERMO DE MATRÍCULA
-
-Pelo presente termo, fica matriculado(a) nesta instituição o(a) estudante(a) [NOME_estudante], filho(a) de [NOME_PAI] e [NOME_MAE], nascido(a) em [DATA_NASCIMENTO], natural de [NATURALIDADE], portador(a) do RG nº [RG_estudante] e CPF nº [CPF_estudante].
-
-Série/Ano: [ANO_SERIE]
-Turma: [TURMA]
-Turno: [TURNO]
-Ano Letivo: [ANO_LETIVO]
-
-[CIDADE], [DATA]
-
-_________________________________          _________________________________
-Responsável pela Matrícula                 Responsável pelo estudante`,
 
   termoCompromisso: `TERMO DE COMPROMISSO E CONDUTA
 

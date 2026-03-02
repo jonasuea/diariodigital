@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import {
   LayoutDashboard,
   Users,
@@ -100,7 +100,16 @@ export function useUserRole() {
           }
         }
 
-        if (userRole) {
+        if (userRole === 'estudante') {
+          const q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid));
+          const snap = await getDocs(q);
+          const estId = snap.empty ? 'not-found' : snap.docs[0].id;
+
+          setMenuItems([
+            { title: 'Meu Perfil', url: `/estudantes/${estId}`, icon: User, allowedRoles: ['estudante'] },
+            { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['estudante'] }
+          ]);
+        } else if (userRole) {
           const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes(userRole));
           setMenuItems(accessibleItems);
         } else {

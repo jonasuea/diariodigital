@@ -18,6 +18,7 @@ interface Escola {
     id: string;
     inep: string;
     nome: string;
+    decreto_criacao: string;
     email: string;
     telefone: string;
     zona: string;
@@ -60,6 +61,7 @@ export default function Escolas() {
                     id: doc.id,
                     inep: doc.id,
                     nome: data.nome || '',
+                    decreto_criacao: data.decreto_criacao || '',
                     email: data.email || '',
                     telefone: data.telefone || '',
                     zona: data.zona || '',
@@ -256,6 +258,10 @@ export default function Escolas() {
                                     <div className="space-y-1">
                                         <Label className="text-muted-foreground text-xs">Nome da Escola</Label>
                                         <p className="font-semibold text-sm">{escolaToView.nome}</p>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-muted-foreground text-xs">Decreto de Criação</Label>
+                                        <p className="font-semibold text-sm">{escolaToView.decreto_criacao || '-'}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-muted-foreground text-xs">E-mail</Label>

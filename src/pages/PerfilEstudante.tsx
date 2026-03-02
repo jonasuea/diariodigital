@@ -13,6 +13,7 @@ import {
   MapPin,
   Phone,
   User as UserIcon,
+  FileDown
 } from 'lucide-react';
 import { doc, getDoc, collection, query, where, getDocs, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -32,6 +33,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { TransferenciaDialog } from '@/components/estudantes/TransferenciaDialog';
 import { BoletimDialog } from '@/components/estudantes/BoletimDialog';
+import { DocumentPrintDialog } from '@/components/relatorios/DocumentPrintDialog';
 
 
 // Interfaces
@@ -46,6 +48,8 @@ interface Estudante {
   bairro: string | null;
   cidade: string | null;
   estado: string | null;
+  cpf?: string | null;
+  rg?: string | null;
   contato?: string | null;
   email?: string | null;
   mae_nome: string | null;
@@ -61,6 +65,7 @@ interface Estudante {
   ano: number;
   turma_nome?: string;
   turma_serie?: string;
+  turma_turno?: string;
   historico_academico?: HistoricoAnual[];
   // responsável adicional
   responsavel_relacao?: string;
@@ -122,6 +127,9 @@ export default function PerfilEstudante() {
   const [turmaHistorica, setTurmaHistorica] = useState<{ nome: string; serie: string }>({ nome: '-', serie: '' });
   const [transferenciaDialogOpen, setTransferenciaDialogOpen] = useState(false);
   const [boletimDialogOpen, setBoletimDialogOpen] = useState(false);
+  const [printDocOpen, setPrintDocOpen] = useState(false);
+  const [printDocType, setPrintDocType] = useState<'declaracaoMatricula' | 'termoCompromisso' | 'autorizacaoSaida' | 'declaracaoComparecimento' | 'termoUsoImagem' | 'termoAutorizacaoTrajeto'>('declaracaoMatricula');
+  const [printDocTitle, setPrintDocTitle] = useState('Documento');
 
   // helper to display notes with one decimal or blank
   const formatNota = (n?: number | null) => {
@@ -160,6 +168,7 @@ export default function PerfilEstudante() {
           turma_nome = turmaData.nome;
           turma_serie = turmaData.serie || '';
           componentes = turmaData.componentes || [];
+          estudanteData.turma_turno = turmaData.turno || '';
         }
       }
 
@@ -424,30 +433,58 @@ export default function PerfilEstudante() {
       <AppLayout title="Estudante não encontrado">
         <div className="text-center py-12">
           <p className="text-muted-foreground">O perfil do estudante não pôde ser carregado.</p>
-          <Button className="mt-4" onClick={() => navigate('/estudantes')}>Voltar para Lista de Alunos</Button>
+          <Button className="mt-4" onClick={() => navigate('/estudantes')}>Voltar para Lista de Estudantes</Button>
         </div>
       </AppLayout>
     );
   }
+
+  const handleGenerateDoc = (type: 'declaracaoMatricula' | 'termoCompromisso' | 'autorizacaoSaida' | 'declaracaoComparecimento' | 'termoUsoImagem' | 'termoAutorizacaoTrajeto', title: string) => {
+    setPrintDocType(type);
+    setPrintDocTitle(title);
+    setPrintDocOpen(true);
+  };
 
   return (
     <AppLayout>
       <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Detalhes do Aluno</h2>
+            <h2 className="text-3xl font-bold tracking-tight">Detalhes do Estudante</h2>
             <p className="text-muted-foreground mt-1">Visualize informações detalhadas, notas e frequência do aluno</p>
           </div>
-          <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => setTransferenciaDialogOpen(true)}>
-            <Download className="h-4 w-4 mr-2" />
-            Gerar Transferência
-          </Button>
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('declaracaoMatricula', 'Declaração de Matrícula')}>
+              <Download className="h-4 w-4 mr-2" />
+              Declaração de Matrícula
+            </Button>
+            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('termoCompromisso', 'Termo de Compromisso')}>
+              <Download className="h-4 w-4 mr-2" />
+              Termo de Compromisso
+            </Button>
+            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('autorizacaoSaida', 'Autorização de Saída')}>
+              <Download className="h-4 w-4 mr-2" />
+              Autorização de Saída
+            </Button>
+            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('declaracaoComparecimento', 'Declaração de Comparecimento')}>
+              <Download className="h-4 w-4 mr-2" />
+              Declaração de Comparecimento
+            </Button>
+            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('termoUsoImagem', 'Termo de Uso de Imagem')}>
+              <Download className="h-4 w-4 mr-2" />
+              Termo de Uso de Imagem
+            </Button>
+            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('termoAutorizacaoTrajeto', 'Termo de Trajeto')}>
+              <Download className="h-4 w-4 mr-2" />
+              Termo de Trajeto
+            </Button>
+          </div>
         </div>
 
         <div>
           <Button variant="ghost" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para Lista de Alunos
+            Voltar para Lista de Estudantes
           </Button>
         </div>
 
@@ -580,7 +617,10 @@ export default function PerfilEstudante() {
                           }}>
                             <SelectTrigger className="w-[100px] h-9"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(year => (
+                              {Array.from(new Set([
+                                String(estudante?.ano || new Date().getFullYear()),
+                                ...(estudante?.historico_academico?.map(h => h.ano_letivo) || [])
+                              ])).sort((a, b) => b.localeCompare(a)).map(year => (
                                 <SelectItem key={year} value={String(year)}>{year}</SelectItem>
                               ))}
                             </SelectContent>
@@ -655,7 +695,10 @@ export default function PerfilEstudante() {
                         </Table>
                       </div>
                       <div className="flex justify-end pt-4">
-                        <Button variant="outline" size="sm" onClick={() => setBoletimDialogOpen(true)}>
+                        <Button className="bg-green-500 hover:bg-green-600 text-white" onClick={() => setTransferenciaDialogOpen(true)}>
+                          <FileDown className="h-4 w-4 mr-2" />Gerar Transferência
+                        </Button>
+                        <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={() => setBoletimDialogOpen(true)}>
                           <Download className="h-4 w-4 mr-2" />Gerar Boletim
                         </Button>
                       </div>
@@ -747,7 +790,7 @@ export default function PerfilEstudante() {
                                 <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm text-muted-foreground">
                                   <span className="flex items-center gap-1.5 line-clamp-1">
                                     <GraduationCap className="h-4 w-4 shrink-0" />
-                                    {anoHistorico.serie || 'Série não informada'}
+                                    {anoHistorico.serie || 'Classificação não informada'}
                                   </span>
                                   {anoHistorico.escola && (
                                     <span className="flex items-center gap-1.5 line-clamp-1">
@@ -884,6 +927,31 @@ export default function PerfilEstudante() {
           ano={selectedYear}
           notas={notas}
           faltasAnuais={faltasAnuais}
+        />
+      )}
+
+      {estudante && (
+        <DocumentPrintDialog
+          open={printDocOpen}
+          onOpenChange={setPrintDocOpen}
+          title={printDocTitle}
+          type={printDocType}
+          estudanteNome={estudante.nome}
+          estudanteMatricula={estudante.matricula}
+          estudanteNascimento={estudante.data_nascimento || undefined}
+          rg={estudante.rg || undefined}
+          cpf={estudante.cpf || undefined}
+          responsavelNome={estudante.responsavel_nome || estudante.mae_nome || estudante.pai_nome || undefined}
+          responsavelRg={estudante.responsavel_rg || undefined}
+          endereco={estudante.endereco || undefined}
+          bairro={estudante.bairro || undefined}
+          cidade={estudante.cidade || undefined}
+          estado={estudante.estado || undefined}
+          turmaNome={turmaHistorica.nome}
+          turmaSerie={turmaHistorica.serie}
+          turmaTurno={estudante.turma_turno || ''}
+          ano={selectedYear}
+          notas={notas}
         />
       )}
     </AppLayout>

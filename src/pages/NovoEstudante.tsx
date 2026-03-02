@@ -1107,7 +1107,7 @@ export default function NovoEstudante() {
                                 <Input value={ano.ano_letivo} onChange={(e) => handleHistoricoChange(ano.id, 'ano_letivo', e.target.value)} />
                               </div>
                               <div className="space-y-2">
-                                <Label>Série</Label>
+                                <Label>Classificação</Label>
                                 <Input placeholder="Ex: 1º Ano Fundamental" value={ano.serie} onChange={(e) => handleHistoricoChange(ano.id, 'serie', e.target.value)} />
                               </div>
                               <div className="space-y-2">
