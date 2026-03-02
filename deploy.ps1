@@ -25,13 +25,13 @@ $newJson = @{
     releaseDate = $currentDate
     notes       = $defaultNotes
 } | ConvertTo-Json
-$newJson | Out-File -FilePath $versionJsonPath -Encoding utf8
+$UTF8NoBOM = New-Object System.Text.UTF8Encoding($false)
+[System.IO.File]::WriteAllText($versionJsonPath, $newJson, $UTF8NoBOM)
 
-# 2. Atualizar src/pages/Configuracoes.tsx
-$configPath = "e:\Projetos_App\educafacil\src\pages\Configuracoes.tsx"
-$configContent = Get-Content $configPath
-$newConfigContent = $configContent -replace 'const APP_VERSION = ".*"; // Versão local atual do código', "const APP_VERSION = `"$versionNumber`"; // Versão local atual do código"
-$newConfigContent | Out-File -FilePath $configPath -Encoding utf8
+# 2. Atualizar src/constants/version.ts
+$versionTsPath = "e:\Projetos_App\educafacil\src\constants\version.ts"
+$versionTsContent = "export const APP_VERSION = `"$versionNumber`";"
+[System.IO.File]::WriteAllText($versionTsPath, $versionTsContent, $UTF8NoBOM)
 
 Write-Host "Arquivos de versão atualizados com sucesso!" -ForegroundColor Cyan
 

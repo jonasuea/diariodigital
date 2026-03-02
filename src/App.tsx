@@ -37,6 +37,7 @@ import PerfilUsuario from "./pages/PerfilUsuario";
 import PerfilMembro from "./pages/PerfilMembro";
 import NotasParciais from "./pages/NotasParciais";
 import ManualUso from "./pages/ManualUso";
+import { useAutoUpdate } from "@/hooks/useAutoUpdate";
 
 const queryClient = new QueryClient();
 
@@ -91,16 +92,20 @@ const router = createBrowserRouter([
   },
 });
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+const App = () => {
+  useAutoUpdate(); // Ativa a verificação global de atualizações
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
 
 export default App;
