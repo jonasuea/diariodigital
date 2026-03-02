@@ -2,11 +2,11 @@
 # Uso: .\deploy.ps1 -m "v1.0.0" [-notes "Descrição das mudanças"]
 
 param(
-  [Parameter(Mandatory=$true)]
-  [string]$m,  # Versão da release (ex: v0.0.3)
+    [Parameter(Mandatory = $true)]
+    [string]$m,  # Versão da release (ex: v0.0.3)
 
-  [Parameter(Mandatory=$false)]
-  [string]$notes = ""  # Notas opcionais da release
+    [Parameter(Mandatory = $false)]
+    [string]$notes = ""  # Notas opcionais da release
 )
 
 # --- PASSO 1: ATUALIZAR O GITHUB ---
@@ -39,16 +39,19 @@ Write-Host "Criando Release no GitHub: $m..." -ForegroundColor Cyan
 if (Get-Command gh -ErrorAction SilentlyContinue) {
     if ($notes -ne "") {
         gh release create "$m" --title "$m" --notes "$notes"
-    } else {
+    }
+    else {
         gh release create "$m" --title "$m" --generate-notes
     }
 
     if ($LASTEXITCODE -eq 0) {
         Write-Host "Release '$m' criada no GitHub com sucesso!" -ForegroundColor Cyan
-    } else {
+    }
+    else {
         Write-Host "Aviso: Não foi possível criar a Release no GitHub (verifique se está logado: gh auth login)." -ForegroundColor Yellow
     }
-} else {
+}
+else {
     Write-Host "Aviso: GitHub CLI (gh) não encontrado. Instale em https://cli.github.com para criar Releases automaticamente." -ForegroundColor Yellow
 }
 
@@ -66,4 +69,4 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "Iniciando o deploy para o Firebase Hosting..." -ForegroundColor Green
 firebase deploy
 
-Write-Host "✅ Processo de deploy concluído! Release '$m' está online." -ForegroundColor Green
+Write-Host "Processo de deploy concluído! Release '$m' está online." -ForegroundColor Green

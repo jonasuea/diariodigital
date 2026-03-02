@@ -68,6 +68,9 @@ export function AppSidebar() {
                 key={item.title}
                 to={item.url}
                 onClick={() => {
+                  if (isMobile && openMobile) {
+                    toggleSidebar();
+                  }
                   if (!item.url.startsWith('/diario-digital')) {
                     sessionStorage.removeItem('diario_filtros');
                   }

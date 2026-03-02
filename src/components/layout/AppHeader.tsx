@@ -11,6 +11,7 @@ import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, documen
 import { db } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 
 interface AppHeaderProps {
@@ -228,30 +229,67 @@ export function AppHeader({ title }: AppHeaderProps) {
       <div className="flex-1" />
 
       {(isAdmin || (permittedEscolas && permittedEscolas.length > 1)) && (
-        <div className="w-[300px] lg:w-[400px] hidden md:block mr-2">
-          <Select
-            value={escolaAtivaId || undefined}
-            onValueChange={(val) => {
-              setEscolaAtivaId(val);
-              sessionStorage.setItem('escolaAtivaId', val);
-              window.location.reload(); // Força recarregamento contextual
-            }}
-          >
-            <SelectTrigger className="h-9">
-              <div className="flex items-center gap-2 truncate">
-                <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                <span className="truncate">
-                  {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || 'Selecione uma Escola'}
-                </span>
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              {escolasDisponiveis.map(esc => (
-                <SelectItem key={esc.id} value={esc.id}>{esc.nome}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <>
+          <div className="w-[300px] lg:w-[400px] hidden md:block mr-2">
+            <Select
+              value={escolaAtivaId || undefined}
+              onValueChange={(val) => {
+                setEscolaAtivaId(val);
+                sessionStorage.setItem('escolaAtivaId', val);
+                window.location.reload(); // Força recarregamento contextual
+              }}
+            >
+              <SelectTrigger className="h-9">
+                <div className="flex items-center gap-2 truncate">
+                  <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  <span className="truncate">
+                    {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || 'Selecione uma Escola'}
+                  </span>
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                {escolasDisponiveis.map(esc => (
+                  <SelectItem key={esc.id} value={esc.id}>{esc.nome}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="md:hidden mr-2">
+            <Dialog>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9" title="Trocar Escola">
+                  <School className="h-4 w-4 text-primary" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[90vw] rounded-lg">
+                <DialogHeader>
+                  <DialogTitle>Trocar de Escola</DialogTitle>
+                  <DialogDescription>
+                    Selecione a unidade escolar que deseja acessar.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-2 py-4">
+                  {escolasDisponiveis.map(esc => (
+                    <Button
+                      key={esc.id}
+                      variant={escolaAtivaId === esc.id ? "default" : "outline"}
+                      className="justify-start h-12"
+                      onClick={() => {
+                        setEscolaAtivaId(esc.id);
+                        sessionStorage.setItem('escolaAtivaId', esc.id);
+                        window.location.reload();
+                      }}
+                    >
+                      <School className="mr-2 h-4 w-4" />
+                      <span className="truncate">{esc.nome}</span>
+                    </Button>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </>
       )}
 
       <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>

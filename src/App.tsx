@@ -36,6 +36,7 @@ import PerfilProfessor from "./pages/PerfilProfessor";
 import PerfilUsuario from "./pages/PerfilUsuario";
 import PerfilMembro from "./pages/PerfilMembro";
 import NotasParciais from "./pages/NotasParciais";
+import ManualUso from "./pages/ManualUso";
 
 const queryClient = new QueryClient();
 
@@ -81,6 +82,7 @@ const router = createBrowserRouter([
   { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Configuracoes /></ProtectedRoute> },
   { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Usuarios /></ProtectedRoute> },
   { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Logs /></ProtectedRoute> },
+  { path: "/manual-uso", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ManualUso /></ProtectedRoute> },
 
   { path: "*", element: <NotFound /> },
 ], {
