@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
+import { useAutoUpdate } from '@/hooks/useAutoUpdate';
 
 interface AppHeaderProps {
   title?: string;
@@ -37,6 +38,7 @@ export function AppHeader({ title }: AppHeaderProps) {
   const { role, escolaAtivaId, setEscolaAtivaId, isAdmin, permittedEscolas } = useUserRole();
   const { toggleSidebar, isMobile } = useSidebar();
   const navigate = useNavigate();
+  const { hasUpdate } = useAutoUpdate();
 
   const [escolasDisponiveis, setEscolasDisponiveis] = useState<{ id: string, nome: string }[]>([]);
 
@@ -343,9 +345,16 @@ export function AppHeader({ title }: AppHeaderProps) {
         </PopoverContent>
       </Popover>
 
-      <Button variant="ghost" size="icon" className="relative">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="relative"
+        onClick={() => navigate('/configuracoes')}
+      >
         <Bell className="h-5 w-5" />
-        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive" />
+        {hasUpdate && (
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
+        )}
       </Button>
 
       <div className="flex items-center gap-3">

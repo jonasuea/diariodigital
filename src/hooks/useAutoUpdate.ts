@@ -4,27 +4,23 @@ import { APP_VERSION } from '@/constants/version';
 
 export function useAutoUpdate() {
     const [lastCheck, setLastCheck] = useState<number>(Date.now());
+    const [hasUpdate, setHasUpdate] = useState(false);
+    const [newVersionInfo, setNewVersionInfo] = useState<{ version: string, notes: string } | null>(null);
 
     const checkUpdate = async () => {
         try {
-            // Adicionamos um timestamp para evitar cache agressivo do navegador
             const response = await fetch(`/version.json?t=${Date.now()}`);
             if (!response.ok) return;
 
             const data = await response.json();
 
             if (data.version && data.version !== APP_VERSION) {
-                toast.info(`Nova versão ${data.version} disponível!`, {
-                    description: data.notes || "Atualização do sistema disponível.",
-                    duration: Infinity,
-                    action: {
-                        label: "Atualizar Agora",
-                        onClick: () => {
-                            handleApplyUpdate();
-                        },
-                    },
-                });
+                setHasUpdate(true);
+                setNewVersionInfo({ version: data.version, notes: data.notes });
                 return true;
+            } else {
+                setHasUpdate(false);
+                setNewVersionInfo(null);
             }
         } catch (error) {
             console.error('Erro ao verificar atualização automática:', error);
@@ -59,5 +55,5 @@ export function useAutoUpdate() {
         return () => clearInterval(interval);
     }, []);
 
-    return { checkUpdate, lastCheck };
+    return { checkUpdate, lastCheck, hasUpdate, newVersionInfo, handleApplyUpdate };
 }

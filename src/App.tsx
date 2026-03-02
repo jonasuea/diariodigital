@@ -93,8 +93,6 @@ const router = createBrowserRouter([
 });
 
 const App = () => {
-  useAutoUpdate(); // Ativa a verificação global de atualizações
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
