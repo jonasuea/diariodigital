@@ -92,7 +92,12 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "Iniciando o deploy para o Firebase Hosting..." -ForegroundColor Green
+Write-Host "Iniciando o deploy para o Firebase..." -ForegroundColor Green
 firebase deploy
+
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "Erro durante o deploy para o Firebase." -ForegroundColor Red
+    exit 1
+}
 
 Write-Host "Processo de deploy concluído! Release '$m' está online." -ForegroundColor Green
