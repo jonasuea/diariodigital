@@ -47,19 +47,33 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
         throw new functions.https.HttpsError("invalid-argument", "Dados insuficientes para criação.");
     }
     try {
-        const userRecord = await admin.auth().createUser({
-            email,
-            password,
-            displayName: nome,
-        });
-        const uid = userRecord.uid;
+        let uid;
+        try {
+            const userRecord = await admin.auth().createUser({
+                email,
+                password,
+                displayName: nome,
+            });
+            uid = userRecord.uid;
+        }
+        catch (authError) {
+            if (authError.code === "auth/email-already-in-use") {
+                const existingUser = await admin.auth().getUserByEmail(email);
+                uid = existingUser.uid;
+                console.log(`Usuário ${email} já existe no Auth. Recuperando UID: ${uid}`);
+            }
+            else {
+                throw authError;
+            }
+        }
         const batch = db.batch();
         const profileRef = db.collection("profiles").doc(uid);
         batch.set(profileRef, {
             nome,
             email,
             created_at: admin.firestore.FieldValue.serverTimestamp(),
-        });
+            excluido: false,
+        }, { merge: true });
         const roleRef = db.collection("user_roles").doc(uid);
         batch.set(roleRef, {
             role,
@@ -67,13 +81,14 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
             email,
             escola_id: escola_id || "",
             escolas: escola_id ? [escola_id] : [],
-            created_at: admin.firestore.FieldValue.serverTimestamp(),
-        });
+            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            excluido: false,
+        }, { merge: true });
         await batch.commit();
         return { success: true, uid };
     }
     catch (error) {
-        console.error("Sem permissão para criar usuário:", error);
+        console.error("Erro ao criar/recuperar usuário:", error);
         throw new functions.https.HttpsError("internal", error.message);
     }
 });
