@@ -1,9 +1,10 @@
+import { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { printContainer } from '@/lib/print-utils';
+import { printElement } from '@/lib/print-utils';
 
 interface Nota {
     id: string;
@@ -54,6 +55,7 @@ export function BoletimDialog({
     estudanteNome, estudanteMatricula, estudanteNascimento,
     turmaNome, turmaSerie, ano, notas, faltasAnuais
 }: BoletimDialogProps) {
+    const printRef = useRef<HTMLDivElement>(null);
     const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
     const dataNasc = estudanteNascimento
         ? format(parseISO(estudanteNascimento), 'dd/MM/yyyy', { locale: ptBR })
@@ -67,7 +69,11 @@ export function BoletimDialog({
     const totalFaltasGeral = Object.values(faltasAnuais)
         .reduce((acc, arr) => acc + arr.reduce((a, b) => a + b, 0), 0);
 
-    const handlePrint = () => printContainer();
+    const handlePrint = () => {
+        if (printRef.current) {
+            printElement(printRef.current);
+        }
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -76,7 +82,7 @@ export function BoletimDialog({
                     <DialogTitle>Boletim Escolar</DialogTitle>
                 </DialogHeader>
 
-                <div className="print-container p-4 bg-white text-black">
+                <div ref={printRef} className="print-container p-4 bg-white text-black">
 
                     {/* Cabeçalho */}
                     <div className="header text-center border-b-2 border-blue-900 pb-3">

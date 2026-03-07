@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,7 +8,7 @@ import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebas
 import { toast } from 'sonner';
 import { Printer, X, Loader2 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
-import { printContainer } from '@/lib/print-utils';
+import { printElement } from '@/lib/print-utils';
 
 interface Turma {
   id: string;
@@ -32,6 +32,7 @@ interface ReportMatriculasDialogProps {
 }
 
 export function ReportMatriculasDialog({ open, onOpenChange }: ReportMatriculasDialogProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   const { escolaAtivaId } = useUserRole();
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [selectedTurmaId, setSelectedTurmaId] = useState<string>('all');
@@ -111,18 +112,16 @@ export function ReportMatriculasDialog({ open, onOpenChange }: ReportMatriculasD
 
     } catch (error) {
       console.error("Error fetching turmas: ", error);
-      toast.error('Erro ao buscar dados');
+      toast.error('Sem permissão para buscar dados');
     } finally {
       setLoading(false);
     }
   };
 
   const handlePrint = () => {
-    if (turmas.length === 0) {
-      toast.error('Nenhum dado para imprimir');
-      return;
+    if (printRef.current) {
+      printElement(printRef.current);
     }
-    printContainer();
   };
 
   const dataAtual = new Date().toLocaleDateString('pt-BR');
@@ -179,7 +178,7 @@ export function ReportMatriculasDialog({ open, onOpenChange }: ReportMatriculasD
           {loading && <Loader2 className="h-5 w-5 animate-spin text-primary mb-2 ml-auto" />}
         </div>
 
-        <div className="print-container p-8 bg-white text-black">
+        <div ref={printRef} className="print-container p-8 bg-white text-black">
           {/* Header */}
           <div className="border border-black p-4 mb-6">
             <h1 className="text-center font-bold text-xl uppercase mb-4 border-b border-black pb-2">
@@ -293,83 +292,6 @@ export function ReportMatriculasDialog({ open, onOpenChange }: ReportMatriculasD
           </Button>
         </div>
 
-        <style dangerouslySetInnerHTML={{
-          __html: `
-      @media print {
-        @page {
-          size: A4 portrait;
-          margin: 1cm;
-        }
-        body {
-          visibility: hidden !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        .print-container {
-          visibility: visible !important;
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-          width: 100% !important;
-          height: auto !important;
-          min-height: 0 !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: white !important;
-          display: block !important;
-        }
-        .print-container * {
-          visibility: visible !important;
-        }
-        .no-print, .no-print * {
-          display: none !important;
-          visibility: hidden !important;
-          width: 0 !important;
-          height: 0 !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          border: none !important;
-        }
-        .no-print-bg {
-          background-color: transparent !important;
-        }
-        /* Explicitly hide radix dark overlay and close button */
-        .bg-black\\/80, 
-        [data-state="open"] > div:first-child:not([role="dialog"]),
-        [role="dialog"] > button:last-child {
-          display: none !important;
-        }
-        /* Ensure the dialog portal doesn't hide everything */
-        [data-radix-portal], [role="dialog"] {
-          visibility: visible !important;
-          overflow: visible !important;
-          max-height: none !important;
-          max-width: none !important;
-          height: auto !important;
-          width: 100% !important;
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-          transform: none !important;
-          border: none !important;
-          box-shadow: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: transparent !important;
-        }
-        /* Table fixes for print */
-        table {
-          border-collapse: collapse !important;
-          width: 100% !important;
-          table-layout: auto !important;
-        }
-        th, td {
-          border: 1px solid black !important;
-          color: black !important;
-          word-break: break-word !important;
-        }
-      }
-    `}} />
       </DialogContent>
     </Dialog >
   );

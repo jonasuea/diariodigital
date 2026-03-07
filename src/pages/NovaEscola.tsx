@@ -20,7 +20,7 @@ const initialState = {
     nome: '',
     decreto_criacao: '',
     email: '',
-    telefone: '',
+    contato: '',
     zona: '',
     endereco: '',
     horario_funcionamento: '',
@@ -67,8 +67,8 @@ export default function NovaEscola() {
                 navigate('/escolas');
             }
         } catch (error) {
-            console.error('Erro ao carregar escola:', error);
-            toast.error('Erro ao carregar dados da escola');
+            console.error('Sem permissão para carregar escola:', error);
+            toast.error('Sem permissão para carregar dados da escola');
         } finally {
             setLoading(false);
         }
@@ -97,7 +97,7 @@ export default function NovaEscola() {
                 nome: formData.nome,
                 decreto_criacao: formData.decreto_criacao,
                 email: formData.email,
-                telefone: formData.telefone,
+                contato: formData.contato,
                 zona: formData.zona,
                 endereco: formData.endereco,
                 horario_funcionamento: formData.horario_funcionamento,
@@ -145,8 +145,8 @@ export default function NovaEscola() {
 
             navigate('/escolas');
         } catch (error) {
-            console.error('Erro ao salvar escola:', error);
-            toast.error('Erro ao salvar os dados. Tente novamente.');
+            console.error('Sem permissão para salvar escola:', error);
+            toast.error('Sem permissão para salvar os dados. Tente novamente.');
         } finally {
             setLoading(false);
         }
@@ -224,8 +224,8 @@ export default function NovaEscola() {
                                     <Input id="email" type="email" placeholder="contato@escola.com" value={formData.email} onChange={(e) => handleChange('email', e.target.value)} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="telefone">Telefone / Contato</Label>
-                                    <Input id="telefone" placeholder="(00) 0000-0000" value={formData.telefone} onChange={(e) => handleChange('telefone', e.target.value)} />
+                                    <Label htmlFor="contato">Contato / Contato</Label>
+                                    <Input id="contato" placeholder="(00) 0000-0000" value={formData.contato} onChange={(e) => handleChange('contato', e.target.value)} />
                                 </div>
 
                                 <div className="space-y-2 lg:col-span-2">

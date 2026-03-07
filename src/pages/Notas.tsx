@@ -147,7 +147,7 @@ export default function Notas() {
 
       setNotas(notasData);
     } catch (error) {
-      toast.error('Erro ao carregar dados');
+      toast.error('Sem permissão para carregar dados');
       console.error(error);
     }
 
@@ -306,7 +306,7 @@ export default function Notas() {
       toast.success('Notas salvas com sucesso!');
       loadData();
     } catch (error) {
-      toast.error('Erro ao salvar notas');
+      toast.error('Sem permissão para salvar notas');
       console.error(error);
     } finally {
       setSaving(false);
@@ -439,7 +439,7 @@ export default function Notas() {
                 loadData();
               } catch (err) {
                 console.error(err);
-                toast.error('Erro ao apagar notas');
+                toast.error('Sem permissão para apagar notas');
               } finally {
                 setClearing(false);
               }

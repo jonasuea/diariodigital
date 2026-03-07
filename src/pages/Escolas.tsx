@@ -22,7 +22,7 @@ interface Escola {
     nome: string;
     decreto_criacao: string;
     email: string;
-    telefone: string;
+    contato: string;
     zona: string;
     endereco: string;
     horario_funcionamento: string;
@@ -65,7 +65,7 @@ export default function Escolas() {
                     nome: data.nome || '',
                     decreto_criacao: data.decreto_criacao || '',
                     email: data.email || '',
-                    telefone: data.telefone || '',
+                    contato: data.contato || '',
                     zona: data.zona || '',
                     endereco: data.endereco || '',
                     horario_funcionamento: data.horario_funcionamento || '',
@@ -88,8 +88,8 @@ export default function Escolas() {
 
             setEscolas(fetchedEscolas);
         } catch (error) {
-            console.error('Erro ao buscar escolas:', error);
-            toast.error('Erro ao carregar lista de escolas');
+            console.error('Sem permissão para buscar escolas:', error);
+            toast.error('Sem permissão para carregar lista de escolas');
         } finally {
             setLoading(false);
         }
@@ -106,8 +106,8 @@ export default function Escolas() {
             setEscolaToDelete(null);
             fetchEscolas();
         } catch (error) {
-            console.error('Erro ao excluir escola:', error);
-            toast.error('Erro ao excluir escola');
+            console.error('Sem permissão para excluir escola:', error);
+            toast.error('Sem permissão para excluir escola');
         }
     };
 
@@ -130,7 +130,7 @@ export default function Escolas() {
             header: 'E-mail',
         },
         {
-            key: 'telefone',
+            key: 'contato',
             header: 'Contato',
         },
         {
@@ -282,8 +282,8 @@ export default function Escolas() {
                                         <p className="font-medium text-sm">{escolaToView.email || '-'}</p>
                                     </div>
                                     <div className="space-y-1">
-                                        <Label className="text-muted-foreground text-xs">Contato (Telefone)</Label>
-                                        <p className="font-medium text-sm">{escolaToView.telefone || '-'}</p>
+                                        <Label className="text-muted-foreground text-xs">Contato (Contato)</Label>
+                                        <p className="font-medium text-sm">{escolaToView.contato || '-'}</p>
                                     </div>
                                     <div className="space-y-1">
                                         <Label className="text-muted-foreground text-xs">Zona</Label>

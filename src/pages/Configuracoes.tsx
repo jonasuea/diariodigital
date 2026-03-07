@@ -12,11 +12,12 @@ import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Buildin
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { db, storage } from '@/lib/firebase';
+import { db, storage, functions } from '@/lib/firebase';
 import { logActivity } from '@/lib/logger';
 import { doc, getDoc, setDoc, collection, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { APP_VERSION } from '@/constants/version';
+import { httpsCallable } from 'firebase/functions';
 
 export default function Configuracoes() {
   const { user } = useAuth();
@@ -37,7 +38,7 @@ export default function Configuracoes() {
     nome: 'Escola Municipal Nome da Escola',
     decretoCriacao: '',
     email: 'contato@escolanome.edu.br',
-    telefone: '(11) 0000-0000',
+    contato: '(11) 0000-0000',
     zona: '',
     endereco: 'Rua das Flores, 123 - São Paulo',
     horarioFuncionamento: 'Segunda a Sexta, 7h às 18h',
@@ -64,7 +65,7 @@ export default function Configuracoes() {
   const [profileData, setProfileData] = useState({
     nome: 'Administrador',
     email: user?.email || 'admin@escola.edu.br',
-    telefone: '(11) 98765-4321',
+    contato: '(11) 98765-4321',
     cargo: 'Administrador',
     foto_url: '',
     novaSenha: '',
@@ -79,7 +80,7 @@ export default function Configuracoes() {
           try {
             await document.documentElement.requestFullscreen();
           } catch (err) {
-            console.error(`Erro ao tentar ativar a tela cheia: ${err.message}`);
+            console.error(`Sem permissão para tentar ativar a tela cheia: ${err.message}`);
           }
         }
       } else {
@@ -87,7 +88,7 @@ export default function Configuracoes() {
           try {
             await document.exitFullscreen();
           } catch (err) {
-            console.error(`Erro ao tentar desativar a tela cheia: ${err.message}`);
+            console.error(`Sem permissão para tentar desativar a tela cheia: ${err.message}`);
           }
         }
       }
@@ -123,7 +124,7 @@ export default function Configuracoes() {
               nome: d.nome || prev.nome,
               decretoCriacao: d.decreto_criacao || prev.decretoCriacao,
               email: d.email || prev.email,
-              telefone: d.telefone || prev.telefone,
+              contato: d.contato || prev.contato,
               zona: d.zona || prev.zona,
               endereco: d.endereco || prev.endereco,
               horarioFuncionamento: d.horario_funcionamento || prev.horarioFuncionamento,
@@ -152,14 +153,14 @@ export default function Configuracoes() {
               ...prev,
               nome: profile.nome || prev.nome,
               email: user.email || prev.email,
-              telefone: profile.telefone || '',
+              contato: profile.contato || '',
               cargo: profile.cargo || role || prev.cargo,
               foto_url: profile.foto_url || '',
             }));
           }
         }
       } catch (error) {
-        toast.error('Erro ao carregar configurações');
+        toast.error('Sem permissão para carregar configurações');
         console.error(error);
       } finally {
         setLoading(false);
@@ -178,7 +179,7 @@ export default function Configuracoes() {
         nome: escolaConfig.nome,
         decreto_criacao: escolaConfig.decretoCriacao,
         email: escolaConfig.email,
-        telefone: escolaConfig.telefone,
+        contato: escolaConfig.contato,
         zona: escolaConfig.zona,
         endereco: escolaConfig.endereco,
         horario_funcionamento: escolaConfig.horarioFuncionamento
@@ -186,7 +187,7 @@ export default function Configuracoes() {
       await logActivity('atualizou as informações da escola.');
       toast.success('Informações da escola salvas com sucesso!');
     } catch (error) {
-      toast.error('Erro ao salvar informações da escola');
+      toast.error('Sem permissão para salvar informações da escola');
       console.error(error);
     }
   };
@@ -209,7 +210,7 @@ export default function Configuracoes() {
       toast.success('Instalações atualizadas com sucesso!');
       setIsInstalacoesOpen(false);
     } catch (error) {
-      toast.error('Erro ao salvar instalaçÃµes');
+      toast.error('Sem permissão para salvar instalaçÃµes');
       console.error(error);
     }
   };
@@ -224,7 +225,7 @@ export default function Configuracoes() {
       await logActivity('atualizou as preferências do sistema.');
       toast.success('Preferências salvas com sucesso!');
     } catch (error) {
-      toast.error('Erro ao salvar preferências');
+      toast.error('Sem permissão para salvar preferências');
       console.error(error);
     }
   };
@@ -247,7 +248,7 @@ export default function Configuracoes() {
       const profileDocRef = doc(db, 'profiles', user.uid);
       const dataToUpdate = {
         nome: profileData.nome,
-        telefone: profileData.telefone,
+        contato: profileData.contato,
       };
       await setDoc(profileDocRef, dataToUpdate, { merge: true });
 
@@ -256,7 +257,7 @@ export default function Configuracoes() {
       setIsEditProfileOpen(false);
       setProfileData(prev => ({ ...prev, novaSenha: '', confirmarSenha: '' }));
     } catch (error) {
-      toast.error('Erro ao atualizar o perfil.');
+      toast.error('Sem permissão para atualizar o perfil.');
       console.error(error);
     }
   };
@@ -287,7 +288,7 @@ export default function Configuracoes() {
       await logActivity('atualizou sua foto de perfil.');
       toast.success('Foto de perfil atualizada!');
     } catch (error) {
-      toast.error('Erro ao fazer upload da foto');
+      toast.error('Sem permissão para fazer upload da foto');
       console.error(error);
     } finally {
       setUploadingPhoto(false);
@@ -334,7 +335,7 @@ export default function Configuracoes() {
       }
 
     } catch (error) {
-      console.error("Erro ao sincronizar dados:", error);
+      console.error("Sem permissão para sincronizar dados:", error);
       toast.error('Ocorreu um erro durante a sincronização.');
     } finally {
       setIsSyncing(false);
@@ -377,7 +378,7 @@ export default function Configuracoes() {
       toast.success(`${count} registros atualizados com o INEP 13034243!`);
       await logActivity('executou o script de migração do tenant para 13034243.');
     } catch (error) {
-      console.error("Erro ao migrar dados:", error);
+      console.error("Sem permissão para migrar dados:", error);
       toast.error('Ocorreu um erro durante a migração. Verifique o console.');
     } finally {
       setIsMigrating(false);
@@ -425,7 +426,7 @@ export default function Configuracoes() {
       toast.success(`${count} estudante(s) transferido(s) tiveram sua escola removida com sucesso!`);
       await logActivity(`executou o script de limpeza de escola de ${count} estudante(s) transferido(s).`);
     } catch (error) {
-      console.error('Erro ao limpar transferidos:', error);
+      console.error('Sem permissão para limpar transferidos:', error);
       toast.error('Ocorreu um erro. Verifique o console.');
     } finally {
       setIsMigrating(false);
@@ -434,7 +435,7 @@ export default function Configuracoes() {
 
   const handleCriarUsuariosFaltantes = async () => {
     const confirmado = window.confirm(
-      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃƒO sejam um usuário terão um usuário criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vários minutos. VocÃª tem certeza que quer rodar isso?'
+      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃƒO sejam um usuário terão um usuário criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vários minutos. Você tem certeza que quer rodar isso?'
     );
     if (!confirmado) return;
 
@@ -490,50 +491,30 @@ export default function Configuracoes() {
             // Apenas tentaremos criar se não tiver um profile correspondente
             if (!existingEmails.has(emailLower)) {
               try {
-                // 1. Cria usuário no Firebase Auth (Auth UI vai logar este usuário localmente no SecondaryAuth)
-                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, emailLower, "EDUCAFACIL2026");
-                const authUid = userCredential.user.uid;
+                // Usa Cloud Function para criar/recuperar conta + papel + perfil
+                const createUser = httpsCallable(functions, 'createUserAccount');
+                const result = await createUser({
+                  email: emailLower,
+                  password: 'EDUCAFACIL2026',
+                  nome: nome || 'Sem nome',
+                  role: colInfo.role,
+                  escola_id: escola_id
+                });
+
+                const { uid } = result.data as { uid: string };
                 existingEmails.add(emailLower);
 
-                // 2. Prepara o batch de dados
+                // Atualiza o cadastro original pra linkar com o authUid
                 const batch = writeBatch(db);
-
-                // Add profile entry vinculado ao id real do Auth
-                const profileRef = doc(db, 'profiles', authUid);
-                batch.set(profileRef, {
-                  nome: nome || 'Sem nome',
-                  email: emailLower,
-                  telefone: docSnap.data().contato || docSnap.data().telefone || '',
-                  cargo: colInfo.role,
-                  foto_url: docSnap.data().foto_url || ''
-                }, { merge: true });
-
-                // Add robust user role entry
-                const roleRef = doc(db, 'user_roles', authUid);
-                batch.set(roleRef, {
-                  role: colInfo.role,
-                  status: 'ativo',
-                  email: emailLower,
-                  escola_id: escola_id,
-                  escolas: escola_id ? [escola_id] : []
-                }, { merge: true });
-
-                // 3. Atualiza o cadastro original pra linkar com o authUid
                 const originalRef = doc(db, colInfo.name, id);
-                batch.update(originalRef, { usuario_id: authUid });
-
-                // 4. Salva a transação
+                batch.update(originalRef, { usuario_id: uid });
                 await batch.commit();
-                createdCount++;
 
-                // Delay curto para evitar bater rate limits muito rápido do Firebase Auth
-                await new Promise(resolve => setTimeout(resolve, 300));
+                createdCount++;
+                // Delay curto para evitar bater rate limits
+                await new Promise(resolve => setTimeout(resolve, 200));
               } catch (err: any) {
-                console.error(`Erro ao criar Firebase Auth para ${emailLower}:`, err);
-                if (err.code === 'auth/email-already-in-use') {
-                  // Se o auth já existe lá, mas não está no profiles, a gente registra no set pra pular
-                  existingEmails.add(emailLower);
-                }
+                console.error(`Erro ao processar usuário ${emailLower}:`, err);
                 errorCount++;
               }
             }
@@ -574,10 +555,73 @@ export default function Configuracoes() {
         setNewVersionAvailable(null);
       }
     } catch (error) {
-      console.error('Erro ao verificar atualização:', error);
-      toast.error('Erro ao verificar atualizações.');
+      console.error('Sem permissão para verificar atualização:', error);
+      toast.error('Sem permissão para verificar atualizações.');
     } finally {
       setIsCheckingUpdate(false);
+    }
+  };
+
+  const handleFixMissingExcluido = async () => {
+    const confirmado = window.confirm(
+      'Isso irá adicionar o campo "excluido: false" a todos os registros de usuários, equipe, professores e estudantes que não o possuem. Isso é necessário para que eles apareçam nas listagens. Deseja continuar?'
+    );
+    if (!confirmado) return;
+
+    setIsMigrating(true);
+    toast.info('Corrigindo campo "excluído"... Aguarde.');
+
+    try {
+      const collectionsToMigrate = ['profiles', 'user_roles', 'equipe_gestora', 'professores', 'estudantes', 'turmas'];
+      let totalUpdated = 0;
+
+      for (const collName of collectionsToMigrate) {
+        const snapshot = await getDocs(collection(db, collName));
+        let batch = writeBatch(db);
+        let opsInBatch = 0;
+
+        for (const docSnap of snapshot.docs) {
+          const data = docSnap.data();
+          const updates: any = {};
+
+          if (data.excluido === undefined) {
+            updates.excluido = false;
+          }
+
+          // Garante que o nome exista para não quebrar o orderBy
+          if (!data.nome || data.nome === 'Sem nome') {
+            if (data.email) {
+              updates.nome = data.email.split('@')[0];
+            } else {
+              updates.nome = 'Usuário sem Nome';
+            }
+          }
+
+          if (Object.keys(updates).length > 0) {
+            batch.update(docSnap.ref, updates);
+            opsInBatch++;
+            totalUpdated++;
+          }
+
+          if (opsInBatch >= 450) {
+            await batch.commit();
+            batch = writeBatch(db);
+            opsInBatch = 0;
+          }
+        }
+
+        if (opsInBatch > 0) {
+          await batch.commit();
+        }
+      }
+
+      toast.success(`${totalUpdated} documentos atualizados com sucesso!`);
+      await logActivity(`corrigiu o campo "excluido" e "nome" em ${totalUpdated} registros.`);
+    } catch (error) {
+      console.error('Erro na migração:', error);
+      toast.error('Ocorreu um erro durante a migração.');
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -590,7 +634,7 @@ export default function Configuracoes() {
       }
       window.location.reload();
     } catch (error) {
-      console.error('Erro ao limpar cache:', error);
+      console.error('Sem permissão para limpar cache:', error);
       window.location.reload();
     }
   };
@@ -610,398 +654,556 @@ export default function Configuracoes() {
       <div className="space-y-6 animate-fade-in">
         <p className="text-muted-foreground -mt-2">Gerencie as configurações do sistema</p>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Coluna principal */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Informações da Escola */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Informações da Escola</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">INEP</Label>
-                    <div className="flex items-center gap-2">
-                      <Building className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={escolaConfig.inep}
-                        disabled
-                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0 cursor-not-allowed opacity-70"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Nome da Escola</Label>
-                    <div className="flex items-center gap-2">
-                      <School className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={escolaConfig.nome}
-                        onChange={(e) => setEscolaConfig({ ...escolaConfig, nome: e.target.value })}
-                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Decreto de Criação</Label>
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 text-muted-foreground invisible" /> {/* Placeholder for consistent alignment */}
-                      <Input
-                        value={escolaConfig.decretoCriacao}
-                        onChange={(e) => setEscolaConfig({ ...escolaConfig, decretoCriacao: e.target.value })}
-                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
-                        placeholder="Informe o decreto"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">E-mail</Label>
-                    <div className="flex items-center gap-2">
-                      <Mail className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={escolaConfig.email}
-                        onChange={(e) => setEscolaConfig({ ...escolaConfig, email: e.target.value })}
-                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Telefone</Label>
-                    <div className="flex items-center gap-2">
-                      <Phone className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={escolaConfig.telefone}
-                        onChange={(e) => setEscolaConfig({ ...escolaConfig, telefone: e.target.value })}
-                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Zona (Urbana/Rural)</Label>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <Select value={escolaConfig.zona} onValueChange={(value) => setEscolaConfig({ ...escolaConfig, zona: value })}>
-                        <SelectTrigger className="border-0 bg-transparent p-0 h-auto font-medium focus:ring-0 w-full text-left">
-                          <SelectValue placeholder="Selecione a Zona" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Urbana">Urbana</SelectItem>
-                          <SelectItem value="Rural - Várzea">Rural - Várzea</SelectItem>
-                          <SelectItem value="Rural - Terra Firme">Rural - Terra Firme</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Endereço</Label>
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={escolaConfig.endereco}
-                        onChange={(e) => setEscolaConfig({ ...escolaConfig, endereco: e.target.value })}
-                        className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Horário de Funcionamento</Label>
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <Input
-                      value={escolaConfig.horarioFuncionamento}
-                      onChange={(e) => setEscolaConfig({ ...escolaConfig, horarioFuncionamento: e.target.value })}
-                      className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
-                    />
-                  </div>
-                </div>
-                <Button onClick={handleSaveEscola} className="mt-2">
-                  Salvar Alterações
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Instalações da Escola */}
-            <Card>
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold">Instalações da Escola</CardTitle>
-                  <Button variant="outline" size="sm" onClick={() => setIsInstalacoesOpen(true)}>
-                    <Building className="h-4 w-4 mr-2" />
-                    Gerenciar Instalações
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Salas de Aula</p>
-                      <p className="text-2xl font-bold">{instalacoes.salasAula}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Laboratórios</p>
-                      <p className="text-2xl font-bold">{instalacoes.laboratorios}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Banheiros</p>
-                      <p className="text-2xl font-bold">{instalacoes.banheiros}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Cantina</p>
-                      <p className="text-2xl font-bold">{instalacoes.cantina}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Biblioteca</p>
-                      <p className="text-2xl font-bold">{instalacoes.biblioteca}</p>
-                    </CardContent>
-                  </Card>
-                  <Card className="bg-muted/50">
-                    <CardContent className="p-4">
-                      <p className="text-sm text-muted-foreground">Quadras</p>
-                      <p className="text-2xl font-bold">{instalacoes.quadras}</p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Preferências do Sistema */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Preferências do Sistema</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-start gap-3">
-                    <Bell className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Notificações</p>
-                      <p className="text-sm text-muted-foreground">
-                        Receber Notificações de eventos e atividades
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={preferencias.notificacoes}
-                    onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, notificacoes: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-start gap-3">
-                    <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Autenticação em Dois Fatores</p>
-                      <p className="text-sm text-muted-foreground">
-                        Aumenta a segurança da sua conta
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={preferencias.autenticacaoDoisFatores}
-                    onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
-                  />
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-start gap-3">
-                    <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div>
-                      <p className="font-medium">Navegador em Tela Cheia</p>
-                      <p className="text-sm text-muted-foreground">
-                        O sistema sempre Iniciação em modo de tela cheia
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={preferencias.telaCheiaPadrao}
-                    onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, telaCheiaPadrao: checked })}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Sidebar direita */}
-          <div className="space-y-6">
-
-            {/* Informações da Conta */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold">Informações da Conta</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center text-center">
-                <div className="relative group mb-4">
-                  <Avatar className="h-24 w-24 border-2 border-primary/20">
-                    <AvatarImage src={profileData.foto_url} alt={profileData.nome} />
-                    <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">
-                      {profileData.nome.substring(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <button
-                    onClick={() => photoInputRef.current?.click()}
-                    disabled={uploadingPhoto}
-                    className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
-                  >
-                    <Camera className="h-6 w-6 text-white" />
-                  </button>
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handlePhotoUpload}
-                  />
-                </div>
-                {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">Enviando foto...</p>}
-                <h3 className="font-semibold text-lg">{profileData.nome}</h3>
-                <p className="text-sm text-muted-foreground mb-4">{profileData.email}</p>
-                <Button variant="outline" className="w-full" onClick={() => setIsEditProfileOpen(true)}>
-                  Editar Perfil
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Sistema e Versão */}
-            <Card>
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                  <Wrench className="h-5 w-5" /> Versão do Sistema
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between border-b pb-4">
-                  <div>
-                    <p className="font-medium">Versão do App</p>
-                    <p className="text-sm text-muted-foreground">Versão Local: v{APP_VERSION}</p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCheckUpdate}
-                    disabled={isCheckingUpdate}
-                  >
-                    {isCheckingUpdate ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Verificando...
-                      </>
-                    ) : 'Verificar Atualizações'}
-                  </Button>
-                </div>
-
-                {newVersionAvailable && (
-                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
-                    <div className="flex items-start justify-between mb-2">
-                      <div>
-                        <p className="font-bold text-primary">Nova Versão Disponí­vel: v{newVersionAvailable.version}</p>
-                        <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
-                      </div>
-                      <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
-                      </Button>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground italic">
-                      Nota: A atualização irá limpar o cache local e recarregar a página. Seus dados no Firebase não serão afetados.
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Manutenção do Sistema */}
-            {role === 'admin' && (
+        <div className={role === 'professor' || role === 'estudante' || role === 'aluno' ? "max-w-3xl mx-auto space-y-6" : "grid gap-6 lg:grid-cols-3"}>
+          {/* Se for Professor ou Estudante, mostrar layout simplificado na ordem solicitada */}
+          {(role === 'professor' || role === 'estudante' || role === 'aluno') ? (
+            <>
+              {/* 1. Informações da Conta */}
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">Manutenção do Sistema</CardTitle>
+                  <CardTitle className="text-lg font-semibold">Informações da Conta</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
+                <CardContent className="flex flex-col items-center text-center">
+                  <div className="relative group mb-4">
+                    <Avatar className="h-24 w-24 border-2 border-primary/20">
+                      <AvatarImage src={profileData.foto_url} alt={profileData.nome} />
+                      <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">
+                        {profileData.nome.substring(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <button
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                      className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+                    >
+                      <Camera className="h-6 w-6 text-white" />
+                    </button>
+                    <input
+                      ref={photoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handlePhotoUpload}
+                    />
+                  </div>
+                  {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">Enviando foto...</p>}
+                  <h3 className="font-semibold text-lg">{profileData.nome}</h3>
+                  <p className="text-sm text-muted-foreground mb-4">{profileData.email}</p>
+                  <Button variant="outline" className="w-full" onClick={() => setIsEditProfileOpen(true)}>
+                    Editar Perfil
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* 2. Preferências do Sistema */}
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold">Preferências do Sistema</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-3">
+                      <Bell className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="font-medium">Notificações</p>
+                        <p className="text-sm text-muted-foreground">
+                          Receber Notificações de eventos e atividades
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={preferencias.notificacoes}
+                      onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, notificacoes: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-3">
+                      <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="font-medium">Autenticação em Dois Fatores</p>
+                        <p className="text-sm text-muted-foreground">
+                          Aumenta a segurança da sua conta
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={preferencias.autenticacaoDoisFatores}
+                      onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-3">
+                      <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="font-medium">Navegador em Tela Cheia</p>
+                        <p className="text-sm text-muted-foreground">
+                          O sistema sempre inicia em modo de tela cheia
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={preferencias.telaCheiaPadrao}
+                      onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, telaCheiaPadrao: checked })}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 3. Sistema e Versão */}
+              <Card>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                    <Wrench className="h-5 w-5" /> Versão do Sistema
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between border-b pb-4">
+                    <div>
+                      <p className="font-medium">Versão do App</p>
+                      <p className="text-sm text-muted-foreground">Versão Local: v{APP_VERSION}</p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleCheckUpdate}
+                      disabled={isCheckingUpdate}
+                    >
+                      {isCheckingUpdate ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Verificando...
+                        </>
+                      ) : 'Verificar Atualizações'}
+                    </Button>
+                  </div>
+
+                  {newVersionAvailable && (
+                    <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <p className="font-bold text-primary">Nova Versão Disponível: v{newVersionAvailable.version}</p>
+                          <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
+                        </div>
+                        <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
+                        </Button>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground italic">
+                        Nota: A atualização irá limpar o cache local e recarregar a página. Seus dados no Firebase não serão afetados.
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              {/* Coluna principal (Admin, Gestor, Secretário) */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Informações da Escola */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-semibold">Informações da Escola</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">INEP</Label>
+                        <div className="flex items-center gap-2">
+                          <Building className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={escolaConfig.inep}
+                            disabled
+                            className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0 cursor-not-allowed opacity-70"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Nome da Escola</Label>
+                        <div className="flex items-center gap-2">
+                          <School className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={escolaConfig.nome}
+                            onChange={(e) => setEscolaConfig({ ...escolaConfig, nome: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Decreto de Criação</Label>
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="h-4 w-4 text-muted-foreground invisible" /> {/* Placeholder for consistent alignment */}
+                          <Input
+                            value={escolaConfig.decretoCriacao}
+                            onChange={(e) => setEscolaConfig({ ...escolaConfig, decretoCriacao: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                            placeholder="Informe o decreto"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">E-mail</Label>
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={escolaConfig.email}
+                            onChange={(e) => setEscolaConfig({ ...escolaConfig, email: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Contato</Label>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={escolaConfig.contato}
+                            onChange={(e) => setEscolaConfig({ ...escolaConfig, contato: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Zona (Urbana/Rural)</Label>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <Select value={escolaConfig.zona} onValueChange={(value) => setEscolaConfig({ ...escolaConfig, zona: value })}>
+                            <SelectTrigger className="border-0 bg-transparent p-0 h-auto font-medium focus:ring-0 w-full text-left">
+                              <SelectValue placeholder="Selecione a Zona" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Urbana">Urbana</SelectItem>
+                              <SelectItem value="Rural - Várzea">Rural - Várzea</SelectItem>
+                              <SelectItem value="Rural - Terra Firme">Rural - Terra Firme</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Endereço</Label>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-muted-foreground" />
+                          <Input
+                            value={escolaConfig.endereco}
+                            onChange={(e) => setEscolaConfig({ ...escolaConfig, endereco: e.target.value })}
+                            className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">Horário de Funcionamento</Label>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-muted-foreground" />
+                        <Input
+                          value={escolaConfig.horarioFuncionamento}
+                          onChange={(e) => setEscolaConfig({ ...escolaConfig, horarioFuncionamento: e.target.value })}
+                          className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={handleSaveEscola} className="mt-2">
+                      Salvar Alterações
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Instalações da Escola */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg font-semibold">Instalações da Escola</CardTitle>
+                      <Button variant="outline" size="sm" onClick={() => setIsInstalacoesOpen(true)}>
+                        <Building className="h-4 w-4 mr-2" />
+                        Gerenciar Instalações
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-4 sm:grid-cols-3">
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">Salas de Aula</p>
+                          <p className="text-2xl font-bold">{instalacoes.salasAula}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">Laboratórios</p>
+                          <p className="text-2xl font-bold">{instalacoes.laboratorios}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">Banheiros</p>
+                          <p className="text-2xl font-bold">{instalacoes.banheiros}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">Cantina</p>
+                          <p className="text-2xl font-bold">{instalacoes.cantina}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">Biblioteca</p>
+                          <p className="text-2xl font-bold">{instalacoes.biblioteca}</p>
+                        </CardContent>
+                      </Card>
+                      <Card className="bg-muted/50">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-muted-foreground">Quadras</p>
+                          <p className="text-2xl font-bold">{instalacoes.quadras}</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Preferências do Sistema */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-semibold">Preferências do Sistema</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-start gap-3">
-                        <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <Bell className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">Modo de Manutenção</p>
+                          <p className="font-medium">Notificações</p>
                           <p className="text-sm text-muted-foreground">
-                            Sistema disponível apenas para administradores
+                            Receber Notificações de eventos e atividades
                           </p>
                         </div>
                       </div>
                       <Switch
-                        checked={preferencias.modoManutencao}
-                        onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, modoManutencao: checked })}
+                        checked={preferencias.notificacoes}
+                        onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, notificacoes: checked })}
                       />
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2 mt-4">
-                        Se a busca por nome não encontrar registros antigos, clique no botão abaixo para sincronizar os dados.
-                      </p>
-                      <Button
-                        className="w-full"
-                        onClick={handleSyncSearchData}
-                        disabled={isSyncing || isMigrating}
-                      >
-                        {isSyncing ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Wrench className="h-4 w-4 mr-2" />
-                        )}
-                        {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados de Busca'}
-                      </Button>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="font-medium">Autenticação em Dois Fatores</p>
+                          <p className="text-sm text-muted-foreground">
+                            Aumenta a segurança da sua conta
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={preferencias.autenticacaoDoisFatores}
+                        onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-3">
+                        <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
+                        <div>
+                          <p className="font-medium">Navegador em Tela Cheia</p>
+                          <p className="text-sm text-muted-foreground">
+                            O sistema sempre Iniciação em modo de tela cheia
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={preferencias.telaCheiaPadrao}
+                        onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, telaCheiaPadrao: checked })}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-                      <Button
-                        className="w-full mt-4"
-                        variant="destructive"
-                        onClick={handleMigrateData}
-                        disabled={isSyncing || isMigrating}
-                      >
-                        {isMigrating ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Wrench className="h-4 w-4 mr-2" />
-                        )}
-                        {isMigrating ? 'Migrando...' : 'Injetar INEP 13034243 nos dados antigos'}
-                      </Button>
+              {/* Sidebar direita */}
+              <div className="space-y-6">
 
+                {/* Informações da Conta */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-semibold">Informações da Conta</CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col items-center text-center">
+                    <div className="relative group mb-4">
+                      <Avatar className="h-24 w-24 border-2 border-primary/20">
+                        <AvatarImage src={profileData.foto_url} alt={profileData.nome} />
+                        <AvatarFallback className="text-2xl bg-primary/10 text-primary font-bold">
+                          {profileData.nome.substring(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <button
+                        onClick={() => photoInputRef.current?.click()}
+                        disabled={uploadingPhoto}
+                        className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer disabled:cursor-not-allowed"
+                      >
+                        <Camera className="h-6 w-6 text-white" />
+                      </button>
+                      <input
+                        ref={photoInputRef}
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoUpload}
+                      />
+                    </div>
+                    {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">Enviando foto...</p>}
+                    <h3 className="font-semibold text-lg">{profileData.nome}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{profileData.email}</p>
+                    <Button variant="outline" className="w-full" onClick={() => setIsEditProfileOpen(true)}>
+                      Editar Perfil
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                {/* Sistema e Versão */}
+                <Card>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                      <Wrench className="h-5 w-5" /> Versão do Sistema
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between border-b pb-4">
+                      <div>
+                        <p className="font-medium">Versão do App</p>
+                        <p className="text-sm text-muted-foreground">Versão Local: v{APP_VERSION}</p>
+                      </div>
                       <Button
-                        className="w-full mt-4"
                         variant="outline"
-                        onClick={handleLimparTransferidos}
-                        disabled={isSyncing || isMigrating}
+                        size="sm"
+                        onClick={handleCheckUpdate}
+                        disabled={isCheckingUpdate}
                       >
-                        {isMigrating ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <Wrench className="h-4 w-4 mr-2" />
-                        )}
-                        {isMigrating ? 'Limpando...' : 'Limpar Escola dos Transferidos'}
-                      </Button>
-
-                      <Button
-                        className="w-full mt-4"
-                        variant="secondary"
-                        onClick={handleCriarUsuariosFaltantes}
-                        disabled={isSyncing || isMigrating}
-                      >
-                        {isMigrating ? (
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        ) : (
-                          <UserCog className="h-4 w-4 mr-2" />
-                        )}
-                        {isMigrating ? 'Criando usuários...' : 'Criar Usuários a partir de Cadastros (E-mail)'}
+                        {isCheckingUpdate ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Verificando...
+                          </>
+                        ) : 'Verificar Atualizações'}
                       </Button>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+
+                    {newVersionAvailable && (
+                      <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <p className="font-bold text-primary">Nova Versão Disponí­vel: v{newVersionAvailable.version}</p>
+                            <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
+                          </div>
+                          <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
+                          </Button>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic">
+                          Nota: A atualização irá limpar o cache local e recarregar a página. Seus dados no Firebase não serão afetados.
+                        </p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Manutenção do Sistema */}
+                {role === 'admin' && (
+                  <Card>
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-lg font-semibold">Manutenção do Sistema</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-start gap-3">
+                            <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
+                            <div>
+                              <p className="font-medium">Modo de Manutenção</p>
+                              <p className="text-sm text-muted-foreground">
+                                Sistema disponível apenas para administradores
+                              </p>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={preferencias.modoManutencao}
+                            onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, modoManutencao: checked })}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground mb-2 mt-4">
+                            Se a busca por nome não encontrar registros antigos, clique no botão abaixo para sincronizar os dados.
+                          </p>
+                          <Button
+                            className="w-full"
+                            onClick={handleSyncSearchData}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            {isSyncing ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Wrench className="h-4 w-4 mr-2" />
+                            )}
+                            {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados de Busca'}
+                          </Button>
+
+                          <Button
+                            className="w-full mt-4"
+                            variant="destructive"
+                            onClick={handleMigrateData}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            {isMigrating ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Wrench className="h-4 w-4 mr-2" />
+                            )}
+                            {isMigrating ? 'Migrando...' : 'Injetar INEP 13034243 nos dados antigos'}
+                          </Button>
+
+                          <Button
+                            className="w-full mt-4"
+                            variant="outline"
+                            onClick={handleLimparTransferidos}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            {isMigrating ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Wrench className="h-4 w-4 mr-2" />
+                            )}
+                            {isMigrating ? 'Limpando...' : 'Limpar Escola dos Transferidos'}
+                          </Button>
+
+                          <Button
+                            className="w-full mt-4"
+                            variant="secondary"
+                            onClick={handleCriarUsuariosFaltantes}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            {isMigrating ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <UserCog className="h-4 w-4 mr-2" />
+                            )}
+                            {isMigrating ? 'Criando usuários...' : 'Criar Usuários a partir de Cadastros (E-mail)'}
+                          </Button>
+
+                          <Button
+                            className="w-full mt-4"
+                            variant="outline"
+                            onClick={handleFixMissingExcluido}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            {isMigrating ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Shield className="h-4 w-4 mr-2" />
+                            )}
+                            {isMigrating ? 'Corrigindo...' : 'Corrigir Campo "Excluído" nos Usuários'}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Dialog Editar Perfil */}
@@ -1023,6 +1225,7 @@ export default function Configuracoes() {
                     className="pl-10"
                     value={profileData.nome}
                     onChange={(e) => setProfileData({ ...profileData, nome: e.target.value })}
+                    disabled={role !== 'admin'}
                   />
                 </div>
               </div>
@@ -1036,18 +1239,20 @@ export default function Configuracoes() {
                     className="pl-10"
                     value={profileData.email}
                     onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                    disabled={role !== 'admin'}
                   />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-telefone">Telefone</Label>
+                <Label htmlFor="profile-contato">Contato</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    id="profile-telefone"
+                    id="profile-contato"
                     className="pl-10"
-                    value={profileData.telefone}
-                    onChange={(e) => setProfileData({ ...profileData, telefone: e.target.value })}
+                    value={profileData.contato}
+                    onChange={(e) => setProfileData({ ...profileData, contato: e.target.value })}
+                    disabled={role !== 'admin'}
                   />
                 </div>
               </div>

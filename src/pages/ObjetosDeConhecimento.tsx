@@ -76,7 +76,7 @@ export default function ObjetosDeConhecimento() {
 
       } catch (error) {
         console.error("Error fetching data: ", error);
-        toast.error("Erro ao carregar os dados.");
+        toast.error("Sem permissão para carregar os dados.");
       } finally {
         setLoading(false);
       }
@@ -112,7 +112,7 @@ export default function ObjetosDeConhecimento() {
       }
     } catch (error) {
       console.error(`Error saving bimestre ${bimestre}: `, error);
-      toast.error(`Erro ao salvar o conteúdo do ${bimestre}º Bimestre.`);
+      toast.error(`Sem permissão para salvar o conteúdo do ${bimestre}º Bimestre.`);
     } finally {
       setSavingBimestre(null);
     }

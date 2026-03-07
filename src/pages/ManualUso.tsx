@@ -19,6 +19,7 @@ import {
     CheckCircle2,
     AlertCircle
 } from 'lucide-react';
+import { ManualScreenshot } from '@/components/manual/ManualScreenshot';
 
 export default function ManualUso() {
     return (
@@ -53,11 +54,10 @@ export default function ManualUso() {
                                 <li><strong>Gráficos:</strong> Acompanhe o desempenho geral e a frequência do mês.</li>
                                 <li><strong>Atalhos:</strong> Acesse rapidamente as funcionalidades mais usadas.</li>
                             </ul>
-                            <Card className="bg-muted/50 border-dashed">
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    [IMAGEM: Print da tela do Painel Inicial mostrando os cartões de métricas e gráficos de pizza/barra]
-                                </CardContent>
-                            </Card>
+                            <ManualScreenshot
+                                sectionId="painel_dashboard"
+                                placeholder="[IMAGEM: Print da tela do Painel Inicial mostrando os cartões de métricas e gráficos de pizza/barra]"
+                            />
                         </AccordionContent>
                     </AccordionItem>
 
@@ -86,11 +86,10 @@ export default function ManualUso() {
                                 <p className="text-sm ml-6">No perfil, você encontra o histórico, notas consolidadas e botões rápidos para emissão de documentos como: <strong>Termo de Trajeto, Uso de Imagem e Declaração de Matrícula</strong>.</p>
                             </div>
 
-                            <Card className="bg-muted/50 border-dashed">
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    [IMAGEM: Print do Perfil do Estudante destacando o cabeçalho com os novos botões de documentos]
-                                </CardContent>
-                            </Card>
+                            <ManualScreenshot
+                                sectionId="perfil_estudante"
+                                placeholder="[IMAGEM: Print do Perfil do Estudante destacando o cabeçalho com os novos botões de documentos]"
+                            />
                         </AccordionContent>
                     </AccordionItem>
 
@@ -122,11 +121,10 @@ export default function ManualUso() {
                                 </div>
                             </div>
 
-                            <Card className="bg-muted/50 border-dashed">
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    [IMAGEM: Print da tela de Notas Parciais mostrando as colunas AV1 a AV4 e o botão de Sincronizar]
-                                </CardContent>
-                            </Card>
+                            <ManualScreenshot
+                                sectionId="notas_parciais"
+                                placeholder="[IMAGEM: Print da tela de Notas Parciais mostrando as colunas AV1 a AV4 e o botão de Sincronizar]"
+                            />
                         </AccordionContent>
                     </AccordionItem>
 
@@ -154,11 +152,10 @@ export default function ManualUso() {
                                 </p>
                             </div>
 
-                            <Card className="bg-muted/50 border-dashed">
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    [IMAGEM: Print da página de Relatórios com a lista de Documentos e Termos do Estudante]
-                                </CardContent>
-                            </Card>
+                            <ManualScreenshot
+                                sectionId="relatorios_documentos"
+                                placeholder="[IMAGEM: Print da página de Relatórios com a lista de Documentos e Termos do Estudante]"
+                            />
                         </AccordionContent>
                     </AccordionItem>
 
@@ -177,11 +174,10 @@ export default function ManualUso() {
                                 <li><strong>Usuários:</strong> Gerencie acessos de professores, secretários e equipe gestora.</li>
                                 <li><strong>Calendário:</strong> Defina dias letivos, feriados e reuniões (isso impacta nos cálculos de frequência).</li>
                             </ul>
-                            <Card className="bg-muted/50 border-dashed">
-                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
-                                    [IMAGEM: Print da tela de Usuários mostrando as permissões/cargos de cada membro]
-                                </CardContent>
-                            </Card>
+                            <ManualScreenshot
+                                sectionId="configuracoes_usuarios"
+                                placeholder="[IMAGEM: Print da tela de Usuários mostrando as permissões/cargos de cada membro]"
+                            />
                         </AccordionContent>
                     </AccordionItem>
 

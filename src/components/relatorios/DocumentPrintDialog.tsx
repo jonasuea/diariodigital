@@ -1,9 +1,10 @@
+import { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { printContainer } from '@/lib/print-utils';
+import { printElement } from '@/lib/print-utils';
 
 interface Nota {
     id: string;
@@ -63,6 +64,7 @@ export function DocumentPrintDialog({
     endereco, bairro, cidade, estado,
     turmaNome, turmaSerie, turmaTurno, ano, notas = []
 }: DocumentPrintDialogProps) {
+    const printRef = useRef<HTMLDivElement>(null);
     const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
     const dataNasc = estudanteNascimento
         ? format(parseISO(estudanteNascimento), 'dd/MM/yyyy', { locale: ptBR })
@@ -212,7 +214,11 @@ export function DocumentPrintDialog({
         }
     };
 
-    const handlePrint = () => printContainer();
+    const handlePrint = () => {
+        if (printRef.current) {
+            printElement(printRef.current);
+        }
+    };
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -222,7 +228,7 @@ export function DocumentPrintDialog({
                 </DialogHeader>
 
                 {/* Documento imprimível */}
-                <div className="print-container bg-white text-black font-serif p-8 space-y-6 text-sm leading-relaxed">
+                <div ref={printRef} className="print-container bg-white text-black font-serif p-8 space-y-6 text-sm leading-relaxed">
 
                     {/* Cabeçalho */}
                     <div className="header text-center border-b-2 border-gray-800 pb-4">

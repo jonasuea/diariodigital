@@ -24,7 +24,7 @@ CREATE TABLE public.professores (
     componente TEXT NOT NULL,
     matricula TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    telefone TEXT,
+    contato TEXT,
     ativo BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -58,7 +58,7 @@ CREATE TABLE public.equipe_gestora (
     cargo TEXT NOT NULL,
     matricula TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
-    telefone TEXT,
+    contato TEXT,
     status TEXT DEFAULT 'Ativo',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

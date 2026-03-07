@@ -291,12 +291,12 @@ Armazena informações completas dos Estudantes matriculados.
 | `vacinado_covid` | text | Não | Status vacinação COVID (default: 'Não') |
 | `mae_nome` | text | Não | Nome da mãe |
 | `mae_email` | text | Não | E-mail da mãe |
-| `mae_contato` | text | Não | Telefone da mãe |
+| `mae_contato` | text | Não | Contato da mãe |
 | `mae_rg` | text | Não | RG da mãe |
 | `mae_cpf` | text | Não | CPF da mãe |
 | `pai_nome` | text | Não | Nome do pai |
 | `pai_email` | text | Não | E-mail do pai |
-| `pai_contato` | text | Não | Telefone do pai |
+| `pai_contato` | text | Não | Contato do pai |
 | `pai_rg` | text | Não | RG do pai |
 | `pai_cpf` | text | Não | CPF do pai |
 | `endereco` | text | Não | Logradouro |
@@ -335,7 +335,7 @@ Armazena informações dos professores.
 | `componente` | text | Sim | componente principal (legado) |
 | `componentes` | text[] | Não | Array de componentes lecionadas |
 | `series` | text[] | Não | Array de séries que leciona |
-| `telefone` | text | Não | Telefone de contato |
+| `contato` | text | Não | Contato de contato |
 | `cpf` | text | Não | CPF |
 | `rg` | text | Não | RG |
 | `foto_url` | text | Não | URL da foto |
@@ -407,7 +407,7 @@ Membros da equipe administrativa da escola.
 | `cargo` | text | Sim | Cargo: 'Diretor', 'Vice-Diretor', 'Coordenador', 'Secretário' |
 | `matricula` | text | Sim | Matrícula funcional |
 | `email` | text | Sim | E-mail institucional |
-| `telefone` | text | Não | Telefone |
+| `contato` | text | Não | Contato |
 | `status` | text | Não | Status: 'Ativo', 'Inativo' (default: 'Ativo') |
 | `foto_url` | text | Não | URL da foto |
 | `rg` | text | Não | RG |

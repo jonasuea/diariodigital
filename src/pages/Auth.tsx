@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { GraduationCap, Loader2, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 export default function Auth() {
   const { user, loading, signIn, signUp } = useAuth();
@@ -26,7 +26,7 @@ export default function Auth() {
     if (user && role === 'estudante') {
       const fetchEstudanteId = async () => {
         try {
-          const q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid));
+          const q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid), limit(1));
           const snap = await getDocs(q);
           if (!snap.empty) {
             setEstudanteId(snap.docs[0].id);
@@ -60,10 +60,7 @@ export default function Auth() {
           </div>
         );
       }
-      if (estudanteId === 'fallback') {
-        return <Navigate to="/calendario" replace />;
-      }
-      return <Navigate to={`/estudantes/${estudanteId}`} replace />;
+      return <Navigate to="/painel" replace />;
     }
 
     // We only redirect to painel if the role is resolved, to prevent race conditions 
@@ -96,7 +93,7 @@ export default function Auth() {
           } else if (error.message.includes('Invalid login credentials')) {
             toast.error('E-mail ou senha incorretos');
           } else {
-            toast.error('Erro ao fazer login: ' + error.message);
+            toast.error('Sem permissão para fazer login: ' + error.message);
           }
         } else {
           toast.success('Login realizado com sucesso!');
@@ -107,7 +104,7 @@ export default function Auth() {
           if (error.message.includes('User already registered')) {
             toast.error('Este email já está cadastrado');
           } else {
-            toast.error('Erro ao criar conta: ' + error.message);
+            toast.error('Sem permissão para criar conta: ' + error.message);
           }
         } else {
           toast.success('Conta criada! Aguarde a aprovação do administrador para acessar o sistema.');

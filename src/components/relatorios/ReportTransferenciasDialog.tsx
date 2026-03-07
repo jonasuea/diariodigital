@@ -29,29 +29,29 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
     setLoading(true);
     try {
       const estudantesQuery1 = query(
-        collection(db, 'estudantes'), 
-        where('ano', '==', parseInt(selectedAno)), 
+        collection(db, 'estudantes'),
+        where('ano', '==', parseInt(selectedAno)),
         where('status', '==', 'Transferido')
       );
       const estudantesQuery2 = query(
-        collection(db, 'estudantes'), 
-        where('ano', '==', parseInt(selectedAno)), 
+        collection(db, 'estudantes'),
+        where('ano', '==', parseInt(selectedAno)),
         where('tipo_movimentacao', '==', 'Transferência')
       );
 
       const [snapshot1, snapshot2] = await Promise.all([getDocs(estudantesQuery1), getDocs(estudantesQuery2)]);
-      
+
       const estudantesMap = new Map();
       snapshot1.docs.forEach(doc => estudantesMap.set(doc.id, { id: doc.id, ...doc.data() }));
       snapshot2.docs.forEach(doc => estudantesMap.set(doc.id, { id: doc.id, ...doc.data() }));
-      
-      const Estudantes = Array.from(estudantesMap.values()).sort((a,b) => b.data_movimentacao.localeCompare(a.data_movimentacao));
+
+      const Estudantes = Array.from(estudantesMap.values()).sort((a, b) => b.data_movimentacao.localeCompare(a.data_movimentacao));
 
       const doc = new jsPDF();
-      
+
       doc.setFontSize(18);
       doc.text('Relatório de Transferências', 105, 20, { align: 'center' });
-      
+
       doc.setFontSize(12);
       doc.text(`Ano Letivo: ${selectedAno}`, 20, 35);
       doc.text(`Data de Emissão: ${new Date().toLocaleDateString('pt-BR')}`, 20, 42);
@@ -70,10 +70,10 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
           const tipo = estudante.status === 'Transferido' ? 'Saída' : 'Entrada';
           const origem = estudante.de_onde_veio || '-';
           const destino = estudante.para_onde_vai || '-';
-          const data = estudante.data_movimentacao 
-            ? new Date(estudante.data_movimentacao).toLocaleDateString('pt-BR') 
+          const data = estudante.data_movimentacao
+            ? new Date(estudante.data_movimentacao).toLocaleDateString('pt-BR')
             : '-';
-          
+
           return [estudante.matricula, estudante.nome, tipo, origem, destino, data];
         });
 
@@ -92,7 +92,7 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
       toast.success('Relatório gerado com sucesso!');
       onOpenChange(false);
     } catch (error) {
-      toast.error('Erro ao gerar relatório');
+      toast.error('Sem permissão para gerar relatório');
       console.error(error);
     } finally {
       setLoading(false);
@@ -105,7 +105,7 @@ export function ReportTransferenciasDialog({ open, onOpenChange }: ReportTransfe
         <DialogHeader>
           <DialogTitle>Relatório de Transferências</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4 py-4">
           <div className="flex items-center gap-4">
             <Label className="w-10">Ano</Label>

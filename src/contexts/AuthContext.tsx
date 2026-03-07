@@ -8,7 +8,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email:string, password: string, nome: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, nome: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const maintenanceData = maintenanceDoc.data();
       const roleData = roleDoc.data();
-      
+
       const isInMaintenance = maintenanceData?.preferencias?.modoManutencao || false;
       const userRole = roleData?.role || null;
 
@@ -52,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         maintenanceError.name = 'MaintenanceMode';
         return { error: maintenanceError };
       }
-      
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };
@@ -68,7 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await setDoc(doc(db, 'profiles', userCredential.user.uid), {
         nome: nome,
         email: userCredential.user.email,
-        created_at: new Date()
+        created_at: new Date(),
+        excluido: false
       });
 
       // Criar role de usuário (pendente por padrão, aguardando aprovação do admin)

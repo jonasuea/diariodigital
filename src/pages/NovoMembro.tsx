@@ -9,9 +9,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, User, Plus, Trash2, Upload, FileText, X } from 'lucide-react';
-import { db, storage } from '@/lib/firebase';
-import { collection, doc, getDoc, addDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { ArrowLeft, User, Plus, Trash2, Upload, FileText, X, Camera } from 'lucide-react';
+import { WebcamCapture } from '@/components/ui/webcam-capture';
+import { db, storage, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { collection, doc, getDoc, addDoc, updateDoc, setDoc, getDocs, query, where } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
@@ -45,7 +47,7 @@ export default function NovoMembro() {
     rg: '',
     cpf: '',
     email: '',
-    telefone: '',
+    contato: '',
     cargo: '',
     status: 'Lotado',
     data_lotacao: '',
@@ -79,7 +81,7 @@ export default function NovoMembro() {
       setFormData(prev => ({ ...prev, arquivo_url: fileURL }));
       toast.success('Arquivo enviado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao enviar arquivo');
+      toast.error('Sem permissão para enviar arquivo');
       console.error(error);
     } finally {
       setUploadingPdf(false);
@@ -88,6 +90,26 @@ export default function NovoMembro() {
 
   function removePdf() {
     setFormData(prev => ({ ...prev, arquivo_url: '' }));
+  }
+
+  async function uploadPhoto(file: File) {
+    setUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `membro_${Date.now()}.${fileExt}`;
+      const storageRef = ref(storage, `equipe_gestora/fotos/${fileName}`);
+
+      await uploadBytes(storageRef, file);
+      const photoURL = await getDownloadURL(storageRef);
+
+      setFormData(prev => ({ ...prev, foto_url: photoURL }));
+      toast.success('Foto carregada com sucesso!');
+    } catch (error) {
+      toast.error('Sem permissão para fazer upload da foto');
+      console.error(error);
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -99,23 +121,7 @@ export default function NovoMembro() {
       return;
     }
 
-    setUploadingPhoto(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `membro_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `equipe_gestora/fotos/${fileName}`);
-
-      await uploadBytes(storageRef, file);
-      const photoURL = await getDownloadURL(storageRef);
-
-      setFormData(prev => ({ ...prev, foto_url: photoURL }));
-      toast.success('Foto carregada com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao fazer upload da foto');
-      console.error(error);
-    } finally {
-      setUploadingPhoto(false);
-    }
+    await uploadPhoto(file);
   }
 
   useEffect(() => {
@@ -139,7 +145,7 @@ export default function NovoMembro() {
           rg: data.rg || '',
           cpf: data.cpf || '',
           email: data.email,
-          telefone: data.telefone || '',
+          contato: data.contato || '',
           cargo: data.cargo,
           status: data.status || 'Lotado',
           data_lotacao: data.data_lotacao || '',
@@ -156,7 +162,7 @@ export default function NovoMembro() {
         navigate('/equipe-gestora');
       }
     } catch (error) {
-      toast.error('Erro ao carregar membro');
+      toast.error('Sem permissão para carregar membro');
       console.error(error);
     } finally {
       setLoading(false);
@@ -200,29 +206,49 @@ export default function NovoMembro() {
         const docRef = doc(db, 'equipe_gestora', id);
         await updateDoc(docRef, payload);
 
-        // Atualiza o e-mail em user_roles se tiver mudado
+        // O perfil de acesso e e-mail agora são protegidos. 
+        // Em um sistema real de 10k usuários, isso também deveria ser uma Cloud Function.
+        // Por enquanto, as regras de segurança permitem update se for Admin.
         const userRoleRef = doc(db, 'user_roles', id);
-        const userRoleSnap = await getDoc(userRoleRef);
-        if (userRoleSnap.exists()) {
-          const currentRole = userRoleSnap.data().role;
-          const currentEmail = userRoleSnap.data().email;
-          if (currentRole !== formData.role || currentEmail !== formData.email) {
+        const profileRef = doc(db, 'profiles', id);
+
+        try {
+          const [userRoleSnap, profileSnap] = await Promise.all([
+            getDoc(userRoleRef),
+            getDoc(profileRef)
+          ]);
+
+          if (userRoleSnap.exists()) {
             await updateDoc(userRoleRef, { role: formData.role, email: formData.email });
           }
+
+          if (profileSnap.exists()) {
+            await updateDoc(profileRef, { nome: formData.nome });
+          }
+        } catch (err) {
+          console.warn('Sem permissão para atualizar user_roles ou profiles:', err);
         }
 
         await logActivity(`atualizou o cadastro do membro da equipe "${formData.nome}".`);
         toast.success('Membro atualizado com sucesso!');
       } else {
-        const docRef = await addDoc(collection(db, 'equipe_gestora'), payload);
-        await setDoc(doc(db, 'user_roles', docRef.id), {
+        // BLINDAGEM: Usa Cloud Function para criar conta + papel + perfil de forma segura
+        const createUser = httpsCallable(functions, 'createUserAccount');
+        const result = await createUser({
           email: formData.email,
+          password: 'EDUCAFACIL2026', // Senha padrão inicial
+          nome: formData.nome,
           role: formData.role,
-          status: 'pending',
-          escola_id: escolaAtivaId,
+          escola_id: escolaAtivaId
         });
+
+        const { uid } = result.data as { uid: string };
+
+        // Cria o documento na coleção equipe_gestora vinculado ao UID criado
+        await setDoc(doc(db, 'equipe_gestora', uid), payload);
+
         await logActivity(`cadastrou o novo membro da equipe "${formData.nome}".`);
-        toast.success('Membro cadastrado com sucesso! Acesse a página de "Usuários" para definir o acesso.');
+        toast.success('Membro cadastrado com sucesso! O usuário já pode acessar o sistema.');
       }
       navigate('/equipe-gestora');
     } catch (error: any) {
@@ -231,7 +257,7 @@ export default function NovoMembro() {
       } else if (error.message.includes('matricula') || error.message.includes('email')) {
         toast.error('Matrícula ou email já cadastrados');
       } else {
-        toast.error('Erro ao salvar membro');
+        toast.error('Sem permissão para salvar membro');
       }
       console.error(error);
     } finally {
@@ -280,16 +306,28 @@ export default function NovoMembro() {
                     className="hidden"
                     onChange={handlePhotoUpload}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => photoInputRef.current?.click()}
-                    disabled={uploadingPhoto}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploadingPhoto ? 'Carregando...' : 'Carregar Foto'}
-                  </Button>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadingPhoto ? 'Carregando...' : 'Carregar Foto'}
+                    </Button>
+
+                    <WebcamCapture
+                      onCapture={uploadPhoto}
+                      trigger={
+                        <Button variant="outline" size="sm" type="button" disabled={uploadingPhoto}>
+                          <Camera className="h-4 w-4 mr-2" />
+                          Tirar Foto
+                        </Button>
+                      }
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -353,12 +391,12 @@ export default function NovoMembro() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="telefone">Telefone</Label>
+                    <Label htmlFor="contato">Contato</Label>
                     <Input
-                      id="telefone"
-                      placeholder="Número de telefone"
-                      value={formData.telefone}
-                      onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                      id="contato"
+                      placeholder="Número de contato"
+                      value={formData.contato}
+                      onChange={(e) => setFormData({ ...formData, contato: e.target.value })}
                     />
                   </div>
                 </div>

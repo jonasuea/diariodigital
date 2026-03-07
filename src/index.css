@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -143,9 +143,34 @@
     background: hsl(var(--muted-foreground) / 0.5);
   }
 
+  .scrollbar-custom {
+    scrollbar-width: auto;
+    scrollbar-color: hsl(var(--primary) / 0.5) transparent;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar {
+    height: 24px;
+    width: 24px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 12px;
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary));
+    border-radius: 12px;
+    border: 4px solid hsl(var(--muted));
+  }
+
+  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary));
+  }
+
   /* Calendar Modifiers */
   .day-letivo {
-    background-color: #dcfce7 !important;
+    background-color: #dcfce7;
     color: #166534 !important;
     font-weight: 600 !important;
   }
@@ -210,29 +235,83 @@
 
 /* Impressão limpa via clone-to-body */
 @media print {
+  @page {
+    size: auto;
+    margin: 10mm;
+  }
 
   /* Esconde tudo exceto o clone de impressão */
   body>*:not(#print-clone) {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    width: 0 !important;
+    overflow: hidden !important;
   }
 
   /* O clone ocupa a página completa, sem bordas */
   #print-clone {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    padding: 32px;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
     box-sizing: border-box;
-    background: transparent !important;
-    overflow: visible;
+    background: white !important;
+    color: black !important;
+    overflow: visible !important;
+    z-index: 99999 !important;
+    transform: none !important;
+    filter: none !important;
   }
 
-  /* Garante transparência para a marca d'água brilhar */
-  #print-clone,
-  #print-clone *,
-  .print-container,
-  .print-container * {
-    background-color: transparent !important;
+  /* Oculta apenas o que não for essencial, mas garante que o clone seja visível */
+  #print-clone *:not(#print-watermark-img) {
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: black !important;
+    background: transparent !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Estilo específico para a marca d'água para não ser sobrescrito pelo seletor acima */
+  #print-watermark-img {
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 60% !important;
+    opacity: 0.05 !important;
+    z-index: -1 !important;
+    pointer-events: none !important;
+    display: block !important;
+  }
+
+  /* Garante que imagens e gráficos apareçam */
+  canvas,
+  img,
+  svg {
+    display: block !important;
+    max-width: 100% !important;
+  }
+
+  /* Forçar bordas em tabelas */
+  table,
+  th,
+  td {
+    border: 1px solid black !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Evitar quebras de página dentro de linhas de tabela ou blocos importantes */
+  tr,
+  .print-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }

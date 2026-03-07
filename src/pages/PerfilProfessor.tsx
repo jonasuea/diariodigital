@@ -37,7 +37,7 @@ interface Professor {
   nome: string;
   matricula: string;
   email: string;
-  telefone: string | null;
+  contato: string | null;
   status_funcional: string;
   foto_url: string | null;
   data_lotacao: string | null;
@@ -113,7 +113,7 @@ export default function PerfilProfessor() {
 
       setTurmasLecionadas(turmasData);
     } catch (error) {
-      toast.error('Erro ao carregar dados do professor');
+      toast.error('Sem permissão para carregar dados do professor');
       console.error(error);
       navigate('/professores');
     } finally {
@@ -218,8 +218,8 @@ export default function PerfilProfessor() {
                   />
                   <InfoItem
                     icon={Phone}
-                    label="Telefone"
-                    value={professor.telefone || 'Não cadastrado'}
+                    label="Contato"
+                    value={professor.contato || 'Não cadastrado'}
                   />
                   <InfoItem
                     icon={Mail}

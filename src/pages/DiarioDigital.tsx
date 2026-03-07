@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Users, BookOpen, ClipboardList, GraduationCap, Filter } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, limit } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -68,7 +68,7 @@ export default function DiarioDigital() {
 
     async function fetchLoggedProfessorId() {
       try {
-        const profQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('email', '==', user.email));
+        const profQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('email', '==', user.email), limit(1));
         const profSnapshot = await getDocs(profQuery);
         if (!profSnapshot.empty) {
           setLoggedProfessorId(profSnapshot.docs[0].id);
@@ -76,7 +76,7 @@ export default function DiarioDigital() {
           console.warn("Nenhum professor encontrado com o e-mail: ", user.email);
         }
       } catch (error) {
-        console.error("Erro ao buscar professor logado:", error);
+        console.error("Sem permissão para buscar professor logado:", error);
       }
     }
 
@@ -93,7 +93,7 @@ export default function DiarioDigital() {
           setProfessores(profSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
         } catch (error) {
           console.error("Error fetching professors: ", error);
-          toast.error("Erro ao carregar professores.");
+          toast.error("Sem permissão para carregar professores.");
         }
       }
       fetchProfessores();
@@ -117,7 +117,8 @@ export default function DiarioDigital() {
           collection(db, 'turmas'),
           where('escola_id', '==', escolaAtivaId),
           where('ano', '==', new Date().getFullYear()),
-          where('professoresIds', 'array-contains', professorId)
+          where('professoresIds', 'array-contains', professorId),
+          limit(50)
         );
         const turmasSnapshot = await getDocs(turmasQuery);
         const turmasData = turmasSnapshot.docs
@@ -135,7 +136,7 @@ export default function DiarioDigital() {
 
         setTurmas(turmasData);
       } catch (error) {
-        toast.error("Erro ao carregar as turmas.");
+        toast.error("Sem permissão para carregar as turmas.");
         console.error(error);
       } finally {
         setLoading(false);
@@ -158,33 +159,45 @@ export default function DiarioDigital() {
     }
   }, [selectedProfessorId, selectedTurmaId, selectedComponente]);
 
-  // Efeito para resetar seleções quando o professor muda
+  // Efeito para resetar seleções quando o professor muda (Gestor)
   useEffect(() => {
     // Pular o reset se estamos restaurando os filtros da sessão anterior
     if (isRestoring) {
       setIsRestoring(false);
       return;
     }
+    // Para professores, o ID não muda ativamente via seletor
+    if (!isGestor) return;
+
     setSelectedTurmaId('');
     setSelectedComponente('');
     setComponentes([]);
-  }, [selectedProfessorId, loggedProfessorId]);
+  }, [selectedProfessorId, isGestor]);
 
   // Efeito para filtrar componentes quando a turma muda
   useEffect(() => {
     const professorId = isGestor ? selectedProfessorId : loggedProfessorId;
-    setSelectedComponente('');
 
     if (selectedTurmaId && professorId) {
       const turmaSelecionada = turmas.find(t => t.id === selectedTurmaId);
       if (turmaSelecionada) {
         const componentesDoProfessor = turmaSelecionada.componentes.filter(d => d.professorId === professorId);
         setComponentes(componentesDoProfessor);
+
+        // BLINDAGEM: Se o componente já selecionado NÃO existe na nova turma/professor, aí sim limpamos.
+        // Isso permite que o componente persista se ele for válido para a nova seleção (ou na restauração inicial).
+        const aindaValido = componentesDoProfessor.some(c => c.nome === selectedComponente);
+        if (!aindaValido && selectedComponente) {
+          setSelectedComponente('');
+        }
       }
-    } else {
+    } else if (!isRestoring) {
       setComponentes([]);
+      if (selectedComponente) {
+        setSelectedComponente('');
+      }
     }
-  }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, loggedProfessorId]);
+  }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, loggedProfessorId, selectedComponente, isRestoring]);
 
   const cards = [
     {
@@ -237,69 +250,61 @@ export default function DiarioDigital() {
         <p className="text-muted-foreground -mt-2">Gestão pedagógica completa</p>
 
         <Card className="overflow-hidden border-border/60 shadow-sm">
-          <CardContent className="p-0">
-            <Accordion type="single" collapsible defaultValue={!selectedTurmaId ? "filters" : undefined} className="w-full">
-              <AccordionItem value="filters" className="border-none">
-                <AccordionTrigger className="px-5 py-4 hover:no-underline">
-                  <div className="flex items-center gap-2.5">
-                    <Filter className="h-4 w-4 text-primary" />
-                    <h3 className="font-bold text-sm text-foreground">Filtros do Diário</h3>
-                    {selectedTurmaId && (
-                      <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                        Ativo
-                      </span>
-                    )}
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-5 pb-6">
-                  <div className={`grid grid-cols-1 ${isGestor ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 md:gap-6`}>
-                    {isGestor && (
-                      <div className="form-group-compact">
-                        <Label className="form-label-compact">Professor</Label>
-                        <Select value={selectedProfessorId} onValueChange={setSelectedProfessorId}>
-                          <SelectTrigger className="h-10">
-                            <SelectValue placeholder="Selecione um professor" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {professores.map((prof) => (
-                              <SelectItem key={prof.id} value={prof.id}>{prof.nome}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+          <div className="px-5 py-4 border-b flex items-center gap-2.5 bg-muted/30">
+            <Filter className="h-4 w-4 text-primary" />
+            <h3 className="font-bold text-sm text-foreground">Filtros do Diário</h3>
+            {selectedTurmaId && (
+              <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                Ativo
+              </span>
+            )}
+          </div>
+          <CardContent className="px-5 py-6">
+            <div className={`grid grid-cols-1 ${isGestor ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 md:gap-6`}>
+              {isGestor && (
+                <div className="form-group-compact">
+                  <Label className="form-label-compact">Professor(a)</Label>
+                  <Select value={selectedProfessorId} onValueChange={setSelectedProfessorId}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Selecione um professor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {professores.map((prof) => (
+                        <SelectItem key={prof.id} value={prof.id}>{prof.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
-                    <div className="form-group-compact">
-                      <Label className="form-label-compact">Turma</Label>
-                      <Select value={selectedTurmaId} onValueChange={setSelectedTurmaId} disabled={loading || turmas.length === 0 || (isGestor && !selectedProfessorId)}>
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder={loading ? "Carregando..." : "Selecione uma turma"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {turmas.map((turma) => (
-                            <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+              <div className="form-group-compact">
+                <Label className="form-label-compact">Turma</Label>
+                <Select value={selectedTurmaId} onValueChange={setSelectedTurmaId} disabled={loading || turmas.length === 0 || (isGestor && !selectedProfessorId)}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder={loading ? "Carregando..." : "Selecione uma turma"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {turmas.map((turma) => (
+                      <SelectItem key={turma.id} value={turma.id}>{turma.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                    <div className="form-group-compact">
-                      <Label className="form-label-compact">Componente Curricular</Label>
-                      <Select value={selectedComponente} onValueChange={setSelectedComponente} disabled={!selectedTurmaId}>
-                        <SelectTrigger className="h-10">
-                          <SelectValue placeholder={!selectedTurmaId ? "Selecione uma turma" : "Selecione um componente"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {componentes.map((componente) => (
-                            <SelectItem key={componente.nome} value={componente.nome}>{componente.nome}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-            </Accordion>
+              <div className="form-group-compact">
+                <Label className="form-label-compact">Componente Curricular</Label>
+                <Select value={selectedComponente} onValueChange={setSelectedComponente} disabled={!selectedTurmaId}>
+                  <SelectTrigger className="h-10">
+                    <SelectValue placeholder={!selectedTurmaId ? "Selecione uma turma" : "Selecione um componente"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {componentes.map((componente) => (
+                      <SelectItem key={componente.nome} value={componente.nome}>{componente.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

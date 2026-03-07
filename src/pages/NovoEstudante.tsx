@@ -11,7 +11,8 @@ import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ArrowLeft, User, Save, X, Upload, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, User, Save, X, Upload, Plus, Trash2, Camera } from 'lucide-react';
+import { WebcamCapture } from '@/components/ui/webcam-capture';
 import { db, storage } from '@/lib/firebase';
 import { collection, getDocs, addDoc, getDoc, doc, updateDoc, query, where } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
@@ -28,6 +29,8 @@ const RACA_COR_OPTIONS = ['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena', 'N
 const MOVIMENTACAO_OPTIONS = ['Matrícula', 'Transferência Entrada', 'Transferência Saída', 'Remanejamento', 'Reclassificação'];
 const STATUS_OPTIONS = ['Frequentando', 'Transferido', 'Desistente', 'Concluído'];
 const VACINACAO_OPTIONS = ['Não', '1ª Dose', '2ª Dose', '3ª Dose', '4ª Dose', '5ª Dose'];
+const TAMANHO_FARDA_OPTIONS = ['Infantil', 'PP', 'P', 'M', 'G', 'GG', 'XG'];
+
 
 const RESTRICOES_OPTIONS = [
   'Glutem', 'Lactose', 'Proteina', 'Proteina do Ovo', 'Diabetes', 'Hipertensão'
@@ -96,8 +99,8 @@ const initialState = {
   dieta_restritiva: false,
   restricoes_alimentares: [] as string[],
   // Informações Escolares
-  largura_farda: '',
-  altura_farda: '',
+  farda_tamanho: '',
+
   pasta: '',
   prateleira: '',
   transporte_escolar: false,
@@ -201,7 +204,7 @@ export default function NovoEstudante() {
         setTurmas(turmasData.sort((a, b) => a.nome.localeCompare(b.nome)));
       } catch (error) {
         console.error("Error fetching turmas: ", error);
-        toast.error("Erro ao carregar a lista de turmas.");
+        toast.error("Sem permissão para carregar a lista de turmas.");
       } finally {
         setTurmasCarregadas(true);
       }
@@ -297,22 +300,14 @@ export default function NovoEstudante() {
         navigate('/estudantes');
       }
     } catch (error) {
-      toast.error('Erro ao carregar dados do estudante');
+      toast.error('Sem permissão para carregar dados do estudante');
       console.error(error);
     } finally {
       setLoading(false);
     }
   }
 
-  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      toast.error('Por favor, selecione uma imagem');
-      return;
-    }
-
+  async function uploadPhoto(file: File) {
     setUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -325,11 +320,23 @@ export default function NovoEstudante() {
       setFormData(prev => ({ ...prev, foto_url: photoURL }));
       toast.success('Foto carregada com sucesso!');
     } catch (error) {
-      toast.error('Erro ao fazer upload da foto!');
+      toast.error('Sem permissão para fazer upload da foto!');
       console.error(error)
     } finally {
       setUploading(false);
     }
+  }
+
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Por favor, selecione uma imagem');
+      return;
+    }
+
+    await uploadPhoto(file);
   }
 
   const handleChange = (field: string, value: string | boolean | number | null) => {
@@ -589,6 +596,28 @@ export default function NovoEstudante() {
 
       if (isEditing && id) {
         await updateDoc(doc(db, 'estudantes', id), finalFormData);
+
+        // Sincronizar nome no perfil de usuário se houver um vínculo
+        const userId = (finalFormData as any).usuario_id;
+        if (userId) {
+          try {
+            await updateDoc(doc(db, 'profiles', userId), { nome: finalFormData.nome });
+          } catch (err) {
+            console.warn('Sem permissão para sincronizar nome no perfil:', err);
+          }
+        } else if (finalFormData.email) {
+          try {
+            const profilesSnap = await getDocs(
+              query(collection(db, 'profiles'), where('email', '==', finalFormData.email.toLowerCase()))
+            );
+            if (!profilesSnap.empty) {
+              await updateDoc(doc(db, 'profiles', profilesSnap.docs[0].id), { nome: finalFormData.nome });
+            }
+          } catch (err) {
+            console.warn('Sem permissão para sincronizar nome no perfil por e-mail:', err);
+          }
+        }
+
         await logActivity(`atualizou o cadastro do estudante "${formData.nome}".`);
         toast.success('Estudante atualizado com sucesso!');
       } else {
@@ -601,7 +630,7 @@ export default function NovoEstudante() {
       if (error.code === 'permission-denied') {
         toast.error('Permissão negada. Verifique as regras de segurança do Firestore.');
       } else {
-        toast.error(`Erro ao ${isEditing ? 'atualizar' : 'cadastrar'} estudante`);
+        toast.error(`Sem permissão para ${isEditing ? 'atualizar' : 'cadastrar'} estudante`);
       }
       console.error(error);
     } finally {
@@ -652,16 +681,28 @@ export default function NovoEstudante() {
                     onChange={handlePhotoUpload}
                     className="hidden"
                   />
-                  <Button
-                    variant="outline"
-                    type="button"
-                    size="sm"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploading ? 'Carregando...' : 'Carregar Foto'}
-                  </Button>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploading ? 'Carregando...' : 'Carregar Foto'}
+                    </Button>
+
+                    <WebcamCapture
+                      onCapture={uploadPhoto}
+                      trigger={
+                        <Button variant="outline" size="sm" type="button" disabled={uploading}>
+                          <Camera className="h-4 w-4 mr-2" />
+                          Tirar Foto
+                        </Button>
+                      }
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -807,11 +848,22 @@ export default function NovoEstudante() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Contato</Label>
-                    <Input placeholder="Telefone do estudante" value={formData.contato} onChange={(e) => handleChange('contato', e.target.value)} />
+                    <Input placeholder="Contato do estudante" value={formData.contato} onChange={(e) => handleChange('contato', e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label>E-mail</Label>
                     <Input type="email" placeholder="E-mail do estudante" value={formData.email} onChange={(e) => handleChange('email', e.target.value)} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Tamanho da Farda</Label>
+                    <Select value={formData.farda_tamanho} onValueChange={(v) => handleChange('farda_tamanho', v)}>
+                      <SelectTrigger><SelectValue placeholder="Selecione o tamanho" /></SelectTrigger>
+                      <SelectContent>
+                        {TAMANHO_FARDA_OPTIONS.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -819,16 +871,18 @@ export default function NovoEstudante() {
               {/* Programas Sociais */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground">Programas Sociais</h3>
-                <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <Label htmlFor="bolsa_familia">Recebe Bolsa Família?</Label>
-                  <Switch id="bolsa_familia" checked={formData.bolsa_familia} onCheckedChange={(v) => handleChange('bolsa_familia', v)} />
-                </div>
-                {formData.bolsa_familia && (
-                  <div className="space-y-2">
-                    <Label htmlFor="numero_nis">Número do NIS*</Label>
-                    <Input id="numero_nis" placeholder="Número de Identificação Social" value={formData.numero_nis} onChange={(e) => handleChange('numero_nis', e.target.value)} required={formData.bolsa_familia} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="flex items-center justify-between p-4 border rounded-lg">
+                    <Label htmlFor="bolsa_familia">Recebe Bolsa Família?</Label>
+                    <Switch id="bolsa_familia" checked={formData.bolsa_familia} onCheckedChange={(v) => handleChange('bolsa_familia', v)} />
                   </div>
-                )}
+                  {formData.bolsa_familia && (
+                    <div className="space-y-2">
+                      <Label htmlFor="numero_nis">Número do NIS*</Label>
+                      <Input id="numero_nis" placeholder="Número de Identificação Social" value={formData.numero_nis} onChange={(e) => handleChange('numero_nis', e.target.value)} required={formData.bolsa_familia} />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Censo e SUS */}
@@ -849,15 +903,15 @@ export default function NovoEstudante() {
                     <Label>Número Cartão SUS</Label>
                     <Input placeholder="Número do Cartão SUS" value={formData.cartao_sus} onChange={(e) => handleChange('cartao_sus', e.target.value)} />
                   </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Vacinado COVID?</Label>
-                  <Select value={formData.vacinado_covid} onValueChange={(v) => handleChange('vacinado_covid', v)}>
-                    <SelectTrigger className="md:w-1/2"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {VACINACAO_OPTIONS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <div className="space-y-2">
+                    <Label>Vacinado COVID?</Label>
+                    <Select value={formData.vacinado_covid} onValueChange={(v) => handleChange('vacinado_covid', v)}>
+                      <SelectTrigger className="md:w-1/2"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {VACINACAO_OPTIONS.map(v => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
@@ -909,37 +963,6 @@ export default function NovoEstudante() {
                 )}
               </div>
 
-              {/* Informações Escolares */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-semibold text-muted-foreground">Informações Escolares</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Largura da Farda</Label>
-                    <Input placeholder="Largura em cm" value={formData.largura_farda} onChange={(e) => handleChange('largura_farda', e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Altura da Farda</Label>
-                    <Input placeholder="Altura em cm" value={formData.altura_farda} onChange={(e) => handleChange('altura_farda', e.target.value)} />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Pasta</Label>
-                    <Input placeholder="Número da pasta" value={formData.pasta} onChange={(e) => handleChange('pasta', e.target.value)} />
-                    <p className="text-xs text-muted-foreground">Localização da pasta física do estudante</p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Prateleira</Label>
-                    <Input placeholder="Localização da prateleira" value={formData.prateleira} onChange={(e) => handleChange('prateleira', e.target.value)} />
-                    <p className="text-xs text-muted-foreground">Prateleira onde está arquivada a pasta</p>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between p-4 border rounded-lg md:w-1/2">
-                  <Label htmlFor="transporte_escolar">Transporte Escolar?</Label>
-                  <Switch id="transporte_escolar" checked={formData.transporte_escolar} onCheckedChange={(v) => handleChange('transporte_escolar', v)} />
-                </div>
-              </div>
-
               {/* Informações da Mãe */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground">Informações da Mãe</h3>
@@ -956,7 +979,7 @@ export default function NovoEstudante() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Contato</Label>
-                    <Input placeholder="Telefone da mãe" value={formData.mae_contato} onChange={(e) => handleChange('mae_contato', e.target.value)} />
+                    <Input placeholder="Contato da mãe" value={formData.mae_contato} onChange={(e) => handleChange('mae_contato', e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label>RG</Label>
@@ -985,7 +1008,7 @@ export default function NovoEstudante() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Contato</Label>
-                    <Input placeholder="Telefone do pai" value={formData.pai_contato} onChange={(e) => handleChange('pai_contato', e.target.value)} />
+                    <Input placeholder="Contato do pai" value={formData.pai_contato} onChange={(e) => handleChange('pai_contato', e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label>RG</Label>
@@ -1025,7 +1048,7 @@ export default function NovoEstudante() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Contato</Label>
-                    <Input placeholder="Telefone do responsável" value={formData.responsavel_contato} onChange={(e) => handleChange('responsavel_contato', e.target.value)} />
+                    <Input placeholder="Contato do responsável" value={formData.responsavel_contato} onChange={(e) => handleChange('responsavel_contato', e.target.value)} />
                   </div>
                   <div className="space-y-2">
                     <Label>RG</Label>
@@ -1042,7 +1065,7 @@ export default function NovoEstudante() {
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground">Endereço</h3>
                 <div className="space-y-2">
-                  <Label>Endereço</Label>
+                  <Label>Logradouro</Label>
                   <Input placeholder="Rua, Avenida, etc." value={formData.endereco} onChange={(e) => handleChange('endereco', e.target.value)} />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1073,6 +1096,27 @@ export default function NovoEstudante() {
                 <div className="space-y-2 md:w-1/2">
                   <Label>CEP</Label>
                   <Input placeholder="CEP" value={formData.cep} onChange={(e) => handleChange('cep', e.target.value)} />
+                </div>
+              </div>
+
+              {/* Informações Escolares */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-muted-foreground">Informações Escolares</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Pasta</Label>
+                    <Input placeholder="Número da pasta" value={formData.pasta} onChange={(e) => handleChange('pasta', e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Localização da pasta física do estudante</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Prateleira</Label>
+                    <Input placeholder="Localização da prateleira" value={formData.prateleira} onChange={(e) => handleChange('prateleira', e.target.value)} />
+                    <p className="text-xs text-muted-foreground">Prateleira onde está arquivada a pasta</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between p-4 border rounded-lg md:w-1/2">
+                  <Label htmlFor="transporte_escolar">Transporte Escolar?</Label>
+                  <Switch id="transporte_escolar" checked={formData.transporte_escolar} onCheckedChange={(v) => handleChange('transporte_escolar', v)} />
                 </div>
               </div>
 
@@ -1178,6 +1222,6 @@ export default function NovoEstudante() {
           </Card>
         </form>
       </div>
-    </AppLayout>
+    </AppLayout >
   );
 }

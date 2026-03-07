@@ -7,12 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Clock } from 'lucide-react';
+import { Plus, Pencil, Trash2, Clock, Calendar } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, getDocs, doc, addDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDocs, doc, addDoc, updateDoc, deleteDoc, limit, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { logActivity } from '@/lib/logger';
+import { useUserRole } from '@/hooks/useUserRole';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { TimeTableGeneratorDialog } from '@/components/horarios/TimeTableGeneratorDialog';
 
 interface Turma {
   id: string;
@@ -54,11 +57,14 @@ const componentes = [
 ];
 
 export default function Horario() {
+  const { role, isEstudante } = useUserRole();
+  const { user } = useAuth();
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
   const [horarios, setHorarios] = useState<Horario[]>([]);
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
   const [editingHorario, setEditingHorario] = useState<Horario | null>(null);
   const [formData, setFormData] = useState({
     dia: 'segunda',
@@ -86,15 +92,48 @@ export default function Horario() {
 
   async function fetchTurmas() {
     try {
-      const q = query(collection(db, 'turmas'), orderBy('nome'));
-      const querySnapshot = await getDocs(q);
-      const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
-      setTurmas(turmasData);
-      if (turmasData.length > 0) {
-        setSelectedTurma(turmasData[0]);
+      if (isEstudante && user) {
+        let q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid), limit(1));
+        let snap = await getDocs(q);
+
+        if (snap.empty && user.email) {
+          q = query(collection(db, 'estudantes'), where('email', '==', user.email), limit(1));
+          snap = await getDocs(q);
+
+          if (snap.empty) {
+            q = query(collection(db, 'estudantes'), where('email_responsavel', '==', user.email), limit(1));
+            snap = await getDocs(q);
+          }
+        }
+
+        if (!snap.empty) {
+          const turmaId = snap.docs[0].data().turma_id;
+          if (turmaId) {
+            const turmaDoc = await getDoc(doc(db, 'turmas', turmaId));
+            if (turmaDoc.exists()) {
+              const turmaData = { id: turmaDoc.id, ...turmaDoc.data() } as Turma;
+              setTurmas([turmaData]);
+              setSelectedTurma(turmaData);
+            } else {
+              setTurmas([]); // Turma referenciada não existe
+            }
+          } else {
+            setTurmas([]); // Estudante sem turma
+          }
+        } else {
+          setTurmas([]); // Estudante não encontrado
+        }
+      } else {
+        const q = query(collection(db, 'turmas'), orderBy('nome'));
+        const querySnapshot = await getDocs(q);
+        const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
+        setTurmas(turmasData);
+        if (turmasData.length > 0) {
+          setSelectedTurma(turmasData[0]);
+        }
       }
     } catch (error) {
-      toast.error('Erro ao carregar turmas');
+      toast.error('Sem permissão para carregar turmas');
       console.error(error);
     }
     setLoading(false);
@@ -108,7 +147,7 @@ export default function Horario() {
       const horariosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Horario));
       setHorarios(horariosData);
     } catch (error) {
-      toast.error('Erro ao carregar horários');
+      toast.error('Sem permissão para carregar horários');
       console.error(error);
     }
     setLoading(false);
@@ -146,7 +185,7 @@ export default function Horario() {
         fetchHorarios(selectedTurma.id);
       }
     } catch (error) {
-      toast.error(editingHorario ? 'Erro ao atualizar horário' : 'Erro ao cadastrar horário');
+      toast.error(editingHorario ? 'Sem permissão para atualizar horário' : 'Sem permissão para cadastrar horário');
       console.error(error);
     }
   }
@@ -161,7 +200,7 @@ export default function Horario() {
       toast.success('Horário excluído com sucesso!');
       if (selectedTurma) fetchHorarios(selectedTurma.id);
     } catch (error) {
-      toast.error('Erro ao excluir horário');
+      toast.error('Sem permissão para excluir horário');
       console.error(error);
     }
   }
@@ -234,103 +273,121 @@ export default function Horario() {
                 <CardTitle className="text-xl md:text-2xl font-bold leading-tight">
                   Horário da {selectedTurma.nome}
                 </CardTitle>
-                <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
-                  <DialogTrigger asChild>
-                    <Button size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Configurar Horário
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>{editingHorario ? 'Editar Horário' : 'Novo Horário'}</DialogTitle>
-                    </DialogHeader>
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Turmas</Label>
-                        <div className="max-h-32 overflow-y-auto space-y-2 rounded-md border p-2 bg-muted/50">
-                          {turmas.map(turma => (
-                            <div key={turma.id} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`turma-dialog-${turma.id}`}
-                                checked={formData.turma_ids.includes(turma.id)}
-                                onCheckedChange={(checked) => {
-                                  const newTurmaIds = checked
-                                    ? [...formData.turma_ids, turma.id]
-                                    : formData.turma_ids.filter(id => id !== turma.id);
-                                  setFormData({ ...formData, turma_ids: newTurmaIds });
-                                }}
-                              />
-                              <Label htmlFor={`turma-dialog-${turma.id}`} className="font-normal cursor-pointer">
-                                {turma.nome}
-                              </Label>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="dia">Dia da Semana</Label>
-                        <Select value={formData.dia} onValueChange={(value) => setFormData({ ...formData, dia: value })}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {DIAS.map((dia) => (
-                              <SelectItem key={dia.value} value={dia.value}>
-                                {dia.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="componente">componente</Label>
-                        <Select value={formData.componente} onValueChange={(value) => setFormData({ ...formData, componente: value })}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Selecione a componente" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {componentes.map((disc) => (
-                              <SelectItem key={disc} value={disc}>
-                                {disc}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
+                {role !== 'professor' && role !== 'estudante' && (
+                  <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
+                    <DialogTrigger asChild>
+                      <Button size="sm" variant="outline" className="hidden sm:flex">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Cadastrar Horário
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>{editingHorario ? 'Editar Horário' : 'Novo Horário'}</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                          <Label htmlFor="inicio">Início</Label>
-                          <Input
-                            id="inicio"
-                            type="time"
-                            value={formData.inicio}
-                            onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
-                            required
-                          />
+                          <Label>Turmas</Label>
+                          <div className="max-h-32 overflow-y-auto space-y-2 rounded-md border p-2 bg-muted/50">
+                            {turmas.map(turma => (
+                              <div key={turma.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`turma-dialog-${turma.id}`}
+                                  checked={formData.turma_ids.includes(turma.id)}
+                                  onCheckedChange={(checked) => {
+                                    const newTurmaIds = checked
+                                      ? [...formData.turma_ids, turma.id]
+                                      : formData.turma_ids.filter(id => id !== turma.id);
+                                    setFormData({ ...formData, turma_ids: newTurmaIds });
+                                  }}
+                                />
+                                <Label htmlFor={`turma-dialog-${turma.id}`} className="font-normal cursor-pointer">
+                                  {turma.nome}
+                                </Label>
+                              </div>
+                            ))}
+                          </div>
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="fim">Fim</Label>
-                          <Input
-                            id="fim"
-                            type="time"
-                            value={formData.fim}
-                            onChange={(e) => setFormData({ ...formData, fim: e.target.value })}
-                            required
-                          />
+                          <Label htmlFor="dia">Dia da Semana</Label>
+                          <Select value={formData.dia} onValueChange={(value) => setFormData({ ...formData, dia: value })}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DIAS.map((dia) => (
+                                <SelectItem key={dia.value} value={dia.value}>
+                                  {dia.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                      </div>
-                      <div className="flex justify-end gap-2 pt-4">
-                        <Button type="button" variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>
-                          Cancelar
-                        </Button>
-                        <Button type="submit">
-                          {editingHorario ? 'Salvar' : 'Cadastrar'}
-                        </Button>
-                      </div>
-                    </form>
-                  </DialogContent>
-                </Dialog>
+                        <div className="space-y-2">
+                          <Label htmlFor="componente">componente</Label>
+                          <Select value={formData.componente} onValueChange={(value) => setFormData({ ...formData, componente: value })}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Selecione a componente" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {componentes.map((disc) => (
+                                <SelectItem key={disc} value={disc}>
+                                  {disc}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="inicio">Início</Label>
+                            <Input
+                              id="inicio"
+                              type="time"
+                              value={formData.inicio}
+                              onChange={(e) => setFormData({ ...formData, inicio: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="fim">Fim</Label>
+                            <Input
+                              id="fim"
+                              type="time"
+                              value={formData.fim}
+                              onChange={(e) => setFormData({ ...formData, fim: e.target.value })}
+                              required
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-4">
+                          <Button type="button" variant="outline" onClick={() => { setIsOpen(false); resetForm(); }}>
+                            Cancelar
+                          </Button>
+                          <Button type="submit">
+                            {editingHorario ? 'Salvar' : 'Cadastrar'}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                )}
+
+                {role !== 'professor' && role !== 'estudante' && (
+                  <Button size="sm" onClick={() => setIsGeneratorOpen(true)}>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Gerador de Horário
+                  </Button>
+                )}
+
+                {isGeneratorOpen && (
+                  <TimeTableGeneratorDialog
+                    open={isGeneratorOpen}
+                    onOpenChange={setIsGeneratorOpen}
+                    turma={selectedTurma as any}
+                    onSuccess={() => selectedTurma && fetchHorarios(selectedTurma.id)}
+                  />
+                )}
               </CardHeader>
               <CardContent>
                 {loading ? (
@@ -355,14 +412,16 @@ export default function Horario() {
                                 <Clock className="h-3 w-3" />
                                 {horario.inicio} - {horario.fim}
                               </p>
-                              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(horario)}>
-                                  <Pencil className="h-3 w-3" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(horario)}>
-                                  <Trash2 className="h-3 w-3 text-destructive" />
-                                </Button>
-                              </div>
+                              {role !== 'professor' && (
+                                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openEdit(horario)}>
+                                    <Pencil className="h-3 w-3" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(horario)}>
+                                    <Trash2 className="h-3 w-3 text-destructive" />
+                                  </Button>
+                                </div>
+                              )}
                             </div>
                           ))}
                           {getHorariosByDia(dia.value).length === 0 && (

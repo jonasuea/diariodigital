@@ -1,4 +1,4 @@
-nome,matricula,data_nascimento,status,endereco,bairro,cidade,estado,telefone,mae_nome,mae_contato,mae_email,pai_nome,pai_contato,pai_email,largura_farda,altura_farda,pasta,prateleira,turma_id,turma_nome,ano
+nome,matricula,data_nascimento,status,endereco,bairro,cidade,estado,contato,mae_nome,mae_contato,mae_email,pai_nome,pai_contato,pai_email,largura_farda,altura_farda,pasta,prateleira,turma_id,turma_nome,ano
 João Silva,2024001,2008-05-15,Ativo,Rua das Flores 123,Centro,São Paulo,SP,11987654321,Maria Silva,11987654322,maria@email.com,José Silva,11987654323,jose@email.com,M,1.50,A1,01,1º Ano A,2024
 ,2024002,2009-03-20,Ativo,Av. Brasil 456,Jardim,Belo Horizonte,MG,31987654324,Carla Santos,31987654325,carla@email.com,Carlos Santos,31987654326,carlos@email.com,G,1.45,A1,02,1º Ano B,2024
 Ana Santos,,2009-03-20,Ativo,Av. Brasil 456,Jardim,Belo Horizonte,MG,31987654324,Carla Santos,31987654325,carla@email.com,Carlos Santos,31987654326,carlos@email.com,G,1.45,A1,02,1º Ano B,2024

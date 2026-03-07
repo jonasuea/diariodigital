@@ -3,46 +3,16 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from './ui/button';
-import { useEffect, useState } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
-
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles: string[];
 }
 
-interface MaintenanceConfig {
-  preferencias?: {
-    modoManutencao?: boolean;
-  };
-}
-
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { user, loading: authLoading, signOut } = useAuth();
-  const { role, loading: roleLoading } = useUserRole();
-  const [maintenanceConfig, setMaintenanceConfig] = useState<MaintenanceConfig | null>(null);
-  const [loadingMaintenance, setLoadingMaintenance] = useState(true);
+  const { role, loading: roleLoading, isInMaintenance } = useUserRole();
 
-  useEffect(() => {
-    const fetchMaintenanceStatus = async () => {
-      try {
-        const docRef = doc(db, 'configuracoes', 'escola');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setMaintenanceConfig(docSnap.data() as MaintenanceConfig);
-        }
-      } catch (error) {
-        console.error("Failed to fetch maintenance status:", error);
-      } finally {
-        setLoadingMaintenance(false);
-      }
-    };
-
-    fetchMaintenanceStatus();
-  }, []);
-
-  const loading = authLoading || roleLoading || loadingMaintenance;
+  const loading = authLoading || roleLoading;
 
   if (loading) {
     return (
@@ -52,7 +22,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     );
   }
 
-  if (maintenanceConfig?.preferencias?.modoManutencao && role !== 'admin') {
+  if (isInMaintenance && role !== 'admin') {
     return <Navigate to="/manutencao" />;
   }
 
@@ -71,7 +41,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Acesso Pendente</h1>
           <p className="text-muted-foreground mb-6">
-            Seu cadastro foi realizado com sucesso, mas você ainda não tem permissão para acessar o sistema. 
+            Seu cadastro foi realizado com sucesso, mas você ainda não tem permissão para acessar o sistema.
             Entre em contato com o administrador para solicitar acesso.
           </p>
           <Button variant="outline" onClick={async () => await signOut()}>
@@ -93,7 +63,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
           </div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Acesso Negado</h1>
           <p className="text-muted-foreground mb-6">
-            Você não tem permissão para acessar esta página. 
+            Você não tem permissão para acessar esta página.
             Se você acredita que isso é um erro, entre em contato com o administrador.
           </p>
           <Button variant="outline" onClick={async () => await signOut()}>

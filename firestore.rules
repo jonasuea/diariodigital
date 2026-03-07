@@ -1,0 +1,161 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // =========================================================================
+    // 1. FUNÇÕES AUXILIARES GERAIS
+    // =========================================================================
+    function isSignedIn() { 
+      return request.auth != null; 
+    }
+    
+    function getRole() {
+      return exists(/databases/$(database)/documents/user_roles/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.get('role', 'none')
+        : 'none';
+    }
+
+    // =========================================================================
+    // 2. FUNÇÕES DE PERFIL (PAPÉIS/ROLES)
+    // =========================================================================
+    // Definição clara de quem é quem dentro do sistema
+    function isAdmin()       { return getRole() == 'admin'; }
+    function isGestor()      { return getRole() == 'gestor'; }
+    function isSecretario()  { return getRole() == 'secretario'; }
+    function isProfessor()   { return getRole() == 'professor'; }
+    function isEstudante()   { return getRole() == 'aluno' || getRole() == 'estudante'; }
+    function isResponsavel() { return getRole() == 'responsavel'; }
+
+    // REGRA DE TRANSIÇÃO: Permitir acesso a qualquer usuário autenticado.
+    // Quando você for habilitar as permissões por perfil, basta trocar
+    // o "hasAnyRole()" pelas funções acima em cada respectiva coleção.
+    function hasAnyRole() {
+      return isSignedIn(); 
+    }
+
+    // =========================================================================
+    // 3. REGRAS POR COLEÇÃO 
+    // (Atualmente liberando Leitura e Escrita para todos os logados)
+    // =========================================================================
+
+    match /user_roles/{uid} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && request.auth.uid == uid && request.resource.data.get('role', 'pending') == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    match /profiles/{uid} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || request.auth.uid == uid;
+    }
+
+    match /escolas/{id} {
+      allow read: if isSignedIn(); // Qualquer pessoa logada no sistema pode saber os nomes/dados das escolas
+    	allow write: if isAdmin() || isGestor(); // Apenas cargos de gestão podem criar ou alterar dados da escola
+    }
+
+    match /estudantes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario();
+    }
+
+    match /professores/{id} {
+      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante(); // Admin, Gestor, Secretário e Professor podem ver as turmas
+      allow write: if isAdmin() || isGestor() || isSecretario(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+    }
+
+    match /equipe-gestora/{id} {
+      allow read: if isAdmin() || isGestor(); // Admin, Gestor e Professor podem ver as turmas
+      allow write: if isAdmin() || isGestor(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+    }
+
+    match /turmas/{id} {
+      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante(); // Admin, Gestor, Secretário e Professor podem ver as turmas
+      allow write: if isAdmin() || isGestor() || isSecretario(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+    }
+
+    match /notas/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+    
+    match /frequencias/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
+    match /activity_log/{id} {
+      // Admin, Gestor e Secretário podem ver as turmas
+      allow read: if isAdmin() || isGestor() || isSecretario();
+      
+      // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+      allow write: if isAdmin() || isGestor() || isSecretario();
+    }
+
+    match /eventos/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
+    match /maintenance_status/{id} {
+      // TODOS os usuários do mundo precisam conseguir LER para saber se o sistema está em manutenção
+      allow read: if true; 
+      
+      // Mas APENAS o Administrador pode LIGAR (escrever) o modo de manutenção
+      allow write: if isAdmin();
+    }
+
+    match /configuracoes/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /objetos_conhecimento/{id} { 
+      // Admin, Gestor, Secretário e Professor podem ver as turmas
+      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      
+      // Mas só Admin, Gestor, Secretário e Professor podem salvar dados nelas
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
+    match /dias_letivos/{id} { 
+      // Todos podem ver os dias letivos
+      allow read: if hasAnyRole();
+      
+      // Mas só Admin, Gestor e Secretário podem salvar dados neles
+      allow write: if isAdmin() || isGestor() || isSecretario();
+    }
+
+    match /horarios/{id} { 
+      allow read, write: if hasAnyRole(); // Todos podem ver o horário
+      
+      // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+      allow write: if isAdmin() || isGestor() || isSecretario();
+    }
+
+    match /avaliacoes/{id} { 
+      // Admin, Gestor, Secretário e Professor podem ver as turmas
+      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      
+      // Mas só Admin, Gestor, Secretário e Professor podem salvar dados nelas
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
+    match /manual-uso/{id} {
+      allow read, write: if hasAnyRole();
+    }
+
+
+   // match /atividades_recentes/{id} {
+   //   allow read, write: if hasAnyRole();
+    //}
+
+    // =========================================================================
+    // 4. REGRA RESIDUAL (COLEÇÕES NÃO LISTADAS ACIMA)
+    // =========================================================================
+    match /{document=**} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+  }
+}

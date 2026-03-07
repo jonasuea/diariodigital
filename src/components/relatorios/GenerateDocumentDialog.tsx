@@ -91,7 +91,7 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, type, onGene
       setSelectedTurma('');
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao buscar turmas');
+      toast.error('Sem permissão para buscar turmas');
     } finally {
       setFetchingData(false);
     }
@@ -110,7 +110,7 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, type, onGene
       setSelectedEstudante('');
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao buscar estudantes');
+      toast.error('Sem permissão para buscar estudantes');
     } finally {
       setFetchingData(false);
     }
@@ -204,7 +204,7 @@ export function GenerateDocumentDialog({ open, onOpenChange, title, type, onGene
       onOpenChange(false);
     } catch (error) {
       console.error(error);
-      toast.error('Erro ao preparar documento');
+      toast.error('Sem permissão para preparar documento');
     } finally {
       setLoading(false);
     }

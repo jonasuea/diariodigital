@@ -10,9 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, User, Plus, Trash2, Upload, FileText, X } from 'lucide-react';
-import { db, storage } from '@/lib/firebase';
-import { collection, doc, getDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { ArrowLeft, User, Plus, Trash2, Upload, FileText, X, Camera } from 'lucide-react';
+import { WebcamCapture } from '@/components/ui/webcam-capture';
+import { db, storage, functions } from '@/lib/firebase';
+import { httpsCallable } from 'firebase/functions';
+import { collection, doc, getDoc, addDoc, updateDoc, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
@@ -67,7 +69,7 @@ export default function NovoProfessor() {
     rg: '',
     cpf: '',
     email: '',
-    telefone: '',
+    contato: '',
     status_funcional: 'Lotado',
     data_lotacao: '',
     arquivo_url: '',
@@ -81,6 +83,7 @@ export default function NovoProfessor() {
     numero: '',
     bairro: '',
     cep: '',
+    usuario_id: '',
   });
 
   const [formacoes, setFormacoes] = useState<Formacao[]>([
@@ -107,7 +110,7 @@ export default function NovoProfessor() {
       setFormData(prev => ({ ...prev, arquivo_url: fileURL }));
       toast.success('Arquivo enviado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao enviar arquivo');
+      toast.error('Sem permissão para enviar arquivo');
       console.error(error);
     } finally {
       setUploadingPdf(false);
@@ -116,6 +119,26 @@ export default function NovoProfessor() {
 
   function removePdf() {
     setFormData(prev => ({ ...prev, arquivo_url: '' }));
+  }
+
+  async function uploadPhoto(file: File) {
+    setUploadingPhoto(true);
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `professor_${Date.now()}.${fileExt}`;
+      const storageRef = ref(storage, `professores/fotos/${fileName}`);
+
+      await uploadBytes(storageRef, file);
+      const photoURL = await getDownloadURL(storageRef);
+
+      setFormData(prev => ({ ...prev, foto_url: photoURL }));
+      toast.success('Foto carregada com sucesso!');
+    } catch (error) {
+      toast.error('Sem permissão para fazer upload da foto');
+      console.error(error);
+    } finally {
+      setUploadingPhoto(false);
+    }
   }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -127,23 +150,7 @@ export default function NovoProfessor() {
       return;
     }
 
-    setUploadingPhoto(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `professor_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `professores/fotos/${fileName}`);
-
-      await uploadBytes(storageRef, file);
-      const photoURL = await getDownloadURL(storageRef);
-
-      setFormData(prev => ({ ...prev, foto_url: photoURL }));
-      toast.success('Foto carregada com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao fazer upload da foto');
-      console.error(error);
-    } finally {
-      setUploadingPhoto(false);
-    }
+    await uploadPhoto(file);
   }
 
   useEffect(() => {
@@ -167,7 +174,7 @@ export default function NovoProfessor() {
           rg: data.rg || '',
           cpf: data.cpf || '',
           email: data.email,
-          telefone: data.telefone || '',
+          contato: data.contato || '',
           status_funcional: data.status_funcional || 'Lotado',
           data_lotacao: data.data_lotacao || '',
           arquivo_url: data.arquivo_url || '',
@@ -181,6 +188,7 @@ export default function NovoProfessor() {
           numero: data.numero || '',
           bairro: data.bairro || '',
           cep: data.cep || '',
+          usuario_id: data.usuario_id || '',
         });
         if (data.formacoes && Array.isArray(data.formacoes)) {
           setFormacoes(data.formacoes as Formacao[]);
@@ -190,7 +198,7 @@ export default function NovoProfessor() {
         navigate('/professores');
       }
     } catch (error) {
-      toast.error('Erro ao carregar professor');
+      toast.error('Sem permissão para carregar professor');
       console.error(error);
     } finally {
       setLoading(false);
@@ -252,12 +260,51 @@ export default function NovoProfessor() {
         if (!id) return;
         const docRef = doc(db, 'professores', id);
         await updateDoc(docRef, payload);
+
+        // Sincronizar nome no perfil de usuário se houver um vínculo
+        const userId = (payload as any).usuario_id;
+        if (userId) {
+          try {
+            await updateDoc(doc(db, 'profiles', userId), { nome: payload.nome });
+          } catch (err) {
+            console.warn('Sem permissão para sincronizar nome no perfil:', err);
+          }
+        } else if (payload.email) {
+          try {
+            const profilesSnap = await getDocs(
+              query(collection(db, 'profiles'), where('email', '==', payload.email.toLowerCase()))
+            );
+            if (!profilesSnap.empty) {
+              await updateDoc(doc(db, 'profiles', profilesSnap.docs[0].id), { nome: payload.nome });
+            }
+          } catch (err) {
+            console.warn('Sem permissão para sincronizar nome no perfil por e-mail:', err);
+          }
+        }
+
         await logActivity(`atualizou o cadastro do professor(a) "${formData.nome}".`);
         toast.success('Professor atualizado com sucesso!');
       } else {
-        await addDoc(collection(db, 'professores'), payload);
+        // BLINDAGEM: Usa Cloud Function para criar conta + papel + perfil de forma segura
+        const createUser = httpsCallable(functions, 'createUserAccount');
+        const result = await createUser({
+          email: formData.email,
+          password: 'EDUCAFACIL2026', // Senha padrão inicial
+          nome: formData.nome,
+          role: 'professor', // Papel fixo para esta página
+          escola_id: escolaAtivaId
+        });
+
+        const { uid } = result.data as { uid: string };
+
+        // Cria o documento na coleção professores vinculado ao UID criado
+        await setDoc(doc(db, 'professores', uid), {
+          ...payload,
+          usuario_id: uid
+        });
+
         await logActivity(`cadastrou o novo professor(a) "${formData.nome}".`);
-        toast.success('Professor cadastrado com sucesso!');
+        toast.success('Professor cadastrado com sucesso! O acesso já está liberado.');
       }
       navigate('/professores');
     } catch (error: any) {
@@ -266,7 +313,7 @@ export default function NovoProfessor() {
       } else if (error.message.includes('matricula') || error.message.includes('email')) {
         toast.error('Matrícula ou email já cadastrados');
       } else {
-        toast.error('Erro ao salvar professor');
+        toast.error('Sem permissão para salvar professor');
       }
       console.error(error);
     } finally {
@@ -315,16 +362,28 @@ export default function NovoProfessor() {
                     className="hidden"
                     onChange={handlePhotoUpload}
                   />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => photoInputRef.current?.click()}
-                    disabled={uploadingPhoto}
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploadingPhoto ? 'Carregando...' : 'Carregar Foto'}
-                  </Button>
+                  <div className="flex flex-wrap gap-2 justify-center">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => photoInputRef.current?.click()}
+                      disabled={uploadingPhoto}
+                    >
+                      <Upload className="h-4 w-4 mr-2" />
+                      {uploadingPhoto ? 'Carregando...' : 'Carregar Foto'}
+                    </Button>
+
+                    <WebcamCapture
+                      onCapture={uploadPhoto}
+                      trigger={
+                        <Button variant="outline" size="sm" type="button" disabled={uploadingPhoto}>
+                          <Camera className="h-4 w-4 mr-2" />
+                          Tirar Foto
+                        </Button>
+                      }
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -388,12 +447,12 @@ export default function NovoProfessor() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="telefone">Telefone</Label>
+                    <Label htmlFor="contato">Contato</Label>
                     <Input
-                      id="telefone"
-                      placeholder="Número de telefone"
-                      value={formData.telefone}
-                      onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                      id="contato"
+                      placeholder="Número de contato"
+                      value={formData.contato}
+                      onChange={(e) => setFormData({ ...formData, contato: e.target.value })}
                     />
                   </div>
                 </div>

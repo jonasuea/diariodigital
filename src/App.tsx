@@ -33,11 +33,12 @@ import ObjetosDeConhecimento from "./pages/ObjetosDeConhecimento";
 import Avaliacoes from "./pages/Avaliacoes";
 import PerfilEstudante from "./pages/PerfilEstudante";
 import PerfilProfessor from "./pages/PerfilProfessor";
-import PerfilUsuario from "./pages/PerfilUsuario";
+
 import PerfilMembro from "./pages/PerfilMembro";
 import NotasParciais from "./pages/NotasParciais";
 import ManualUso from "./pages/ManualUso";
 import { useAutoUpdate } from "@/hooks/useAutoUpdate";
+import { UserRoleProvider } from "@/hooks/useUserRole";
 
 const queryClient = new QueryClient();
 
@@ -46,7 +47,7 @@ const router = createBrowserRouter([
   { path: "/auth", element: <Auth /> },
   { path: "/manutencao", element: <Manutencao /> },
 
-  { path: "/painel", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Painel /></ProtectedRoute> },
+  { path: "/painel", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Painel /></ProtectedRoute> },
 
   { path: "/escolas", element: <ProtectedRoute allowedRoles={['admin']}><Escolas /></ProtectedRoute> },
   { path: "/escolas/nova", element: <ProtectedRoute allowedRoles={['admin']}><NovaEscola /></ProtectedRoute> },
@@ -73,17 +74,17 @@ const router = createBrowserRouter([
   { path: "/equipe-gestora/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><PerfilMembro /></ProtectedRoute> },
   { path: "/equipe-gestora/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoMembro /></ProtectedRoute> },
 
-  { path: "/horario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Horario /></ProtectedRoute> },
-  { path: "/calendario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Calendario /></ProtectedRoute> },
+  { path: "/horario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Horario /></ProtectedRoute> },
+  { path: "/calendario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Calendario /></ProtectedRoute> },
   { path: "/diario-digital", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><DiarioDigital /></ProtectedRoute> },
   { path: "/diario-digital/objetos-de-conhecimento/:turmaId", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
   { path: "/diario-digital/objetos-de-conhecimento", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
   { path: "/diario-digital/avaliacoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Avaliacoes /></ProtectedRoute> },
   { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Relatorios /></ProtectedRoute> },
-  { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Configuracoes /></ProtectedRoute> },
+  { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Configuracoes /></ProtectedRoute> },
   { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Usuarios /></ProtectedRoute> },
   { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Logs /></ProtectedRoute> },
-  { path: "/manual-uso", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ManualUso /></ProtectedRoute> },
+  { path: "/manual-uso", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><ManualUso /></ProtectedRoute> },
 
   { path: "*", element: <NotFound /> },
 ], {
@@ -99,7 +100,9 @@ const App = () => {
         <Toaster />
         <Sonner />
         <AuthProvider>
-          <RouterProvider router={router} />
+          <UserRoleProvider>
+            <RouterProvider router={router} />
+          </UserRoleProvider>
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>

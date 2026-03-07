@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Plus, Search, Pencil, Trash2, Eye, Upload, Download } from 'lucide-react';
+import { Plus, Search, Pencil, Trash2, Eye, Upload, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 import { useUserRole } from '@/hooks/useUserRole';
+import { logActivity } from '@/lib/logger';
+import { RotateCcw, Trash } from 'lucide-react';
 
 interface Estudante {
   id: string;
@@ -21,76 +23,82 @@ interface Estudante {
   status: string;
   turma_id: string | null;
   turma_nome?: string;
+  excluido?: boolean;
 }
 
 export default function Estudantes() {
   const navigate = useNavigate();
-  const { isAdmin, escolaAtivaId } = useUserRole();
+  const { isAdmin, isMasterAdmin, isSecretario, escolaAtivaId } = useUserRole();
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [lastVisible, setLastVisible] = useState<any>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [estudanteToDelete, setEstudanteToDelete] = useState<Estudante | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
 
+  const PAGE_SIZE = 20;
+
   useEffect(() => {
     fetchEstudantes();
-  }, [search, escolaAtivaId]);
+  }, [search, escolaAtivaId, showDeleted]);
 
-  async function fetchEstudantes() {
-    if (!escolaAtivaId) {
-      setLoading(false);
-      return;
-    }
+  async function fetchEstudantes(next = false) {
     setLoading(true);
     try {
-      // Query 1: Estudantes matriculados na escola ativa
-      let q1, q2;
-      if (search) {
-        const searchLower = search.toLowerCase();
-        q1 = query(
+      const searchLower = search.trim().toLowerCase();
+      let estudantesQuery;
+
+      if (searchLower) {
+        // Busca global por nome na rede (qualquer escola, com ou sem turma)
+        estudantesQuery = query(
           collection(db, 'estudantes'),
-          where('escola_id', '==', escolaAtivaId),
           where('nome_lower', '>=', searchLower),
           where('nome_lower', '<=', searchLower + '\uf8ff'),
-          orderBy('nome_lower')
-        );
-        // Query 2: Transferidos SEM escola (disponíveis para matrícula)
-        q2 = query(
-          collection(db, 'estudantes'),
-          where('status', '==', 'Transferido'),
-          where('escola_id', '==', ''),
-          where('nome_lower', '>=', searchLower),
-          where('nome_lower', '<=', searchLower + '\uf8ff'),
-          orderBy('nome_lower')
+          orderBy('nome_lower'),
+          limit(PAGE_SIZE + 1)
         );
       } else {
-        q1 = query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
-        // Query 2: Transferidos SEM escola (disponíveis para matrícula)
-        q2 = query(
+        if (!escolaAtivaId) {
+          setLoading(false);
+          return;
+        }
+
+        // Comportamento padrão: Estudantes da escola ativa OU transferidos OR sem escola
+        estudantesQuery = query(
           collection(db, 'estudantes'),
-          where('status', '==', 'Transferido'),
-          where('escola_id', '==', ''),
+          where('escola_id', 'in', [escolaAtivaId, '']),
+          where('excluido', '==', showDeleted),
+          orderBy('nome'),
+          limit(PAGE_SIZE + 1)
         );
       }
 
-      const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);
+      if (next && lastVisible) {
+        estudantesQuery = query(estudantesQuery, startAfter(lastVisible));
+      }
 
-      // Une os resultados eliminando duplicatas pelo ID
-      const seenIds = new Set<string>();
-      const allDocs = [...snap1.docs, ...snap2.docs].filter(d => {
-        if (seenIds.has(d.id)) return false;
-        seenIds.add(d.id);
-        return true;
-      });
+      const snap = await getDocs(estudantesQuery);
+      let docs = snap.docs;
 
-      const estudantesData = await Promise.all(allDocs.map(async (estudanteDoc) => {
-        const estudanteData = estudanteDoc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
+      const hasNext = docs.length > PAGE_SIZE;
+      const displayDocs = hasNext ? docs.slice(0, PAGE_SIZE) : docs;
+
+      setHasMore(hasNext);
+      if (displayDocs.length > 0) {
+        setLastVisible(displayDocs[displayDocs.length - 1]);
+      }
+
+      const estudantesData = await Promise.all(displayDocs.map(async (estudanteDoc) => {
+        const data = estudanteDoc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
         let turma_nome: string | undefined = '-';
 
-        if (estudanteData.turma_id) {
-          const turmaDocRef = doc(db, 'turmas', estudanteData.turma_id);
+        if (data.turma_id) {
+          const turmaDocRef = doc(db, 'turmas', data.turma_id);
           const turmaDoc = await getDoc(turmaDocRef);
           if (turmaDoc.exists()) {
             turma_nome = turmaDoc.data().nome;
@@ -99,22 +107,36 @@ export default function Estudantes() {
 
         return {
           id: estudanteDoc.id,
-          ...estudanteData,
+          ...data,
           turma_nome,
         };
       }));
 
-      estudantesData.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       setEstudantes(estudantesData);
+      if (!next) setPage(1);
     } catch (error) {
-      toast.error('Erro ao carregar estudantes');
+      toast.error('Sem permissão para carregar estudantes');
       console.error(error);
     } finally {
       setLoading(false);
     }
   }
 
+  const handleNextPage = () => {
+    setPage(prev => prev + 1);
+    fetchEstudantes(true);
+  };
+
+  const handlePrevPage = () => {
+    setPage(1);
+    fetchEstudantes();
+  };
+
   function openDeleteDialog(estudante: Estudante) {
+    if (isSecretario) {
+      toast.error('Secretários não têm permissão para excluir registros.');
+      return;
+    }
     setEstudanteToDelete(estudante);
     setDeleteDialogOpen(true);
   }
@@ -123,13 +145,50 @@ export default function Estudantes() {
     if (!estudanteToDelete) return;
 
     try {
-      await deleteDoc(doc(db, 'estudantes', estudanteToDelete.id));
-      toast.success('Estudante excluído com sucesso!');
+      if (isMasterAdmin && showDeleted) {
+        // Exclusão definitiva apenas para Master Admin na lixeira
+        await deleteDoc(doc(db, 'estudantes', estudanteToDelete.id));
+        await logActivity(`Estudante ${estudanteToDelete.nome} excluído permanentemente por ${isMasterAdmin ? 'Master Admin' : 'Admin'}`);
+        toast.success('Estudante excluído permanentemente!');
+      } else {
+        // Soft delete para os demais ou se não estiver na lixeira
+        const userDocRef = doc(db, 'estudantes', estudanteToDelete.id);
+        await addDoc(collection(db, 'logs'), {
+          acao: 'exclusao_logica',
+          entidade: 'estudante',
+          entidade_id: estudanteToDelete.id,
+          usuario: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor',
+          data: new Date()
+        });
+
+        await updateDoc(userDocRef, {
+          excluido: true,
+          excluido_em: new Date(),
+          excluido_por: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor'
+        } as any);
+
+        toast.success('Estudante movido para a lixeira!');
+      }
       setDeleteDialogOpen(false);
       setEstudanteToDelete(null);
       fetchEstudantes();
     } catch (error) {
-      toast.error('Erro ao excluir estudante');
+      toast.error('Sem permissão para excluir estudante');
+      console.error(error);
+    }
+  }
+
+  async function handleReactivate(estudante: Estudante) {
+    try {
+      const userDocRef = doc(db, 'estudantes', estudante.id);
+      await updateDoc(userDocRef, {
+        excluido: false,
+        reativado_em: new Date()
+      } as any);
+      toast.success('Estudante reativado com sucesso!');
+      fetchEstudantes();
+    } catch (error) {
+      toast.error('Erro ao reativar estudante');
       console.error(error);
     }
   }
@@ -208,7 +267,7 @@ export default function Estudantes() {
         }
 
         if (missingFieldsErrors.length > 0) {
-          errorMessage += '• Campos ausentes em algumas linhas\n';
+          errorMessage += '• Campos ausentes em algumas lines\n';
         }
 
         // Adicionar mensagens específicas
@@ -416,12 +475,13 @@ export default function Estudantes() {
             ano,
             turma_id: row.turma_id ? row.turma_id.toString().trim() : null,
             escola_id: escolaAtivaId,
+            excluido: false,
           };
 
           await addDoc(collection(db, 'estudantes'), estudanteData);
           successCount++;
         } catch (error) {
-          errorMessages.push(`Linha ${rowNumber}: Erro ao salvar - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          errorMessages.push(`Linha ${rowNumber}: Sem permissão para salvar - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
           errorCount++;
           console.error(`Erro na linha ${rowNumber}:`, error);
         }
@@ -449,7 +509,7 @@ export default function Estudantes() {
       fetchEstudantes();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast.error(`Erro ao processar arquivo: ${errorMessage}`);
+      toast.error(`Sem permissão para processar arquivo: ${errorMessage}`);
       console.error('Erro geral na importação:', error);
     } finally {
       setImporting(false);
@@ -568,7 +628,7 @@ export default function Estudantes() {
 
       toast.success('Exportação concluída com sucesso!');
     } catch (error) {
-      toast.error('Erro ao exportar estudantes');
+      toast.error('Sem permissão para exportar estudantes');
       console.error(error);
     }
   }
@@ -578,6 +638,15 @@ export default function Estudantes() {
     { key: 'matricula', header: 'Matrícula' },
     { key: 'ano', header: 'Ano' },
     { key: 'turma_nome', header: 'Turma', render: (estudante: Estudante) => estudante.turma_nome && estudante.turma_nome !== '-' ? estudante.turma_nome : <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-warning/10 text-warning">Sem turma</span> },
+    {
+      key: 'cpf',
+      header: 'CPF',
+      render: (estudante: any) => {
+        const cpf = estudante.cpf || '';
+        if (!cpf) return '-';
+        return `***.***.${cpf.slice(-5, -2)}-${cpf.slice(-2)}`;
+      }
+    },
     {
       key: 'status',
       header: 'Status',
@@ -593,17 +662,26 @@ export default function Estudantes() {
     {
       key: 'actions',
       header: 'Ações',
-      render: (estudante: Estudante) => (
+      render: (estudante: any) => (
         <div className="flex gap-2">
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/estudantes/${estudante.id}`); }}>
             <Eye className="h-4 w-4 text-blue-500" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/estudantes/${estudante.id}/editar`); }}>
-            <Pencil className="h-4 w-4 text-orange-500" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(estudante); }}>
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
+          {!estudante.excluido && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/estudantes/${estudante.id}/editar`); }}>
+              <Pencil className="h-4 w-4 text-orange-500" />
+            </Button>
+          )}
+          {estudante.excluido && isAdmin && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleReactivate(estudante); }} title="Reativar">
+              <RotateCcw className="h-4 w-4 text-green-500" />
+            </Button>
+          )}
+          {!isSecretario && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(estudante); }}>
+              <Trash2 className={`h-4 w-4 ${estudante.excluido ? 'text-red-700' : 'text-red-500'}`} />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -626,6 +704,13 @@ export default function Estudantes() {
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
               <>
+                <Button
+                  variant={showDeleted ? "destructive" : "outline"}
+                  onClick={() => setShowDeleted(!showDeleted)}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  {showDeleted ? 'Ver Ativos' : 'Ver Lixeira'}
+                </Button>
                 <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" />
                   Importar CSV
@@ -644,6 +729,32 @@ export default function Estudantes() {
         </div>
 
         <DataTable columns={columns} data={estudantes} loading={loading} emptyMessage="Nenhum estudante encontrado" />
+
+        <div className="flex items-center justify-between py-4">
+          <p className="text-sm text-muted-foreground">
+            Página {page}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handlePrevPage}
+              disabled={page === 1 || loading}
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Início
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleNextPage}
+              disabled={!hasMore || loading}
+            >
+              Próximo
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </Button>
+          </div>
+        </div>
 
         {/* Dialog de Importação CSV */}
         <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
@@ -695,14 +806,16 @@ export default function Estudantes() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o estudante "{estudanteToDelete?.nome}"?
-                Esta ação não pode ser desfeita.
+                {showDeleted
+                  ? `Tem certeza que deseja excluir PERMANENTEMENTE o estudante "${estudanteToDelete?.nome}"? Esta ação não pode ser desfeita.`
+                  : `Tem certeza que deseja mover o estudante "${estudanteToDelete?.nome}" para a lixeira?`
+                }
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
+                {showDeleted ? 'Excluir Permanentemente' : 'Mover para Lixeira'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

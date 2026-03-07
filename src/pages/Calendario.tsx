@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Navigate } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +35,11 @@ interface Evento {
 export default function Calendario() {
   const { user } = useAuth();
   const { role, escolaAtivaId } = useUserRole();
+
+  if (role === 'estudante') {
+    return <Navigate to="/painel" replace />;
+  }
+
   const isAdminOrGestor = role === 'admin' || role === 'gestor';
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
@@ -91,7 +97,7 @@ export default function Calendario() {
 
       setEventos(eventosData);
     } catch (error) {
-      toast.error('Erro ao carregar eventos');
+      toast.error('Sem permissão para carregar eventos');
       console.error(error);
     }
     setLoading(false);
@@ -119,7 +125,7 @@ export default function Calendario() {
 
       setDiasLetivos(dias);
     } catch (error) {
-      console.error("Erro ao carregar dias letivos:", error);
+      console.error("Sem permissão para carregar dias letivos:", error);
     }
   }
 
@@ -162,8 +168,8 @@ export default function Calendario() {
         toast.success(`Dia ${format(date, 'dd/MM')} marcado como LETIVO.`);
       }
     } catch (error) {
-      console.error("Erro ao alterar dia letivo:", error);
-      toast.error("Erro ao atualizar o calendário escolar.");
+      console.error("Sem permissão para alterar dia letivo:", error);
+      toast.error("Sem permissão para atualizar o calendário escolar.");
     }
   }
 
@@ -190,7 +196,7 @@ export default function Calendario() {
       resetForm();
       fetchEventos();
     } catch (error) {
-      toast.error('Erro ao cadastrar evento');
+      toast.error('Sem permissão para cadastrar evento');
       console.error(error);
     }
   }
@@ -218,7 +224,7 @@ export default function Calendario() {
       resetForm();
       fetchEventos();
     } catch (error) {
-      toast.error('Erro ao atualizar evento');
+      toast.error('Sem permissão para atualizar evento');
       console.error(error);
     }
   }
@@ -235,7 +241,7 @@ export default function Calendario() {
       setEventoToDelete(null);
       fetchEventos();
     } catch (error) {
-      toast.error('Erro ao excluir evento');
+      toast.error('Sem permissão para excluir evento');
       console.error(error);
     }
   }
@@ -315,10 +321,12 @@ export default function Calendario() {
               Modo de Edição: Selecione uma data e clique em "Alternar Dia Letivo"
             </div>
           )}
-          <Button onClick={openAddDialog}>
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar Evento
-          </Button>
+          {role !== 'estudante' && (
+            <Button onClick={openAddDialog}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar Evento
+            </Button>
+          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-2">
@@ -355,16 +363,14 @@ export default function Calendario() {
                     hasEvent: eventDates,
                     isLetivo: diasLetivosDates
                   }}
+                  modifiersClassNames={{
+                    isLetivo: 'day-letivo'
+                  }}
                   modifiersStyles={{
                     hasEvent: {
                       fontWeight: 'bold',
                       textDecoration: 'underline',
                       textDecorationColor: 'hsl(var(--primary))',
-                    },
-                    isLetivo: {
-                      backgroundColor: '#dcfce7', // green-100
-                      color: '#166534', // green-800
-                      fontWeight: 'bold'
                     }
                   }}
                 />

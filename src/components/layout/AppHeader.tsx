@@ -56,9 +56,9 @@ export function AppHeader({ title }: AppHeaderProps) {
         try {
           let escolasQuery;
           if (isAdmin) {
-            escolasQuery = query(collection(db, 'escolas'));
+            escolasQuery = query(collection(db, 'escolas'), limit(50));
           } else {
-            escolasQuery = query(collection(db, 'escolas'), where(documentId(), 'in', permittedEscolas));
+            escolasQuery = query(collection(db, 'escolas'), where(documentId(), 'in', permittedEscolas), limit(50));
           }
 
           const escolasSnap = await getDocs(escolasQuery);
@@ -71,7 +71,7 @@ export function AppHeader({ title }: AppHeaderProps) {
             sessionStorage.setItem('escolaAtivaId', lista[0].id);
           }
         } catch (error) {
-          console.error("Erro ao carregar escolas no header:", error);
+          console.error("Sem permissão para carregar escolas no header:", error);
         }
       } else {
         setEscolasDisponiveis([]);
@@ -92,7 +92,7 @@ export function AppHeader({ title }: AppHeaderProps) {
 
         if (['gestor', 'pedagogo', 'secretario', 'professor'].includes(role)) {
           const collectionName = role === 'professor' ? 'professores' : 'equipe_gestora';
-          const q = query(collection(db, collectionName), where('email', '==', user.email));
+          const q = query(collection(db, collectionName), where('email', '==', user.email), limit(1));
           const querySnapshot = await getDocs(q);
 
           if (!querySnapshot.empty) {
@@ -115,7 +115,7 @@ export function AppHeader({ title }: AppHeaderProps) {
 
         setUserProfile(profileData || { nome: user.displayName || user.email || 'Usuário', foto_url: user.photoURL || undefined });
       } catch (error) {
-        console.error("Erro ao carregar perfil no header:", error);
+        console.error("Sem permissão para carregar perfil no header:", error);
         setUserProfile({ nome: user.displayName || user.email || 'Usuário', foto_url: user.photoURL || undefined });
       }
     }
@@ -294,56 +294,60 @@ export function AppHeader({ title }: AppHeaderProps) {
         </>
       )}
 
-      <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-        <PopoverTrigger asChild>
-          <div className="relative flex-1 max-w-[12rem] sm:max-w-none md:max-w-[32rem]">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Buscar..."
-              className="w-full pl-9 bg-secondary border-0 transition-all h-9"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              onFocus={() => {
-                if (searchQuery.length > 1) {
-                  setIsPopoverOpen(true);
-                }
-              }}
-            />
-          </div>
-        </PopoverTrigger>
-        <PopoverContent className="w-40 sm:w-64 lg:w-[32rem] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-          {isSearching ? (
-            <div className="flex items-center justify-center p-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      {role !== 'estudante' && (
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+
+          <PopoverTrigger asChild>
+            <div className="relative flex-1 max-w-[12rem] sm:max-w-none md:max-w-[32rem]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Buscar..."
+                className="w-full pl-9 bg-secondary border-0 transition-all h-9"
+                value={searchQuery}
+                onChange={handleSearchChange}
+                onFocus={() => {
+                  if (searchQuery.length > 1) {
+                    setIsPopoverOpen(true);
+                  }
+                }}
+              />
             </div>
-          ) : searchResults.length > 0 ? (
-            <div className="py-2">
-              {searchResults.map(result => (
-                <div
-                  key={result.id}
-                  className="flex items-center gap-3 px-3 py-2 hover:bg-muted cursor-pointer"
-                  onClick={() => handleResultClick(result)}
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={result.foto_url} />
-                    <AvatarFallback>{result.nome.substring(0, 2).toUpperCase()}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{result.nome}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{result.tipo}</p>
+          </PopoverTrigger>
+          <PopoverContent className="w-40 sm:w-64 lg:w-[32rem] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
+            {isSearching ? (
+              <div className="flex items-center justify-center p-4">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : searchResults.length > 0 ? (
+              <div className="py-2">
+                {searchResults.map(result => (
+                  <div
+                    key={result.id}
+                    className="flex items-center gap-3 px-3 py-2 hover:bg-muted cursor-pointer"
+                    onClick={() => handleResultClick(result)}
+                  >
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={result.foto_url} />
+                      <AvatarFallback>{result.nome.substring(0, 2).toUpperCase()}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">{result.nome}</p>
+                      <p className="text-xs text-muted-foreground capitalize">{result.tipo}</p>
+                    </div>
+                    {getTipoIcon(result.tipo)}
                   </div>
-                  {getTipoIcon(result.tipo)}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="p-4 text-sm text-center text-muted-foreground">
-              {debouncedSearchQuery.length > 1 ? 'Nenhum resultado encontrado.' : 'Digite para buscar...'}
-            </p>
-          )}
-        </PopoverContent>
-      </Popover>
+                ))}
+              </div>
+            ) : (
+              <p className="p-4 text-sm text-center text-muted-foreground">
+                {debouncedSearchQuery.length > 1 ? 'Nenhum resultado encontrado.' : 'Digite para buscar...'}
+              </p>
+            )}
+          </PopoverContent>
+        </Popover>
+      )}
+
 
       <Button
         variant="ghost"

@@ -53,7 +53,7 @@ git push origin "$m"
 
 # Verifica se o push foi bem-sucedido antes de continuar
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "Erro ao enviar para o GitHub. Abortando o deploy." -ForegroundColor Red
+    Write-Host "Sem permissão para enviar para o GitHub. Abortando o deploy." -ForegroundColor Red
     exit 1
 }
 

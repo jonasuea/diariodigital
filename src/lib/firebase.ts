@@ -3,6 +3,7 @@ import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
+import { getFunctions } from "firebase/functions";
 
 // Suas credenciais do Firebase usando as variáveis de ambiente do seu .env
 const firebaseConfig = {
@@ -23,6 +24,7 @@ const analytics = getAnalytics(app);
 export const auth = getAuth(app);
 export const db = getFirestore(app, 'database');
 export const storage = getStorage(app);
+export const functions = getFunctions(app);
 export { analytics };
 
 export default app;

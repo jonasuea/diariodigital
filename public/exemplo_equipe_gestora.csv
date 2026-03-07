@@ -1,3 +1,3 @@
-nome;matricula;rg;cpf;email;telefone;cargo;status;data_lotacao;biografia;link_lattes;formacoes
+nome;matricula;rg;cpf;email;contato;cargo;status;data_lotacao;biografia;link_lattes;formacoes
 "Gestor Exemplo Um";"GEST001";"123456789";"111.222.333-44";"gestor1@escola.com";"(11) 98888-1111";"Diretor";"Lotado";"2020-01-10";"Biografia do gestor um...";"http://lattes.cnpq.br/123";"[{\"curso\":\"Pedagogia\",\"nivel\":\"Graduação\",\"ano_conclusao\":\"2005\"},{\"curso\":\"Gestão Escolar\",\"nivel\":\"Especialização\",\"ano_conclusao\":\"2010\"}]"
 "Gestora Exemplo Dois";"GEST002";"987654321";"444.555.666-77";"gestora2@escola.com";"(11) 98888-2222";"Coordenador Pedagógico";"Lotado";"2021-03-22";"Biografia da gestora dois...";"http://lattes.cnpq.br/456";"[{\"curso\":\"Letras\",\"nivel\":\"Graduação\",\"ano_conclusao\":\"2012\"}]"

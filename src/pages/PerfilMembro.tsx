@@ -25,7 +25,7 @@ interface Membro {
   cargo: string;
   matricula: string;
   email: string;
-  telefone: string | null;
+  contato: string | null;
   status: string;
   foto_url: string | null;
   rg: string | null;
@@ -63,7 +63,7 @@ export default function PerfilMembro() {
         navigate('/equipe-gestora');
       }
     } catch (error) {
-      toast.error('Erro ao carregar membro');
+      toast.error('Sem permissão para carregar membro');
       console.error(error);
       navigate('/equipe-gestora');
     }
@@ -169,7 +169,7 @@ export default function PerfilMembro() {
 
               <div className="w-full mt-6 pt-6 border-t space-y-4 text-left">
                 <InfoItem icon={Mail} label="E-mail" value={membro.email} />
-                <InfoItem icon={Phone} label="Telefone" value={membro.telefone} />
+                <InfoItem icon={Phone} label="Contato" value={membro.contato} />
                 <InfoItem icon={FileText} label="CPF" value={membro.cpf} />
                 <InfoItem icon={FileText} label="RG" value={membro.rg} />
                 <InfoItem

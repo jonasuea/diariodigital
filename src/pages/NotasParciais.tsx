@@ -154,10 +154,11 @@ export default function NotasParciais() {
                 const locked: number[] = snap.data()?.bimestres_bloqueados || [];
                 setBimestresLocked(new Set(locked));
             } else {
-                setBimestresLocked(new Set());
+                // Sem config salva: todos os bimestres começam bloqueados
+                setBimestresLocked(new Set([1, 2, 3, 4]));
             }
         } catch (err) {
-            console.warn('Erro ao carregar config de bloqueio:', err);
+            console.warn('Sem permissão para carregar config de bloqueio:', err);
         }
     }
 
@@ -172,7 +173,7 @@ export default function NotasParciais() {
                 bimestres_bloqueados: Array.from(locked),
             }, { merge: true });
         } catch (err) {
-            console.warn('Erro ao salvar config de bloqueio:', err);
+            console.warn('Sem permissão para salvar config de bloqueio:', err);
         }
     }
 
@@ -198,7 +199,7 @@ export default function NotasParciais() {
                 .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
             setEstudantes(lista);
         } catch (err) {
-            toast.error('Erro ao carregar dados');
+            toast.error('Sem permissão para carregar dados');
             console.error(err);
         } finally {
             setLoading(false);
@@ -245,7 +246,7 @@ export default function NotasParciais() {
 
             setNotas(newNotas);
         } catch (err) {
-            console.error('Erro ao carregar notas parciais:', err);
+            console.error('Sem permissão para carregar notas parciais:', err);
         }
     }, [turmaId, componente, ano, estudantes, escolaAtivaId]);
 
@@ -324,7 +325,7 @@ export default function NotasParciais() {
             await logActivity(`salvou notas parciais do ${bim}º bimestre de "${componente}" — turma "${turma?.nome}".`);
             toast.success(`Notas do ${bim}º bimestre salvas!`);
         } catch (err) {
-            toast.error('Erro ao salvar notas parciais.');
+            toast.error('Sem permissão para salvar notas parciais.');
             console.error(err);
         } finally {
             setSaving(null);
@@ -386,7 +387,7 @@ export default function NotasParciais() {
             toast.info(`${bim}º bimestre bloqueado para edição. Apenas gestores podem reabrir.`);
 
         } catch (err) {
-            toast.error('Erro ao enviar médias para Notas.');
+            toast.error('Sem permissão para enviar médias para Notas.');
             console.error(err);
         } finally {
             setSyncing(null);
@@ -404,7 +405,7 @@ export default function NotasParciais() {
             await logActivity(`habilitou edição do ${bim}º bimestre de "${componente}" — turma "${turma?.nome}".`);
             toast.success(`${bim}º bimestre desbloqueado para edição.`);
         } catch (err) {
-            toast.error('Erro ao desbloquear bimestre.');
+            toast.error('Sem permissão para desbloquear bimestre.');
             console.error(err);
         } finally {
             setUnlocking(null);
@@ -586,7 +587,7 @@ export default function NotasParciais() {
                                                                         inputMode="decimal"
                                                                         className="h-7 text-center text-sm px-1 bg-white/80 focus:bg-white border-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                                                         placeholder="—"
-                                                                        disabled={bimestresLocked.has(bim) && (isProfessor || !podeDesbloquear)}
+                                                                        disabled={bimestresLocked.has(bim)}
                                                                     />
                                                                 </TableCell>
                                                             ))}

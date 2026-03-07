@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, Pencil, ClipboardList, Calendar, Trash2, Users, BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Search, Pencil, ClipboardList, Calendar, Trash2, Users, BookOpen, ChevronDown, ChevronUp, RotateCcw, Trash } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, collectionGroup, getCountFromServer, orderBy, writeBatch } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
@@ -34,6 +34,7 @@ interface Turma {
   professoresIds: string[]; // Para facilitar a busca
   monitoresIds?: string[]; // IDs dos monitores da turma
   estudantes_count?: number;
+  excluido?: boolean;
 }
 
 const COMPONENTES_CURRICULARES = [
@@ -69,6 +70,7 @@ interface Estudante {
 export default function Turmas() {
   const navigate = useNavigate();
   const [turmas, setTurmas] = useState<Turma[]>([]);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -90,7 +92,7 @@ export default function Turmas() {
   const [novaAlocacao, setNovaAlocacao] = useState({ professorId: '', nome: '' });
 
   const { user } = useAuth();
-  const { escolaAtivaId } = useUserRole();
+  const { isAdmin, isMasterAdmin, isSecretario, escolaAtivaId } = useUserRole();
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -110,7 +112,7 @@ export default function Turmas() {
   useEffect(() => {
     fetchTurmas();
     fetchProfessores();
-  }, [search, anoFiltro, escolaAtivaId]);
+  }, [search, anoFiltro, escolaAtivaId, showDeleted]);
 
   async function fetchTurmas() {
     if (!escolaAtivaId) {
@@ -129,7 +131,8 @@ export default function Turmas() {
       let turmasQuery = query(
         collection(db, 'turmas'),
         where('escola_id', '==', escolaAtivaId),
-        where('ano', '==', parseInt(anoFiltro))
+        where('ano', '==', parseInt(anoFiltro)),
+        where('excluido', '==', showDeleted)
       );
 
       if (search) {
@@ -137,6 +140,7 @@ export default function Turmas() {
           collection(db, 'turmas'),
           where('escola_id', '==', escolaAtivaId),
           where('ano', '==', parseInt(anoFiltro)),
+          where('excluido', '==', showDeleted),
           where('nome', '>=', search),
           where('nome', '<=', search + '\uf8ff')
         );
@@ -166,7 +170,7 @@ export default function Turmas() {
 
       setTurmas(turmasData.sort((a, b) => a.nome.localeCompare(b.nome)));
     } catch (error) {
-      toast.error('Erro ao carregar turmas');
+      toast.error('Sem permissão para carregar turmas');
       console.error(error);
     } finally {
       setLoading(false);
@@ -208,7 +212,7 @@ export default function Turmas() {
         toast.success('Turma atualizada com sucesso!');
       } else {
         // Para novas turmas, iniciamos com componentes e professores vazios
-        const newPayload = { ...payload, componentes: [], professoresIds: [] };
+        const newPayload = { ...payload, componentes: [], professoresIds: [], excluido: false };
         await addDoc(collection(db, 'turmas'), newPayload);
         await logActivity(`(App) ${user.email} criou a nova turma "${payload.nome}".`);
         toast.success('Turma cadastrada com sucesso!');
@@ -218,7 +222,7 @@ export default function Turmas() {
       resetForm();
       fetchTurmas();
     } catch (error) {
-      toast.error(editingTurma ? 'Erro ao atualizar turma' : 'Erro ao cadastrar turma');
+      toast.error(editingTurma ? 'Sem permissão para atualizar turma' : 'Sem permissão para cadastrar turma');
       console.error(error);
     }
   }
@@ -249,6 +253,10 @@ export default function Turmas() {
   }
 
   function openDeleteDialog(turma: Turma) {
+    if (isSecretario) {
+      toast.error('Secretários não têm permissão para excluir registros.');
+      return;
+    }
     setTurmaToDelete(turma);
     setDeleteDialogOpen(true);
   }
@@ -257,14 +265,42 @@ export default function Turmas() {
     if (!turmaToDelete || !user) return;
 
     try {
-      await deleteDoc(doc(db, 'turmas', turmaToDelete.id));
-      await logActivity(`(App) ${user.email} excluiu a turma "${turmaToDelete.nome}".`);
-      toast.success('Turma excluída com sucesso!');
+      if (isMasterAdmin && showDeleted) {
+        await deleteDoc(doc(db, 'turmas', turmaToDelete.id));
+        await logActivity(`(App) ${user.email} excluiu permanentemente a turma "${turmaToDelete.nome}".`);
+        toast.success('Turma excluída permanentemente!');
+      } else {
+        const docRef = doc(db, 'turmas', turmaToDelete.id);
+        await updateDoc(docRef, {
+          excluido: true,
+          excluido_em: new Date(),
+          excluido_por: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor'
+        } as any);
+        await logActivity(`(App) ${user.email} moveu a turma "${turmaToDelete.nome}" para a lixeira.`);
+        toast.success('Turma movida para a lixeira!');
+      }
       setDeleteDialogOpen(false);
       setTurmaToDelete(null);
       fetchTurmas();
     } catch (error) {
-      toast.error('Erro ao excluir turma');
+      toast.error('Sem permissão para excluir turma');
+      console.error(error);
+    }
+  }
+
+  async function handleReactivate(turma: Turma) {
+    if (!user) return;
+    try {
+      const docRef = doc(db, 'turmas', turma.id);
+      await updateDoc(docRef, {
+        excluido: false,
+        reativado_em: new Date()
+      } as any);
+      await logActivity(`(App) ${user.email} reativou a turma "${turma.nome}".`);
+      toast.success('Turma reativada com sucesso!');
+      fetchTurmas();
+    } catch (error) {
+      toast.error('Erro ao reativar turma');
       console.error(error);
     }
   }
@@ -290,7 +326,7 @@ export default function Turmas() {
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       setEstudantesParaEnturmar(semTurma);
     } catch (error) {
-      toast.error('Erro ao carregar estudantes para enturmação.');
+      toast.error('Sem permissão para carregar estudantes para enturmação.');
       console.error(error);
     } finally {
       setLoadingEstudantes(false);
@@ -391,7 +427,7 @@ export default function Turmas() {
       setSelecaoEstudantes({});
       fetchTurmas();
     } catch (error) {
-      toast.error('Erro ao salvar enturmação.');
+      toast.error('Sem permissão para salvar enturmação.');
       console.error(error);
     }
   }
@@ -440,7 +476,7 @@ export default function Turmas() {
       setAlocacaoData([]);
       fetchTurmas();
     } catch (error) {
-      toast.error('Erro ao salvar alocação de professores.');
+      toast.error('Sem permissão para salvar alocação de professores.');
       console.error(error);
     }
   }
@@ -476,6 +512,17 @@ export default function Turmas() {
           </div>
 
           <div className="flex-1" />
+
+          {isAdmin && (
+            <Button
+              variant={showDeleted ? "destructive" : "outline"}
+              onClick={() => setShowDeleted(!showDeleted)}
+              className="mr-2"
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              {showDeleted ? 'Ver Ativos' : 'Ver Lixeira'}
+            </Button>
+          )}
 
           <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
@@ -656,21 +703,32 @@ export default function Turmas() {
                       </div>
 
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEnturmarDialog(turma)} title="Enturmar">
-                          <Users className="h-4 w-4 text-blue-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openAlocarDialog(turma)} title="Alocar">
-                          <BookOpen className="h-4 w-4 text-green-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas">
-                          <ClipboardList className="h-4 w-4 text-yellow-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(turma)} title="Editar">
-                          <Pencil className="h-4 w-4 text-orange-500" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDeleteDialog(turma)} title="Excluir">
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
+                        {!turma.excluido && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEnturmarDialog(turma)} title="Enturmar">
+                              <Users className="h-4 w-4 text-blue-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openAlocarDialog(turma)} title="Alocar">
+                              <BookOpen className="h-4 w-4 text-green-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas">
+                              <ClipboardList className="h-4 w-4 text-yellow-500" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(turma)} title="Editar">
+                              <Pencil className="h-4 w-4 text-orange-500" />
+                            </Button>
+                          </>
+                        )}
+                        {turma.excluido && isAdmin && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleReactivate(turma)} title="Reativar">
+                            <RotateCcw className="h-4 w-4 text-green-500" />
+                          </Button>
+                        )}
+                        {!isSecretario && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDeleteDialog(turma)} title="Excluir">
+                            <Trash2 className={`h-4 w-4 ${turma.excluido ? 'text-red-700' : 'text-red-500'}`} />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -743,24 +801,35 @@ export default function Turmas() {
                       <td className="p-4">{turma.ano}</td>
                       <td className="p-4">
                         <div className="flex justify-end gap-2">
-                          <Button variant="outline" size="sm" onClick={() => openEnturmarDialog(turma)} title="Enturmar Estudantes">
-                            <Users className="h-4 w-4 text-blue-500" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => openAlocarDialog(turma)} title="Alocar Professores">
-                            <BookOpen className="h-4 w-4 text-green-500" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas Bimestrais">
-                            <ClipboardList className="h-4 w-4 text-yellow-500" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/frequencia`)} title="Frequência">
-                            <Calendar className="h-4 w-4 text-gray-500" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => openEdit(turma)} title="Editar Turma">
-                            <Pencil className="h-4 w-4 text-orange-500" />
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={() => openDeleteDialog(turma)} title="Excluir Turma" className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4 text-red-500" />
-                          </Button>
+                          {!turma.excluido && (
+                            <>
+                              <Button variant="outline" size="sm" onClick={() => openEnturmarDialog(turma)} title="Enturmar Estudantes">
+                                <Users className="h-4 w-4 text-blue-500" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => openAlocarDialog(turma)} title="Alocar Professores">
+                                <BookOpen className="h-4 w-4 text-green-500" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/notas`)} title="Notas Bimestrais">
+                                <ClipboardList className="h-4 w-4 text-yellow-500" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => navigate(`/turmas/${turma.id}/frequencia`)} title="Frequência">
+                                <Calendar className="h-4 w-4 text-gray-500" />
+                              </Button>
+                              <Button variant="outline" size="sm" onClick={() => openEdit(turma)} title="Editar Turma">
+                                <Pencil className="h-4 w-4 text-orange-500" />
+                              </Button>
+                            </>
+                          )}
+                          {turma.excluido && isAdmin && (
+                            <Button variant="outline" size="sm" onClick={() => handleReactivate(turma)} title="Reativar Turma">
+                              <RotateCcw className="h-4 w-4 text-green-500" />
+                            </Button>
+                          )}
+                          {!isSecretario && (
+                            <Button variant="outline" size="sm" onClick={() => openDeleteDialog(turma)} title="Excluir Turma" className="text-destructive hover:text-destructive">
+                              <Trash2 className={`h-4 w-4 ${turma.excluido ? 'text-red-700' : 'text-red-500'}`} />
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -778,14 +847,16 @@ export default function Turmas() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
             <AlertDialogDescription>
-              Tem certeza que deseja excluir a turma "{turmaToDelete?.nome}"?
-              Esta ação não pode ser desfeita e todos os dados relacionados serão perdidos.
+              {showDeleted
+                ? `Tem certeza que deseja excluir PERMANENTEMENTE a turma "${turmaToDelete?.nome}"? Esta ação não pode ser desfeita.`
+                : `Tem certeza que deseja mover a turma "${turmaToDelete?.nome}" para a lixeira?`
+              }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
+              {showDeleted ? 'Excluir Permanentemente' : 'Mover para Lixeira'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

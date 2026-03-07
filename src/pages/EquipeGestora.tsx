@@ -10,7 +10,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Search, Eye, Pencil, Trash2, Upload, Download } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { RotateCcw, Trash } from 'lucide-react';
+import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import Papa from 'papaparse';
@@ -21,16 +23,18 @@ interface Membro {
   cargo: string;
   matricula: string;
   email: string;
-  telefone: string | null;
+  contato: string | null;
   status: string;
   link_lattes: string | null;
   formacoes: unknown[];
+  excluido?: boolean;
 }
 
 export default function EquipeGestora() {
   const navigate = useNavigate();
-  const { isAdmin, escolaAtivaId } = useUserRole();
+  const { isAdmin, isMasterAdmin, isSecretario, escolaAtivaId } = useUserRole();
   const [membros, setMembros] = useState<Membro[]>([]);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -40,7 +44,7 @@ export default function EquipeGestora() {
 
   useEffect(() => {
     fetchMembros();
-  }, [search, escolaAtivaId]);
+  }, [search, escolaAtivaId, showDeleted]);
 
   async function fetchMembros() {
     if (!escolaAtivaId) {
@@ -49,25 +53,39 @@ export default function EquipeGestora() {
     }
     setLoading(true);
     try {
-      let membrosQuery = query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
+      let membrosQuery = query(
+        collection(db, 'equipe_gestora'),
+        where('escola_id', '==', escolaAtivaId),
+        where('excluido', '==', showDeleted),
+        orderBy('nome')
+      );
 
       if (search) {
-        // NOTE: Firestore queries are case-sensitive.
-        // This search is simplified to query by name only.
-        membrosQuery = query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'), orderBy('nome'));
+        membrosQuery = query(
+          collection(db, 'equipe_gestora'),
+          where('escola_id', '==', escolaAtivaId),
+          where('excluido', '==', showDeleted),
+          where('nome', '>=', search),
+          where('nome', '<=', search + '\uf8ff'),
+          orderBy('nome')
+        );
       }
 
       const querySnapshot = await getDocs(membrosQuery);
       const membrosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Membro));
       setMembros(membrosData);
     } catch (error) {
-      toast.error('Erro ao carregar equipe gestora');
+      toast.error('Sem permissão para carregar equipe gestora');
       console.error(error);
     }
     setLoading(false);
   }
 
   function openDeleteDialog(membro: Membro) {
+    if (isSecretario) {
+      toast.error('Secretários não têm permissão para excluir registros.');
+      return;
+    }
     setMembroToDelete(membro);
     setDeleteDialogOpen(true);
   }
@@ -76,15 +94,43 @@ export default function EquipeGestora() {
     if (!membroToDelete) return;
 
     try {
-      await deleteDoc(doc(db, 'equipe_gestora', membroToDelete.id));
-      toast.success('Membro excluído com sucesso!');
+      if (isMasterAdmin && showDeleted) {
+        await deleteDoc(doc(db, 'equipe_gestora', membroToDelete.id));
+        await logActivity(`Excluiu permanentemente o membro da equipe gestora "${membroToDelete.nome}"`);
+        toast.success('Membro excluído permanentemente!');
+      } else {
+        const docRef = doc(db, 'equipe_gestora', membroToDelete.id);
+        await updateDoc(docRef, {
+          excluido: true,
+          excluido_em: new Date(),
+          excluido_por: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor'
+        } as any);
+        await logActivity(`Moveu o membro da equipe gestora "${membroToDelete.nome}" para a lixeira`);
+        toast.success('Membro movido para a lixeira!');
+      }
       fetchMembros();
     } catch (error) {
-      toast.error('Erro ao excluir membro');
+      toast.error('Sem permissão para excluir membro');
       console.error(error);
     } finally {
       setDeleteDialogOpen(false);
       setMembroToDelete(null);
+    }
+  }
+
+  async function handleReactivate(membro: Membro) {
+    try {
+      const docRef = doc(db, 'equipe_gestora', membro.id);
+      await updateDoc(docRef, {
+        excluido: false,
+        reativado_em: new Date()
+      } as any);
+      await logActivity(`Reativou o membro da equipe gestora "${membro.nome}"`);
+      toast.success('Membro reativado com sucesso!');
+      fetchMembros();
+    } catch (error) {
+      toast.error('Erro ao reativar membro');
+      console.error(error);
     }
   }
 
@@ -115,7 +161,7 @@ export default function EquipeGestora() {
       }
 
       if (result.errors.length > 0) {
-        toast.error('Erro ao fazer o parsing do CSV. Verifique o formato e o separador.');
+        toast.error('Sem permissão para fazer o parsing do CSV. Verifique o formato e o separador.');
         return;
       }
 
@@ -170,7 +216,7 @@ export default function EquipeGestora() {
             matricula: matricula || '',
             rg: row.rg?.trim() || '',
             cpf: row.cpf?.trim() || '',
-            telefone: row.telefone?.trim() || '',
+            contato: row.contato?.trim() || '',
             cargo: row.cargo.trim(),
             status: row.status?.trim() || 'Lotado',
             data_lotacao: row.data_lotacao?.trim() || '',
@@ -178,6 +224,7 @@ export default function EquipeGestora() {
             link_lattes: row.link_lattes?.trim() || '',
             formacoes,
             escola_id: escolaAtivaId,
+            excluido: false,
           };
           await addDoc(collection(db, 'equipe_gestora'), membroData);
           successCount++;
@@ -215,7 +262,7 @@ export default function EquipeGestora() {
           rg: data.rg,
           cpf: data.cpf,
           email: data.email,
-          telefone: data.telefone,
+          contato: data.contato,
           cargo: data.cargo,
           status: data.status,
           data_lotacao: data.data_lotacao,
@@ -236,7 +283,7 @@ export default function EquipeGestora() {
       document.body.removeChild(link);
       toast.success('Exportação concluída com sucesso!');
     } catch (error) {
-      toast.error('Erro ao exportar dados da equipe gestora.');
+      toast.error('Sem permissão para exportar dados da equipe gestora.');
     }
   }
 
@@ -293,7 +340,7 @@ export default function EquipeGestora() {
         <a href={`mailto:${m.email}`} className="text-primary hover:underline">{m.email}</a>
       )
     },
-    { key: 'telefone', header: 'Telefone', render: (m: Membro) => m.telefone || '-' },
+    { key: 'contato', header: 'Contato', render: (m: Membro) => m.contato || '-' },
     {
       key: 'status',
       header: 'Status',
@@ -304,17 +351,26 @@ export default function EquipeGestora() {
     {
       key: 'actions',
       header: 'Ações',
-      render: (m: Membro) => (
+      render: (m: any) => (
         <div className="flex gap-2">
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/equipe-gestora/${m.id}`); }}>
             <Eye className="h-4 w-4 text-blue-500" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/equipe-gestora/${m.id}/editar`); }}>
-            <Pencil className="h-4 w-4 text-orange-500" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(m); }}>
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
+          {!m.excluido && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/equipe-gestora/${m.id}/editar`); }}>
+              <Pencil className="h-4 w-4 text-orange-500" />
+            </Button>
+          )}
+          {m.excluido && isAdmin && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleReactivate(m); }} title="Reativar">
+              <RotateCcw className="h-4 w-4 text-green-500" />
+            </Button>
+          )}
+          {!isSecretario && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(m); }}>
+              <Trash2 className={`h-4 w-4 ${m.excluido ? 'text-red-700' : 'text-red-500'}`} />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -339,6 +395,13 @@ export default function EquipeGestora() {
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
               <>
+                <Button
+                  variant={showDeleted ? "destructive" : "outline"}
+                  onClick={() => setShowDeleted(!showDeleted)}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  {showDeleted ? 'Ver Ativos' : 'Ver Lixeira'}
+                </Button>
                 <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" />
                   Importar CSV
@@ -403,14 +466,16 @@ export default function EquipeGestora() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o membro "{membroToDelete?.nome}"?
-                Esta ação não pode ser desfeita.
+                {showDeleted
+                  ? `Tem certeza que deseja excluir PERMANENTEMENTE o membro "${membroToDelete?.nome}"? Esta ação não pode ser desfeita.`
+                  : `Tem certeza que deseja mover o membro "${membroToDelete?.nome}" para a lixeira?`
+                }
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
+                {showDeleted ? 'Excluir Permanentemente' : 'Mover para Lixeira'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,7 +8,7 @@ import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebas
 import { toast } from 'sonner';
 import { Printer, X, Loader2 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
-import { printContainer } from '@/lib/print-utils';
+import { printElement } from '@/lib/print-utils';
 
 interface Turma {
     id: string;
@@ -32,6 +32,7 @@ interface ReportAtaFinalDialogProps {
 }
 
 export function ReportAtaFinalDialog({ open, onOpenChange }: ReportAtaFinalDialogProps) {
+    const printRef = useRef<HTMLDivElement>(null);
     const { escolaAtivaId } = useUserRole();
     const [turmas, setTurmas] = useState<Turma[]>([]);
     const [selectedTurmaId, setSelectedTurmaId] = useState<string>('');
@@ -146,18 +147,16 @@ export function ReportAtaFinalDialog({ open, onOpenChange }: ReportAtaFinalDialo
 
         } catch (error) {
             console.error("Error fetching data:", error);
-            toast.error('Erro ao carregar dados');
+            toast.error('Sem permissão para carregar dados');
         } finally {
             setLoading(false);
         }
     };
 
     const handlePrint = () => {
-        if (!currentTurma) {
-            toast.error('Selecione uma turma primeiro');
-            return;
+        if (printRef.current) {
+            printElement(printRef.current);
         }
-        printContainer();
     };
 
     const getSituacao = (estudante: Estudante) => {
@@ -222,7 +221,7 @@ export function ReportAtaFinalDialog({ open, onOpenChange }: ReportAtaFinalDialo
                     {loading && <Loader2 className="h-5 w-5 animate-spin text-primary mb-2 ml-auto" />}
                 </div>
 
-                <div className="print-container p-8 bg-white text-black min-h-screen">
+                <div ref={printRef} className="print-container p-8 bg-white text-black min-h-screen">
                     <div className="text-center font-bold text-blue-800 uppercase text-xs mb-1">
                         {escolaInfo.nome || 'NOME DA ESCOLA'}
                     </div>
@@ -335,37 +334,6 @@ export function ReportAtaFinalDialog({ open, onOpenChange }: ReportAtaFinalDialo
                     </Button>
                 </div>
 
-                <style dangerouslySetInnerHTML={{
-                    __html: `
-          @media print {
-            @page {
-              size: A4 landscape !important;
-              margin: 0.5cm !important;
-            }
-            body { 
-              visibility: hidden !important; 
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            .print-container {
-              visibility: visible !important;
-              position: absolute !important;
-              left: 0 !important; top: 0 !important;
-              width: 100% !important;
-              background: white !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              display: block !important;
-            }
-            .no-print { display: none !important; }
-            table { border-collapse: collapse !important; width: 100% !important; }
-            th, td { border: 1px solid black !important; }
-            .underline { text-decoration: underline !important; }
-            .text-blue-800 { color: #1e40af !important; }
-            .text-blue-700 { color: #1d4ed8 !important; }
-            .text-red-600 { color: #dc2626 !important; }
-          }
-        `}} />
             </DialogContent>
         </Dialog>
     );

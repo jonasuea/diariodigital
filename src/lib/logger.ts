@@ -20,13 +20,13 @@ export async function logActivity(action: string) {
 
   try {
     await addDoc(collection(db, 'activity_log'), {
-      user_id: user.uid,
+      usuario_id: user.uid,
       user_name: user.displayName || user.email,
       action: action,
       escola_id: escolaId,
       created_at: serverTimestamp(),
     });
   } catch (error) {
-    console.error("Erro ao registrar atividade no log:", error);
+    console.error("Sem permissão para registrar atividade no log:", error);
   }
 }

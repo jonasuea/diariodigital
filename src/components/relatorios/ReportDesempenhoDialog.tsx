@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,7 +8,7 @@ import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebas
 import { toast } from 'sonner';
 import { Printer, X, Loader2 } from 'lucide-react';
 import { useUserRole } from '@/hooks/useUserRole';
-import { printContainer } from '@/lib/print-utils';
+import { printElement } from '@/lib/print-utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Turma {
@@ -32,11 +32,13 @@ interface ReportDesempenhoDialogProps {
 }
 
 export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoDialogProps) {
+  const printRef = useRef<HTMLDivElement>(null);
   const { escolaAtivaId } = useUserRole();
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [selectedTurmaId, setSelectedTurmaId] = useState<string>('');
   const [currentTurma, setCurrentTurma] = useState<Turma | null>(null);
   const [selectedAno, setSelectedAno] = useState<string>(new Date().getFullYear().toString());
+  const [selectedBimestre, setSelectedBimestre] = useState<string>('all');
 
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
   const [notas, setNotas] = useState<any[]>([]);
@@ -138,29 +140,24 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
 
     } catch (error) {
       console.error("Error fetching data:", error);
-      toast.error('Erro ao carregar dados');
+      toast.error('Sem permissão para carregar dados');
     } finally {
       setLoading(false);
     }
   };
 
   const handlePrint = () => {
-    if (!currentTurma || !selectedAno) {
-      toast.error('Preencha os campos para imprimir');
-      return;
+    if (printRef.current) {
+      printElement(printRef.current);
     }
-    if (estudantes.length === 0) {
-      toast.error('Nenhum dado para imprimir');
-      return;
-    }
-    printContainer();
   };
 
   const dataAtual = new Date().toLocaleDateString('pt-BR');
 
   // Calcular os dados do gráfico
-  const bimesters = [1, 2, 3, 4];
-  const chartData = bimesters.map(bim => {
+  const bimestersToDraw = selectedBimestre === 'all' ? [1, 2, 3, 4] : [parseInt(selectedBimestre)];
+
+  const chartData = bimestersToDraw.map(bim => {
     let aprovados = 0;
     let reprovados = 0;
     let transferidos = 0;
@@ -193,7 +190,7 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
       Transferidos: transferidos,
       hasData: comNotasDoBimestre > 0 || transferidos > 0
     };
-  }).filter(d => d.hasData || d.name === '1º Bimestre'); // Always show at least 1st bimester if empty
+  }).filter(d => selectedBimestre !== 'all' || d.hasData || d.name === '1º Bimestre'); // Show all selected, or at least 1st if "all" and empty
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -234,10 +231,28 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
             </Select>
           </div>
 
+          <div className="w-40">
+            <Label htmlFor="select-bimestre" className="text-xs font-bold uppercase text-gray-500 mb-1 block">
+              Período
+            </Label>
+            <Select value={selectedBimestre} onValueChange={setSelectedBimestre}>
+              <SelectTrigger id="select-bimestre">
+                <SelectValue placeholder="Selecione..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Geral (Anual)</SelectItem>
+                <SelectItem value="1">1º Bimestre</SelectItem>
+                <SelectItem value="2">2º Bimestre</SelectItem>
+                <SelectItem value="3">3º Bimestre</SelectItem>
+                <SelectItem value="4">4º Bimestre</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           {loading && <Loader2 className="h-5 w-5 animate-spin text-primary mb-2 ml-auto" />}
         </div>
 
-        <div className="print-container p-8 bg-white text-black">
+        <div ref={printRef} className="print-container p-8 bg-white text-black">
           {/* Header */}
           <div className="border border-black p-4 mb-6">
             <h1 className="text-center font-bold text-xl uppercase mb-4 border-b border-black pb-2">
@@ -270,7 +285,7 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
               </div>
             </div>
             <div className="mt-4 bg-orange-100/50 p-2 border border-black text-center font-bold no-print-bg uppercase">
-              Relatório de Desempenho
+              Relatório de Desempenho {selectedBimestre === 'all' ? 'Geral' : `- ${selectedBimestre}º Bimestre`}
             </div>
           </div>
 
@@ -292,7 +307,9 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
                 </div>
               ) : (
                 <div className="border border-black p-6">
-                  <h3 className="text-center font-bold text-lg mb-6 uppercase">Desempenho Geral por Bimestre - Quantitativo</h3>
+                  <h3 className="text-center font-bold text-lg mb-6 uppercase">
+                    Desempenho {selectedBimestre === 'all' ? 'Geral por Bimestre' : `${selectedBimestre}º Bimestre`} - Quantitativo
+                  </h3>
 
                   {/* Tabela Resumo para facilitar visualização na Impressão */}
                   <table className="w-full border-collapse border border-black text-sm mb-8">
@@ -354,83 +371,6 @@ export function ReportDesempenhoDialog({ open, onOpenChange }: ReportDesempenhoD
           </Button>
         </div>
 
-        <style dangerouslySetInnerHTML={{
-          __html: `
-      @media print {
-        @page {
-          size: A4 portrait;
-          margin: 1cm;
-        }
-        body {
-          visibility: hidden !important;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
-        }
-        .print-container {
-          visibility: visible !important;
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-          width: 100% !important;
-          height: auto !important;
-          min-height: 0 !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: white !important;
-          display: block !important;
-        }
-        .print-container * {
-          visibility: visible !important;
-        }
-        .no-print, .no-print * {
-          display: none !important;
-          visibility: hidden !important;
-          width: 0 !important;
-          height: 0 !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          border: none !important;
-        }
-        .no-print-bg {
-          background-color: transparent !important;
-        }
-        /* Explicitly hide radix dark overlay and close button */
-        .bg-black\\/80, 
-        [data-state="open"] > div:first-child:not([role="dialog"]),
-        [role="dialog"] > button:last-child {
-          display: none !important;
-        }
-        /* Ensure the dialog portal doesn't hide everything */
-        [data-radix-portal], [role="dialog"] {
-          visibility: visible !important;
-          overflow: visible !important;
-          max-height: none !important;
-          max-width: none !important;
-          height: auto !important;
-          width: 100% !important;
-          position: absolute !important;
-          left: 0 !important;
-          top: 0 !important;
-          transform: none !important;
-          border: none !important;
-          box-shadow: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: transparent !important;
-        }
-        /* Table fixes for print */
-        table {
-          border-collapse: collapse !important;
-          width: 100% !important;
-          table-layout: auto !important;
-        }
-        th, td {
-          border: 1px solid black !important;
-          color: black !important;
-          word-break: break-word !important;
-        }
-      }
-    `}} />
       </DialogContent>
     </Dialog >
   );

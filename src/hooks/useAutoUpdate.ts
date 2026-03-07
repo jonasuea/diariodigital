@@ -23,7 +23,7 @@ export function useAutoUpdate() {
                 setNewVersionInfo(null);
             }
         } catch (error) {
-            console.error('Erro ao verificar atualização automática:', error);
+            console.error('Sem permissão para verificar atualização automática:', error);
         }
         return false;
     };
@@ -37,7 +37,7 @@ export function useAutoUpdate() {
             }
             window.location.reload();
         } catch (error) {
-            console.error('Erro ao limpar cache:', error);
+            console.error('Sem permissão para limpar cache:', error);
             window.location.reload();
         }
     };

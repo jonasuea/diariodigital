@@ -15,8 +15,9 @@ import { ReportPSEDialog } from '@/components/relatorios/ReportPSEDialog';
 import { ReportContatoPaisDialog } from '@/components/relatorios/ReportContatoPaisDialog';
 import { ReportAtaFinalDialog } from '@/components/relatorios/ReportAtaFinalDialog';
 import { DocumentPrintDialog } from '@/components/relatorios/DocumentPrintDialog';
+import { ReportProfessoresDialog } from '@/components/relatorios/ReportProfessoresDialog';
 
-type ReportDialog = 'notas' | 'frequencia' | 'desempenho' | 'matriculas' | 'reuniao' | 'lotacao' | 'pse' | 'contatoPais' | 'ataFinal' | null;
+type ReportDialog = 'notas' | 'frequencia' | 'desempenho' | 'matriculas' | 'reuniao' | 'lotacao' | 'pse' | 'contatoPais' | 'ataFinal' | 'professores' | null;
 type TemplateDialog = 'declaracaoMatricula' | 'termoCompromisso' | 'autorizacaoSaida' | 'declaracaoComparecimento' | 'termoUsoImagem' | 'termoAutorizacaoTrajeto' | null;
 
 export default function Relatorios() {
@@ -73,6 +74,11 @@ export default function Relatorios() {
       id: 'contatoPais' as const,
       title: 'Relatório de Contato',
       description: 'Contatos dos pais ou responsáveis',
+    },
+    {
+      id: 'professores' as const,
+      title: 'Lista de Professores',
+      description: 'Lista de professores com opção de incluir turmas e disciplinas',
     },
   ];
 
@@ -233,6 +239,10 @@ export default function Relatorios() {
       />
       <ReportAtaFinalDialog
         open={activeReportDialog === 'ataFinal'}
+        onOpenChange={(open) => !open && setActiveReportDialog(null)}
+      />
+      <ReportProfessoresDialog
+        open={activeReportDialog === 'professores'}
         onOpenChange={(open) => !open && setActiveReportDialog(null)}
       />
 

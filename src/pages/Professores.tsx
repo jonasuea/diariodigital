@@ -9,7 +9,9 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Search, Eye, Pencil, Trash2, Upload, Download } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { RotateCcw, Trash } from 'lucide-react';
+import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -20,7 +22,7 @@ interface Professor {
   componente: string;
   matricula: string;
   email: string;
-  telefone: string | null;
+  contato: string | null;
   ativo: boolean;
   status_funcional: string | null;
   rg: string | null;
@@ -31,12 +33,14 @@ interface Professor {
   componentes: string[] | null;
   series: string[] | null;
   formacoes: string[] | null;
+  excluido?: boolean;
 }
 
 export default function Professores() {
   const navigate = useNavigate();
-  const { isAdmin, escolaAtivaId } = useUserRole();
+  const { isAdmin, isMasterAdmin, isSecretario, escolaAtivaId } = useUserRole();
   const [professores, setProfessores] = useState<Professor[]>([]);
+  const [showDeleted, setShowDeleted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -46,7 +50,7 @@ export default function Professores() {
 
   useEffect(() => {
     fetchProfessores();
-  }, [search, escolaAtivaId]);
+  }, [search, escolaAtivaId, showDeleted]);
 
   async function fetchProfessores() {
     if (!escolaAtivaId) {
@@ -55,26 +59,39 @@ export default function Professores() {
     }
     setLoading(true);
     try {
-      let professoresQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), orderBy('nome'));
+      let professoresQuery = query(
+        collection(db, 'professores'),
+        where('escola_id', '==', escolaAtivaId),
+        where('excluido', '==', showDeleted),
+        orderBy('nome')
+      );
 
       if (search) {
-        // NOTE: Firestore queries are case-sensitive. For case-insensitive search,
-        // you'd typically store a lowercase version of the fields.
-        // This search is simplified to query by name only.
-        professoresQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('nome', '>=', search), where('nome', '<=', search + '\uf8ff'), orderBy('nome'));
+        professoresQuery = query(
+          collection(db, 'professores'),
+          where('escola_id', '==', escolaAtivaId),
+          where('excluido', '==', showDeleted),
+          where('nome', '>=', search),
+          where('nome', '<=', search + '\uf8ff'),
+          orderBy('nome')
+        );
       }
 
       const querySnapshot = await getDocs(professoresQuery);
       const professoresData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor));
       setProfessores(professoresData);
     } catch (error) {
-      toast.error('Erro ao carregar professores');
+      toast.error('Sem permissão para carregar professores');
       console.error(error);
     }
     setLoading(false);
   }
 
   function openDeleteDialog(professor: Professor) {
+    if (isSecretario) {
+      toast.error('Secretários não têm permissão para excluir registros.');
+      return;
+    }
     setProfessorToDelete(professor);
     setDeleteDialogOpen(true);
   }
@@ -83,15 +100,43 @@ export default function Professores() {
     if (!professorToDelete) return;
 
     try {
-      await deleteDoc(doc(db, 'professores', professorToDelete.id));
-      toast.success('Professor excluído com sucesso!');
+      if (isMasterAdmin && showDeleted) {
+        await deleteDoc(doc(db, 'professores', professorToDelete.id));
+        await logActivity(`Excluiu permanentemente o professor "${professorToDelete.nome}"`);
+        toast.success('Professor excluído permanentemente!');
+      } else {
+        const docRef = doc(db, 'professores', professorToDelete.id);
+        await updateDoc(docRef, {
+          excluido: true,
+          excluido_em: new Date(),
+          excluido_por: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor'
+        } as any);
+        await logActivity(`Moveu o professor "${professorToDelete.nome}" para a lixeira`);
+        toast.success('Professor movido para a lixeira!');
+      }
       fetchProfessores();
     } catch (error) {
-      toast.error('Erro ao excluir professor');
+      toast.error('Sem permissão para excluir professor');
       console.error(error);
     } finally {
       setDeleteDialogOpen(false);
       setProfessorToDelete(null);
+    }
+  }
+
+  async function handleReactivate(professor: Professor) {
+    try {
+      const docRef = doc(db, 'professores', professor.id);
+      await updateDoc(docRef, {
+        excluido: false,
+        reativado_em: new Date()
+      } as any);
+      await logActivity(`Reativou o professor "${professor.nome}"`);
+      toast.success('Professor reativado com sucesso!');
+      fetchProfessores();
+    } catch (error) {
+      toast.error('Erro ao reativar professor');
+      console.error(error);
     }
   }
 
@@ -126,7 +171,7 @@ export default function Professores() {
       }
 
       if (result.errors.length > 0) {
-        toast.error('Erro ao fazer o parsing do CSV. Verifique o formato.');
+        toast.error('Sem permissão para fazer o parsing do CSV. Verifique o formato.');
         console.error('Erros de parsing do CSV:', result.errors);
         return;
       }
@@ -182,7 +227,7 @@ export default function Professores() {
             matricula: matricula || '',
             rg: row.rg?.trim() || '',
             cpf: row.cpf?.trim() || '',
-            telefone: row.telefone?.trim() || null,
+            contato: row.contato?.trim() || null,
             status_funcional: row.status_funcional?.trim() || 'Lotado',
             data_lotacao: row.data_lotacao?.trim() || '',
             link_lattes: row.link_lattes?.trim() || '',
@@ -193,12 +238,13 @@ export default function Professores() {
             ativo: row.ativo ? (row.ativo.toLowerCase() === 'true' || row.ativo === '1') : true,
             componente: row.componentes ? row.componentes.split(',')[0].trim() : '',
             escola_id: escolaAtivaId,
+            excluido: false,
           };
           await addDoc(collection(db, 'professores'), professorData);
           successCount++;
         } catch (error) {
           errorCount++;
-          console.error('Erro ao importar linha:', row, error);
+          console.error('Sem permissão para importar linha:', row, error);
         }
       }
 
@@ -232,7 +278,7 @@ export default function Professores() {
           rg: data.rg || '',
           cpf: data.cpf || '',
           email: data.email || '',
-          telefone: data.telefone || '',
+          contato: data.contato || '',
           status_funcional: data.status_funcional || '',
           data_lotacao: data.data_lotacao || '',
           link_lattes: data.link_lattes || '',
@@ -263,7 +309,7 @@ export default function Professores() {
       document.body.removeChild(link);
       toast.success('Exportação concluída com sucesso!');
     } catch (error) {
-      toast.error('Erro ao exportar professores.');
+      toast.error('Sem permissão para exportar professores.');
       console.error(error);
     }
   }
@@ -282,7 +328,7 @@ export default function Professores() {
     { key: 'componente', header: 'componente' },
     { key: 'matricula', header: 'Matrícula' },
     { key: 'email', header: 'E-mail' },
-    { key: 'telefone', header: 'Telefone', render: (p: Professor) => p.telefone || '-' },
+    { key: 'contato', header: 'Contato', render: (p: Professor) => p.contato || '-' },
     {
       key: 'status',
       header: 'Status',
@@ -300,12 +346,21 @@ export default function Professores() {
           <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/professores/${p.id}`); }}>
             <Eye className="h-4 w-4 text-blue-500" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/professores/${p.id}/editar`); }}>
-            <Pencil className="h-4 w-4 text-orange-500" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(p); }}>
-            <Trash2 className="h-4 w-4 text-red-500" />
-          </Button>
+          {!p.excluido && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); navigate(`/professores/${p.id}/editar`); }}>
+              <Pencil className="h-4 w-4 text-orange-500" />
+            </Button>
+          )}
+          {p.excluido && isAdmin && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); handleReactivate(p); }} title="Reativar">
+              <RotateCcw className="h-4 w-4 text-green-500" />
+            </Button>
+          )}
+          {!isSecretario && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.stopPropagation(); openDeleteDialog(p); }}>
+              <Trash2 className={`h-4 w-4 ${p.excluido ? 'text-red-700' : 'text-red-500'}`} />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -330,6 +385,13 @@ export default function Professores() {
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
               <>
+                <Button
+                  variant={showDeleted ? "destructive" : "outline"}
+                  onClick={() => setShowDeleted(!showDeleted)}
+                >
+                  <Trash className="h-4 w-4 mr-2" />
+                  {showDeleted ? 'Ver Ativos' : 'Ver Lixeira'}
+                </Button>
                 <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" />
                   Importar CSV
@@ -399,14 +461,16 @@ export default function Professores() {
             <AlertDialogHeader>
               <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
               <AlertDialogDescription>
-                Tem certeza que deseja excluir o professor "{professorToDelete?.nome}"?
-                Esta ação não pode ser desfeita.
+                {showDeleted
+                  ? `Tem certeza que deseja excluir PERMANENTEMENTE o professor "${professorToDelete?.nome}"? Esta ação não pode ser desfeita.`
+                  : `Tem certeza que deseja mover o professor "${professorToDelete?.nome}" para a lixeira?`
+                }
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancelar</AlertDialogCancel>
               <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
+                {showDeleted ? 'Excluir Permanentemente' : 'Mover para Lixeira'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

@@ -1,0 +1,19 @@
+{
+    "compilerOptions": {
+        "module": "commonjs",
+        "noImplicitAny": true,
+        "outDir": "lib",
+        "preserveConstEnums": true,
+        "removeComments": true,
+        "sourceMap": true,
+        "strict": true,
+        "target": "es2017",
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true
+    },
+    "compileOnSave": true,
+    "include": [
+        "src"
+    ]
+}

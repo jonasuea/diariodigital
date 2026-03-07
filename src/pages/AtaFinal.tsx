@@ -85,7 +85,7 @@ export default function AtaFinal() {
       setNotas(notasMap);
       setSituacoes(situacoesMap);
     } catch (error) {
-      toast.error('Erro ao carregar dados');
+      toast.error('Sem permissão para carregar dados');
       console.error(error);
     }
 
@@ -142,7 +142,7 @@ export default function AtaFinal() {
             {/* Header da Ata */}
             <div className="p-6 border-b bg-muted/30">
               <h2 className="text-xl font-bold text-center mb-6">ATA FINAL DO ENSINO FUNDAMENTAL</h2>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                 <div className="space-y-2">
                   <p><strong>INEP:</strong> ________________</p>
@@ -211,8 +211,8 @@ export default function AtaFinal() {
                         );
                       })}
                       <td className="p-3 text-center border-l">
-                        <Select 
-                          value={situacoes[estudante.id]} 
+                        <Select
+                          value={situacoes[estudante.id]}
                           onValueChange={(v) => setSituacoes(prev => ({ ...prev, [estudante.id]: v }))}
                         >
                           <SelectTrigger className="w-[120px]">

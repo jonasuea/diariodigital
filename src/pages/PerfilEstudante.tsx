@@ -34,7 +34,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { TransferenciaDialog } from '@/components/estudantes/TransferenciaDialog';
 import { BoletimDialog } from '@/components/estudantes/BoletimDialog';
 import { DocumentPrintDialog } from '@/components/relatorios/DocumentPrintDialog';
-
+import { useUserRole } from '@/hooks/useUserRole';
 
 // Interfaces
 interface Estudante {
@@ -59,8 +59,8 @@ interface Estudante {
   email_responsavel?: string | null;
   pasta: string | null;
   prateleira: string | null;
-  tamanho_farda_largura: string | null;
-  tamanho_farda_altura: string | null;
+  farda_tamanho: string | null;
+
   turma_id: string | null;
   ano: number;
   turma_nome?: string;
@@ -129,7 +129,8 @@ export default function PerfilEstudante() {
   const [boletimDialogOpen, setBoletimDialogOpen] = useState(false);
   const [printDocOpen, setPrintDocOpen] = useState(false);
   const [printDocType, setPrintDocType] = useState<'declaracaoMatricula' | 'termoCompromisso' | 'autorizacaoSaida' | 'declaracaoComparecimento' | 'termoUsoImagem' | 'termoAutorizacaoTrajeto'>('declaracaoMatricula');
-  const [printDocTitle, setPrintDocTitle] = useState('Documento');
+  const [printDocTitle, setPrintDocTitle] = useState('');
+  const { role } = useUserRole();
 
   // helper to display notes with one decimal or blank
   const formatNota = (n?: number | null) => {
@@ -152,7 +153,7 @@ export default function PerfilEstudante() {
 
       if (!estudanteDoc.exists()) {
         toast.error('Estudante não encontrado');
-        navigate('/estudantes');
+        navigate(-1);
         return;
       }
 
@@ -182,7 +183,7 @@ export default function PerfilEstudante() {
       ]);
 
     } catch (error) {
-      toast.error('Erro ao carregar dados do estudante');
+      toast.error('Sem permissão para carregar dados do estudante');
       console.error(error);
     } finally {
       setLoading(false);
@@ -312,7 +313,7 @@ export default function PerfilEstudante() {
       console.log('Notas carregadas para', estudanteId, ano, notasLista);
       setNotas(notasLista);
     } catch (error) {
-      toast.error('Erro ao carregar notas');
+      toast.error('Sem permissão para carregar notas');
       console.error(error);
     }
   }
@@ -390,7 +391,7 @@ export default function PerfilEstudante() {
       console.log('Faltas carregadas para', estudanteId, ano, faltas);
       setFaltasAnuais(faltas);
     } catch (error) {
-      toast.error('Erro ao carregar frequência');
+      toast.error('Sem permissão para carregar frequência');
       console.error(error);
     }
   }
@@ -433,7 +434,7 @@ export default function PerfilEstudante() {
       <AppLayout title="Estudante não encontrado">
         <div className="text-center py-12">
           <p className="text-muted-foreground">O perfil do estudante não pôde ser carregado.</p>
-          <Button className="mt-4" onClick={() => navigate('/estudantes')}>Voltar para Lista de Estudantes</Button>
+          <Button className="mt-4" onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/painel')}>Voltar</Button>
         </div>
       </AppLayout>
     );
@@ -447,48 +448,54 @@ export default function PerfilEstudante() {
 
   return (
     <AppLayout>
-      <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
-        <div className="flex items-start justify-between mb-6">
+      <div className="w-full max-w-full space-y-4 pt-4 md:pt-0 overflow-x-hidden">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-6 min-w-0">
+          <div className="min-w-0 uppercase">
+            <h2 className="text-xl md:text-3xl font-bold tracking-tight break-words">Detalhes do Estudante</h2>
+            <p className="text-sm md:text-base text-muted-foreground mt-1">Visualize informações detalhadas, notas e frequência do aluno</p>
+          </div>
+          <div className="flex flex-wrap gap-2 md:justify-end">
+            <Button size="sm" className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto" onClick={() => handleGenerateDoc('declaracaoMatricula', 'Declaração de Matrícula')}>
+              <Download className="h-4 w-4 mr-2" />
+              Declaração
+            </Button>
+            {role !== 'estudante' && (
+              <>
+                <Button size="sm" className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto" onClick={() => handleGenerateDoc('termoCompromisso', 'Termo de Compromisso')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Compromisso
+                </Button>
+                <Button size="sm" className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto" onClick={() => handleGenerateDoc('autorizacaoSaida', 'Autorização de Saída')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Saída
+                </Button>
+                <Button size="sm" className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto" onClick={() => handleGenerateDoc('declaracaoComparecimento', 'Declaração de Comparecimento')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Comparecimento
+                </Button>
+                <Button size="sm" className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto" onClick={() => handleGenerateDoc('termoUsoImagem', 'Termo de Uso de Imagem')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Uso Imagem
+                </Button>
+                <Button size="sm" className="bg-blue-500 hover:bg-blue-600 w-full sm:w-auto" onClick={() => handleGenerateDoc('termoAutorizacaoTrajeto', 'Termo de Trajeto')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Trajeto
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {role !== 'estudante' && (
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Detalhes do Estudante</h2>
-            <p className="text-muted-foreground mt-1">Visualize informações detalhadas, notas e frequência do aluno</p>
-          </div>
-          <div className="flex flex-wrap gap-2 justify-end">
-            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('declaracaoMatricula', 'Declaração de Matrícula')}>
-              <Download className="h-4 w-4 mr-2" />
-              Declaração de Matrícula
-            </Button>
-            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('termoCompromisso', 'Termo de Compromisso')}>
-              <Download className="h-4 w-4 mr-2" />
-              Termo de Compromisso
-            </Button>
-            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('autorizacaoSaida', 'Autorização de Saída')}>
-              <Download className="h-4 w-4 mr-2" />
-              Autorização de Saída
-            </Button>
-            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('declaracaoComparecimento', 'Declaração de Comparecimento')}>
-              <Download className="h-4 w-4 mr-2" />
-              Declaração de Comparecimento
-            </Button>
-            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('termoUsoImagem', 'Termo de Uso de Imagem')}>
-              <Download className="h-4 w-4 mr-2" />
-              Termo de Uso de Imagem
-            </Button>
-            <Button className="bg-blue-500 hover:bg-blue-600" onClick={() => handleGenerateDoc('termoAutorizacaoTrajeto', 'Termo de Trajeto')}>
-              <Download className="h-4 w-4 mr-2" />
-              Termo de Trajeto
+            <Button variant="ghost" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Voltar para Lista de Estudantes
             </Button>
           </div>
-        </div>
+        )}
 
-        <div>
-          <Button variant="ghost" onClick={() => navigate(-1)} className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para Lista de Estudantes
-          </Button>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-12 mt-6">
+        <div className="grid gap-6 lg:grid-cols-12 mt-6 w-full max-w-full overflow-hidden">
           {/* Coluna de Informações Pessoais */}
           <div className="lg:col-span-4">
             <Card>
@@ -496,13 +503,13 @@ export default function PerfilEstudante() {
                 <div className="space-y-6">
                   {/* Avatar e Informações Básicas */}
                   <div className="flex flex-col items-center text-center border-b pb-6">
-                    <Avatar className="h-32 w-32 mb-4 border-4 border-muted">
+                    <Avatar className="h-24 w-24 md:h-32 md:w-32 mb-4 border-4 border-muted">
                       <AvatarImage src={estudante.foto_url || undefined} />
-                      <AvatarFallback className="text-4xl bg-blue-50 text-blue-600 font-semibold">
+                      <AvatarFallback className="text-3xl md:text-4xl bg-blue-50 text-blue-600 font-semibold">
                         {estudante.nome.split(' ').map(n => n[0]).slice(0, 2).join('')}
                       </AvatarFallback>
                     </Avatar>
-                    <h3 className="text-2xl font-bold">{estudante.nome}</h3>
+                    <h3 className="text-xl md:text-2xl font-bold break-words w-full">{estudante.nome}</h3>
                     <p className="text-sm text-muted-foreground mt-1">Matrícula: {estudante.matricula}</p>
                     <div className="flex items-center gap-2 mt-4 justify-center flex-wrap">
                       {estudante.turma_id && estudante.turma_nome && estudante.turma_nome !== '-' ? (
@@ -534,7 +541,7 @@ export default function PerfilEstudante() {
                       <MapPin className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Endereço</p>
-                        <p className="font-medium text-sm">{[estudante.endereco, estudante.bairro, estudante.cidade, estudante.estado].filter(Boolean).join(', ') || 'Não informado'}</p>
+                        <p className="font-medium text-sm break-words whitespace-pre-wrap">{[estudante.endereco, estudante.bairro, estudante.cidade, estudante.estado].filter(Boolean).join(', ') || 'Não informado'}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -548,7 +555,7 @@ export default function PerfilEstudante() {
                       <Mail className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">E-mail</p>
-                        <p className="font-medium text-sm">{estudante.email || 'Não informado'}</p>
+                        <p className="font-medium text-sm break-all">{estudante.email || 'Não informado'}</p>
                       </div>
                     </div>
                   </div>
@@ -566,7 +573,7 @@ export default function PerfilEstudante() {
                       </div>
                       <div className="flex items-start gap-3">
                         <Mail className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-                        <p className="font-medium text-sm">{estudante.responsavel_email || '-'}</p>
+                        <p className="font-medium text-sm break-all">{estudante.responsavel_email || '-'}</p>
                       </div>
                     </div>
                   )}
@@ -578,7 +585,8 @@ export default function PerfilEstudante() {
                       <Activity className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Tamanho da Farda</p>
-                        <p className="font-medium text-sm">Largura: {estudante.tamanho_farda_largura || '-'} | Altura: {estudante.tamanho_farda_altura || '-'}</p>
+                        <p className="font-medium text-sm">{estudante.farda_tamanho || '-'}</p>
+
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -602,14 +610,14 @@ export default function PerfilEstudante() {
           </div>
 
           {/* Coluna de Desempenho Acadêmico */}
-          <div className="lg:col-span-8">
+          <div className="lg:col-span-8 min-w-0">
             <Tabs value={activeTab} onValueChange={setActiveTab}>
               <Card>
                 <div className="border-b">
                   <CardHeader className="py-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <CardTitle className="text-lg">Desempenho Acadêmico</CardTitle>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">Ano:</span>
                           <Select value={selectedYear} onValueChange={(val) => {
@@ -626,12 +634,12 @@ export default function PerfilEstudante() {
                             </SelectContent>
                           </Select>
                         </div>
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
                           <TabsList className="bg-muted">
                             <TabsTrigger value="notas" className="text-xs">Notas</TabsTrigger>
                             <TabsTrigger value="frequencia" className="text-xs">Frequência</TabsTrigger>
                           </TabsList>
-                          <div className="hidden sm:flex items-center gap-2 text-xs">
+                          <div className="hidden lg:flex items-center gap-2 text-xs">
                             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-100 border border-green-300" />≥ 8</span>
                             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-100 border border-yellow-300" />6‑7.9</span>
                             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-100 border border-red-300" />{'<6'}</span>
@@ -649,57 +657,61 @@ export default function PerfilEstudante() {
                         <h4 className="font-semibold text-sm mb-1">Boletim</h4>
                         <p className="text-xs text-muted-foreground">Notas por Componente</p>
                       </div>
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
-                              <TableHead className="font-semibold text-xs h-10">Componente</TableHead>
-                              <TableHead className="font-semibold text-xs h-10">Professor</TableHead>
-                              <TableHead className="text-center font-semibold text-xs h-10">1º Bim</TableHead>
-                              <TableHead className="text-center font-semibold text-xs h-10">2º Bim</TableHead>
-                              <TableHead className="text-center font-semibold text-xs h-10">3º Bim</TableHead>
-                              <TableHead className="text-center font-semibold text-xs h-10">4º Bim</TableHead>
-                              <TableHead className="text-center font-semibold text-xs h-10">Média</TableHead>
-                              <TableHead className="text-center font-semibold text-xs h-10">Situação</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {notas.length > 0 ? notas.map((nota) => {
-                              const mediaDisplay = calcularMediaDisplay(nota);
-                              const situacaoDisplay = getSituacaoDisplay(nota);
-                              return (
-                                <TableRow key={nota.id} className="border-b hover:bg-muted/30">
-                                  <TableCell className="font-medium text-sm py-3">{nota.componente}</TableCell>
-                                  <TableCell className="text-muted-foreground text-sm py-3">{nota.professor_nome}</TableCell>
-                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_1)}`}>{formatNota(nota.bimestre_1) || '-'}</TableCell>
-                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_2)}`}>{formatNota(nota.bimestre_2) || '-'}</TableCell>
-                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_3)}`}>{formatNota(nota.bimestre_3) || '-'}</TableCell>
-                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_4)}`}>{formatNota(nota.bimestre_4) || '-'}</TableCell>
-                                  <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(mediaDisplay)}`}>{formatNota(mediaDisplay) || '-'}</TableCell>
-                                  <TableCell className="text-center text-sm py-3">
-                                    <Badge variant="default" className={`font-semibold text-xs capitalize ${situacaoDisplay === 'Aprovado' ? 'bg-green-100 text-green-800' :
-                                      situacaoDisplay === 'Reprovado' ? 'bg-red-100 text-red-800' :
-                                        'bg-blue-100 text-blue-800'
-                                      }`}>
-                                      {situacaoDisplay}
-                                    </Badge>
-                                  </TableCell>
-                                </TableRow>
-                              );
-                            }) : (
-                              <TableRow>
-                                <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">Nenhuma nota registrada para este ano.</TableCell>
+                      <div className="overflow-x-auto scrollbar-custom -mx-6 sm:mx-0 sm:border sm:rounded-lg">
+                        <div className="min-w-[800px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
+                                <TableHead className="font-semibold text-xs h-10">Componente</TableHead>
+                                <TableHead className="font-semibold text-xs h-10">Professor</TableHead>
+                                <TableHead className="text-center font-semibold text-xs h-10">1º Bim</TableHead>
+                                <TableHead className="text-center font-semibold text-xs h-10">2º Bim</TableHead>
+                                <TableHead className="text-center font-semibold text-xs h-10">3º Bim</TableHead>
+                                <TableHead className="text-center font-semibold text-xs h-10">4º Bim</TableHead>
+                                <TableHead className="text-center font-semibold text-xs h-10">Média</TableHead>
+                                <TableHead className="text-center font-semibold text-xs h-10">Situação</TableHead>
                               </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {notas.length > 0 ? notas.map((nota) => {
+                                const mediaDisplay = calcularMediaDisplay(nota);
+                                const situacaoDisplay = getSituacaoDisplay(nota);
+                                return (
+                                  <TableRow key={nota.id} className="border-b hover:bg-muted/30">
+                                    <TableCell className="font-medium text-sm py-3">{nota.componente}</TableCell>
+                                    <TableCell className="text-muted-foreground text-sm py-3">{nota.professor_nome}</TableCell>
+                                    <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_1)}`}>{formatNota(nota.bimestre_1) || '-'}</TableCell>
+                                    <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_2)}`}>{formatNota(nota.bimestre_2) || '-'}</TableCell>
+                                    <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_3)}`}>{formatNota(nota.bimestre_3) || '-'}</TableCell>
+                                    <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(nota.bimestre_4)}`}>{formatNota(nota.bimestre_4) || '-'}</TableCell>
+                                    <TableCell className={`text-center font-semibold text-sm py-3 ${getNotaColor(mediaDisplay)}`}>{formatNota(mediaDisplay) || '-'}</TableCell>
+                                    <TableCell className="text-center text-sm py-3">
+                                      <Badge variant="default" className={`font-semibold text-xs capitalize ${situacaoDisplay === 'Aprovado' ? 'bg-green-100 text-green-800' :
+                                        situacaoDisplay === 'Reprovado' ? 'bg-red-100 text-red-800' :
+                                          'bg-blue-100 text-blue-800'
+                                        }`}>
+                                        {situacaoDisplay}
+                                      </Badge>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }) : (
+                                <TableRow>
+                                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">Nenhuma nota registrada para este ano.</TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
-                      <div className="flex justify-end pt-4">
-                        <Button className="bg-green-500 hover:bg-green-600 text-white" onClick={() => setTransferenciaDialogOpen(true)}>
-                          <FileDown className="h-4 w-4 mr-2" />Gerar Transferência
-                        </Button>
-                        <Button className="bg-blue-500 hover:bg-blue-600 text-white" onClick={() => setBoletimDialogOpen(true)}>
-                          <Download className="h-4 w-4 mr-2" />Gerar Boletim
+                      <div className="flex flex-col sm:flex-row justify-end pt-4 gap-2">
+                        {role !== 'estudante' && (
+                          <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white w-full sm:w-auto" onClick={() => setTransferenciaDialogOpen(true)}>
+                            <FileDown className="h-4 w-4 mr-2" />Transferência
+                          </Button>
+                        )}
+                        <Button size="sm" className="bg-blue-500 hover:bg-blue-600 text-white w-full sm:w-auto" onClick={() => setBoletimDialogOpen(true)}>
+                          <Download className="h-4 w-4 mr-2" />Boletim
                         </Button>
                       </div>
                     </div>
@@ -713,39 +725,41 @@ export default function PerfilEstudante() {
                         <h4 className="font-semibold text-sm mb-1">Frequência Escolar</h4>
                         <p className="text-xs text-muted-foreground">Total de faltas por componente no ano de {selectedYear}</p>
                       </div>
-                      <div className="border rounded-lg overflow-hidden">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
-                              <TableHead className="font-semibold text-xs h-10 min-w-[150px]">Componente Curricular</TableHead>
-                              {['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'].map((mes) => (
-                                <TableHead key={mes} className="text-center font-semibold text-xs h-10 w-[40px] px-1 capitalize">{mes}</TableHead>
-                              ))}
-                              <TableHead className="text-center font-semibold text-xs h-10 w-[60px]">Total</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(turmaComponentes.length > 0 || Object.keys(faltasAnuais).length > 0) ? (
-                              Array.from(new Set([...(turmaComponentes.map(c => c.nome)), ...Object.keys(faltasAnuais)])).sort().map((comp) => {
-                                const faltas = faltasAnuais[comp] || Array(12).fill(0);
-                                const totalFaltas = faltas.reduce((a, b) => a + b, 0);
-                                return (
-                                  <TableRow key={comp} className="border-b hover:bg-muted/30">
-                                    <TableCell className="font-medium text-sm py-3">{comp}</TableCell>
-                                    {faltas.map((f, i) => (
-                                      <TableCell key={i} className={`text-center text-sm py-3 ${f > 0 ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>{f > 0 ? f : '-'}</TableCell>
-                                    ))}
-                                    <TableCell className="text-center font-bold text-sm py-3 text-red-700">{totalFaltas > 0 ? totalFaltas : '-'}</TableCell>
-                                  </TableRow>
-                                );
-                              })
-                            ) : (
-                              <TableRow>
-                                <TableCell colSpan={14} className="h-24 text-center text-muted-foreground">Nenhuma falta registrada ou componentes não definidos.</TableCell>
+                      <div className="overflow-x-auto scrollbar-custom -mx-6 sm:mx-0 sm:border sm:rounded-lg">
+                        <div className="min-w-[800px]">
+                          <Table>
+                            <TableHeader>
+                              <TableRow className="bg-muted/50 hover:bg-muted/50 border-b">
+                                <TableHead className="font-semibold text-xs h-10 min-w-[150px]">Componente Curricular</TableHead>
+                                {['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'].map((mes) => (
+                                  <TableHead key={mes} className="text-center font-semibold text-xs h-10 w-[40px] px-1 capitalize">{mes}</TableHead>
+                                ))}
+                                <TableHead className="text-center font-semibold text-xs h-10 w-[60px]">Total</TableHead>
                               </TableRow>
-                            )}
-                          </TableBody>
-                        </Table>
+                            </TableHeader>
+                            <TableBody>
+                              {(turmaComponentes.length > 0 || Object.keys(faltasAnuais).length > 0) ? (
+                                Array.from(new Set([...(turmaComponentes.map(c => c.nome)), ...Object.keys(faltasAnuais)])).sort().map((comp) => {
+                                  const faltas = faltasAnuais[comp] || Array(12).fill(0);
+                                  const totalFaltas = faltas.reduce((a, b) => a + b, 0);
+                                  return (
+                                    <TableRow key={comp} className="border-b hover:bg-muted/30">
+                                      <TableCell className="font-medium text-sm py-3">{comp}</TableCell>
+                                      {faltas.map((f, i) => (
+                                        <TableCell key={i} className={`text-center text-sm py-3 ${f > 0 ? 'text-red-600 font-semibold' : 'text-muted-foreground'}`}>{f > 0 ? f : '-'}</TableCell>
+                                      ))}
+                                      <TableCell className="text-center font-bold text-sm py-3 text-red-700">{totalFaltas > 0 ? totalFaltas : '-'}</TableCell>
+                                    </TableRow>
+                                  );
+                                })
+                              ) : (
+                                <TableRow>
+                                  <TableCell colSpan={14} className="h-24 text-center text-muted-foreground">Nenhuma falta registrada ou componentes não definidos.</TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                        </div>
                       </div>
                     </div>
                   </CardContent>
@@ -808,90 +822,92 @@ export default function PerfilEstudante() {
                               </div>
                             </AccordionTrigger>
                             <AccordionContent className="pt-2 pb-4">
-                              <div className="border rounded-md overflow-hidden bg-background">
-                                <Table>
-                                  <TableHeader>
-                                    <TableRow className="bg-muted/50">
-                                      <TableHead className="font-semibold text-xs h-10">Componente Curricular</TableHead>
-                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">1º Bim</TableHead>
-                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">2º Bim</TableHead>
-                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">3º Bim</TableHead>
-                                      <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">4º Bim</TableHead>
-                                      <TableHead className="text-center font-semibold text-xs h-10 w-20 px-1">Média Final</TableHead>
-                                    </TableRow>
-                                  </TableHeader>
-                                  <TableBody>
-                                    {(() => {
-                                      let displayComponentes = anoHistorico.componentes || [];
-                                      if (isAnoAtual) {
-                                        const compMap = new Map<string, HistoricoDisciplina>();
-                                        displayComponentes.forEach(c => {
-                                          if (c.nome) compMap.set(c.nome, c);
+                              <div className="overflow-x-auto border rounded-md bg-background">
+                                <div className="min-w-[600px]">
+                                  <Table>
+                                    <TableHeader>
+                                      <TableRow className="bg-muted/50">
+                                        <TableHead className="font-semibold text-xs h-10">Componente Curricular</TableHead>
+                                        <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">1º Bim</TableHead>
+                                        <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">2º Bim</TableHead>
+                                        <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">3º Bim</TableHead>
+                                        <TableHead className="text-center font-semibold text-xs h-10 w-16 px-1">4º Bim</TableHead>
+                                        <TableHead className="text-center font-semibold text-xs h-10 w-20 px-1">Média Final</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                      {(() => {
+                                        let displayComponentes = anoHistorico.componentes || [];
+                                        if (isAnoAtual) {
+                                          const compMap = new Map<string, HistoricoDisciplina>();
+                                          displayComponentes.forEach(c => {
+                                            if (c.nome) compMap.set(c.nome, c);
+                                          });
+                                          notasMap.forEach((nota, nome) => {
+                                            if (!compMap.has(nome)) {
+                                              compMap.set(nome, { id: nota.id, nome, nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: '' });
+                                            }
+                                          });
+                                          turmaComponentes.forEach(tc => {
+                                            if (tc.nome && !compMap.has(tc.nome)) {
+                                              compMap.set(tc.nome, { id: `tc_${tc.nome}`, nome: tc.nome, nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: '' });
+                                            }
+                                          });
+                                          displayComponentes = Array.from(compMap.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+                                        }
+
+                                        if (displayComponentes.length === 0) {
+                                          return (
+                                            <TableRow>
+                                              <TableCell colSpan={6} className="h-16 text-center text-sm text-muted-foreground">
+                                                Nenhum componente registrado.
+                                              </TableCell>
+                                            </TableRow>
+                                          );
+                                        }
+
+                                        return displayComponentes.map((disciplina) => {
+                                          if (!disciplina.nome) return null;
+
+                                          // Para o ano atual, usa notas reais do boletim se disponíveis
+                                          const notaReal = notasMap.get(disciplina.nome);
+                                          const b1 = notaReal ? formatNota(notaReal.bimestre_1) : (disciplina.nota_b1 || '-');
+                                          const b2 = notaReal ? formatNota(notaReal.bimestre_2) : (disciplina.nota_b2 || '-');
+                                          const b3 = notaReal ? formatNota(notaReal.bimestre_3) : (disciplina.nota_b3 || '-');
+                                          const b4 = notaReal ? formatNota(notaReal.bimestre_4) : (disciplina.nota_b4 || '-');
+                                          const mediaNum = notaReal ? calcularMediaDisplay(notaReal) : null;
+                                          const mediaStr = mediaNum != null
+                                            ? formatNota(mediaNum)
+                                            : (disciplina.media_final || '-');
+                                          const mediaColorClass = mediaNum != null ? getNotaColor(mediaNum) : '';
+
+                                          return (
+                                            <TableRow key={disciplina.id} className="border-b last:border-0 hover:bg-muted/10">
+                                              <TableCell className="font-medium text-sm py-2">
+                                                {disciplina.nome}
+                                              </TableCell>
+                                              <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_1) : 'text-muted-foreground'}`}>
+                                                {b1 || '-'}
+                                              </TableCell>
+                                              <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_2) : 'text-muted-foreground'}`}>
+                                                {b2 || '-'}
+                                              </TableCell>
+                                              <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_3) : 'text-muted-foreground'}`}>
+                                                {b3 || '-'}
+                                              </TableCell>
+                                              <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_4) : 'text-muted-foreground'}`}>
+                                                {b4 || '-'}
+                                              </TableCell>
+                                              <TableCell className={`text-center font-semibold text-sm py-2 px-1 ${mediaColorClass}`}>
+                                                {mediaStr}
+                                              </TableCell>
+                                            </TableRow>
+                                          );
                                         });
-                                        notasMap.forEach((nota, nome) => {
-                                          if (!compMap.has(nome)) {
-                                            compMap.set(nome, { id: nota.id, nome, nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: '' });
-                                          }
-                                        });
-                                        turmaComponentes.forEach(tc => {
-                                          if (tc.nome && !compMap.has(tc.nome)) {
-                                            compMap.set(tc.nome, { id: `tc_${tc.nome}`, nome: tc.nome, nota_b1: '', nota_b2: '', nota_b3: '', nota_b4: '', media_final: '' });
-                                          }
-                                        });
-                                        displayComponentes = Array.from(compMap.values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-                                      }
-
-                                      if (displayComponentes.length === 0) {
-                                        return (
-                                          <TableRow>
-                                            <TableCell colSpan={6} className="h-16 text-center text-sm text-muted-foreground">
-                                              Nenhum componente registrado.
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      }
-
-                                      return displayComponentes.map((disciplina) => {
-                                        if (!disciplina.nome) return null;
-
-                                        // Para o ano atual, usa notas reais do boletim se disponíveis
-                                        const notaReal = notasMap.get(disciplina.nome);
-                                        const b1 = notaReal ? formatNota(notaReal.bimestre_1) : (disciplina.nota_b1 || '-');
-                                        const b2 = notaReal ? formatNota(notaReal.bimestre_2) : (disciplina.nota_b2 || '-');
-                                        const b3 = notaReal ? formatNota(notaReal.bimestre_3) : (disciplina.nota_b3 || '-');
-                                        const b4 = notaReal ? formatNota(notaReal.bimestre_4) : (disciplina.nota_b4 || '-');
-                                        const mediaNum = notaReal ? calcularMediaDisplay(notaReal) : null;
-                                        const mediaStr = mediaNum != null
-                                          ? formatNota(mediaNum)
-                                          : (disciplina.media_final || '-');
-                                        const mediaColorClass = mediaNum != null ? getNotaColor(mediaNum) : '';
-
-                                        return (
-                                          <TableRow key={disciplina.id} className="border-b last:border-0 hover:bg-muted/10">
-                                            <TableCell className="font-medium text-sm py-2">
-                                              {disciplina.nome}
-                                            </TableCell>
-                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_1) : 'text-muted-foreground'}`}>
-                                              {b1 || '-'}
-                                            </TableCell>
-                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_2) : 'text-muted-foreground'}`}>
-                                              {b2 || '-'}
-                                            </TableCell>
-                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_3) : 'text-muted-foreground'}`}>
-                                              {b3 || '-'}
-                                            </TableCell>
-                                            <TableCell className={`text-center text-sm py-2 px-1 ${notaReal ? getNotaColor(notaReal.bimestre_4) : 'text-muted-foreground'}`}>
-                                              {b4 || '-'}
-                                            </TableCell>
-                                            <TableCell className={`text-center font-semibold text-sm py-2 px-1 ${mediaColorClass}`}>
-                                              {mediaStr}
-                                            </TableCell>
-                                          </TableRow>
-                                        );
-                                      });
-                                    })()}
-                                  </TableBody>
-                                </Table>
+                                      })()}
+                                    </TableBody>
+                                  </Table>
+                                </div>
                               </div>
                             </AccordionContent>
                           </AccordionItem>
@@ -905,7 +921,7 @@ export default function PerfilEstudante() {
 
           </div>
         </div>
-      </main>
+      </div>
 
       {estudante && (
         <TransferenciaDialog

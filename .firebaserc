@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "educafacil1"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }
