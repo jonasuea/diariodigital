@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
+
 import { useUserRole } from '@/hooks/useUserRole';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -139,6 +140,8 @@ const initialState = {
 export default function NovoEstudante() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const location = useLocation();
+
   const { escolaAtivaId } = useUserRole();
   const isEditing = !!id;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -219,8 +222,22 @@ export default function NovoEstudante() {
     }
     // Garante que o formulário é resetado se navegar de uma página de edição para uma de criação
     if (!isEditing) {
-      setFormData(initialState);
+      if (location.state?.preMatriculaData) {
+        const preData = location.state.preMatriculaData;
+        setFormData({
+          ...initialState,
+          nome: preData.nome || '',
+          cpf: preData.cpf || '',
+          sexo: preData.sexo || '',
+          endereco: preData.endereco || '',
+          responsavel_nome: preData.responsavel_nome || '',
+          // Você pode adicionar outros mapeamentos aqui
+        });
+      } else {
+        setFormData(initialState);
+      }
     }
+
   }, [id, isEditing, turmasCarregadas]);
 
   async function fetchEstudante(estudanteId: string) {
@@ -601,7 +618,7 @@ export default function NovoEstudante() {
         const userId = (finalFormData as any).usuario_id;
         if (userId) {
           try {
-            await updateDoc(doc(db, 'profiles', userId), { nome: finalFormData.nome });
+            await updateDoc(doc(db, 'profiles', userId), { nome: (finalFormData as any).responsavel_nome });
           } catch (err) {
             console.warn('Sem permissão para sincronizar nome no perfil:', err);
           }
@@ -611,7 +628,7 @@ export default function NovoEstudante() {
               query(collection(db, 'profiles'), where('email', '==', finalFormData.email.toLowerCase()))
             );
             if (!profilesSnap.empty) {
-              await updateDoc(doc(db, 'profiles', profilesSnap.docs[0].id), { nome: finalFormData.nome });
+              await updateDoc(doc(db, 'profiles', profilesSnap.docs[0].id), { nome: (finalFormData as any).responsavel_nome });
             }
           } catch (err) {
             console.warn('Sem permissão para sincronizar nome no perfil por e-mail:', err);

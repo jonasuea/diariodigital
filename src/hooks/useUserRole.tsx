@@ -15,8 +15,10 @@ import {
   Settings,
   User,
   Building2,
+  UserCheck,
   LucideIcon
 } from 'lucide-react';
+
 
 interface MenuItem {
   title: string;
@@ -29,6 +31,8 @@ const allMenuItems: MenuItem[] = [
   { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
   { title: 'Escolas', url: '/escolas', icon: Building2, allowedRoles: ['admin'] },
   { title: 'Estudantes', url: '/Estudantes', icon: Users, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+  { title: 'Pré-Matrículas', url: '/pre-matriculas', icon: UserCheck, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+
   { title: 'Professores', url: '/professores', icon: GraduationCap, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
   { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
   { title: 'Turmas', url: '/turmas', icon: School, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
@@ -53,6 +57,7 @@ interface UserRoleContextType {
   isSecretario: boolean;
   isProfessor: boolean;
   isEstudante: boolean;
+  isResponsavel: boolean;
   permittedEscolas: string[];
   menuItems: MenuItem[];
   isInMaintenance: boolean;
@@ -132,37 +137,40 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        if (userRole === 'estudante') {
+        if (userRole === 'estudante' || userRole === 'responsavel') {
           try {
             let q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid), limit(1));
             let snap = await getDocs(q);
 
             if (snap.empty && user.email) {
-              q = query(collection(db, 'estudantes'), where('email', '==', user.email), limit(1));
+              // Busca por email do próprio estudante
+              q = query(collection(db, 'estudantes'), where('email', '==', user.email.toLowerCase()), limit(1));
               snap = await getDocs(q);
 
+              // Se não encontrou e for responsável, busca pelo email_responsavel
               if (snap.empty) {
-                q = query(collection(db, 'estudantes'), where('email_responsavel', '==', user.email), limit(1));
+                q = query(collection(db, 'estudantes'), where('email_responsavel', '==', user.email.toLowerCase()), limit(1));
                 snap = await getDocs(q);
               }
             }
 
             const estId = snap.empty ? 'not-found' : snap.docs[0].id;
+            const roleLabel = userRole === 'estudante' ? 'estudante' : 'responsavel';
 
             setMenuItems([
-              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['estudante'] },
-              { title: 'Meu Perfil', url: `/estudantes/${estId}`, icon: User, allowedRoles: ['estudante'] },
-              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['estudante'] },
-              { title: 'Manual de Uso', url: '/manual-uso', icon: BookOpen, allowedRoles: ['estudante'] },
-              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['estudante'] }
+              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['estudante', 'responsavel'] },
+              { title: 'Meu Perfil', url: `/estudantes/${estId}`, icon: User, allowedRoles: ['estudante', 'responsavel'] },
+              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['estudante', 'responsavel'] },
+              { title: 'Manual de Uso', url: '/manual-uso', icon: BookOpen, allowedRoles: ['estudante', 'responsavel'] },
+              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['estudante', 'responsavel'] }
             ]);
           } catch (e) {
-            console.error('Erro ao buscar perfil de estudante. Carregando menus genéricos de estudante...', e);
+            console.error('Erro ao buscar perfil de estudante. Carregando menus genéricos...', e);
             setMenuItems([
-              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['estudante'] },
-              { title: 'Meu Perfil', url: `/estudantes/not-found`, icon: User, allowedRoles: ['estudante'] },
-              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['estudante'] },
-              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['estudante'] }
+              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['estudante', 'responsavel'] },
+              { title: 'Meu Perfil', url: `/estudantes/not-found`, icon: User, allowedRoles: ['estudante', 'responsavel'] },
+              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['estudante', 'responsavel'] },
+              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['estudante', 'responsavel'] }
             ]);
           }
         } else if (userRole) {
@@ -191,6 +199,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const isSecretario = role === 'secretario';
   const isProfessor = role === 'professor';
   const isEstudante = role === 'estudante';
+  const isResponsavel = role === 'responsavel';
 
   return (
     <UserRoleContext.Provider
@@ -206,6 +215,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         isSecretario,
         isProfessor,
         isEstudante,
+        isResponsavel,
         permittedEscolas,
         menuItems,
         isInMaintenance

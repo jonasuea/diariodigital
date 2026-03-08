@@ -1,6 +1,21 @@
-import { createUserAccount, assignTeacherToTurma } from "./adminFunctions";
+import {
+    createUserAccount,
+    assignTeacherToTurma,
+    checkEnrollmentStatus,
+    submitReservation,
+    cleanupExpiredReservations,
+    checkResponsibleByCPF,
+    syncResponsibleData
+} from "./adminFunctions";
+
 
 export {
     createUserAccount,
-    assignTeacherToTurma
+    assignTeacherToTurma,
+    checkEnrollmentStatus,
+    submitReservation,
+    cleanupExpiredReservations,
+    checkResponsibleByCPF,
+    syncResponsibleData
 };
+

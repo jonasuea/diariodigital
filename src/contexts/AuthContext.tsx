@@ -53,6 +53,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: maintenanceError };
       }
 
+      if (userRole === 'responsavel') {
+        await firebaseSignOut(auth);
+        const roleError = new Error("Responsáveis devem acessar pelo portal de matriculas: matricula.manaus.am.gov.br");
+        roleError.name = 'RoleRestriction';
+        return { error: roleError };
+      }
+
       return { error: null };
     } catch (error) {
       return { error: error as Error };

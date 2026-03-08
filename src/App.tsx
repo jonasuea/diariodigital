@@ -37,6 +37,8 @@ import PerfilProfessor from "./pages/PerfilProfessor";
 import PerfilMembro from "./pages/PerfilMembro";
 import NotasParciais from "./pages/NotasParciais";
 import ManualUso from "./pages/ManualUso";
+import PreMatriculas from "./pages/PreMatriculas";
+
 import { useAutoUpdate } from "@/hooks/useAutoUpdate";
 import { UserRoleProvider } from "@/hooks/useUserRole";
 
@@ -57,6 +59,8 @@ const router = createBrowserRouter([
   { path: "/estudantes/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
   { path: "/estudantes/:id", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><PerfilEstudante /></ProtectedRoute> },
   { path: "/estudantes/:id/editar", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoEstudante /></ProtectedRoute> },
+  { path: "/pre-matriculas", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><PreMatriculas /></ProtectedRoute> },
+
 
   { path: "/professores", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Professores /></ProtectedRoute> },
   { path: "/professores/novo", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><NovoProfessor /></ProtectedRoute> },

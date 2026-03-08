@@ -23,28 +23,38 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.assignTeacherToTurma = exports.createUserAccount = void 0;
-const functions = __importStar(require("firebase-functions"));
+exports.syncResponsibleData = exports.checkResponsibleByCPF = exports.cleanupExpiredReservations = exports.submitReservation = exports.checkEnrollmentStatus = exports.assignTeacherToTurma = exports.createUserAccount = void 0;
+const https_1 = require("firebase-functions/v2/https");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
 const firestore_1 = require("firebase-admin/firestore");
 if (!admin.apps.length) {
     admin.initializeApp();
 }
 const db = (0, firestore_1.getFirestore)(admin.app(), "database");
-exports.createUserAccount = functions.https.onCall(async (request) => {
+function formatToCPF(cpf) {
+    const numbers = cpf.replace(/\D/g, "");
+    if (numbers.length !== 11)
+        return numbers;
+    return numbers
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d)/, "$1.$2")
+        .replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+}
+exports.createUserAccount = (0, https_1.onCall)(async (request) => {
     var _a;
     if (!request.auth) {
-        throw new functions.https.HttpsError("unauthenticated", "Usuário não autenticado.");
+        throw new https_1.HttpsError("unauthenticated", "Usuário não autenticado.");
     }
     const callerUid = request.auth.uid;
     const callerRoleDoc = await db.collection("user_roles").doc(callerUid).get();
     const callerRole = (_a = callerRoleDoc.data()) === null || _a === void 0 ? void 0 : _a.role;
     if (callerRole !== "admin") {
-        throw new functions.https.HttpsError("permission-denied", "Apenas administradores podem criar contas.");
+        throw new https_1.HttpsError("permission-denied", "Apenas administradores podem criar contas.");
     }
     const { email, password, nome, role, escola_id } = request.data;
     if (!email || !password || !nome || !role) {
-        throw new functions.https.HttpsError("invalid-argument", "Dados insuficientes para criação.");
+        throw new https_1.HttpsError("invalid-argument", "Dados insuficientes para criação.");
     }
     try {
         let uid;
@@ -71,7 +81,7 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
         batch.set(profileRef, {
             nome,
             email,
-            created_at: admin.firestore.FieldValue.serverTimestamp(),
+            created_at: firestore_1.FieldValue.serverTimestamp(),
             excluido: false,
         }, { merge: true });
         const roleRef = db.collection("user_roles").doc(uid);
@@ -81,7 +91,7 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
             email,
             escola_id: escola_id || "",
             escolas: escola_id ? [escola_id] : [],
-            updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            updated_at: firestore_1.FieldValue.serverTimestamp(),
             excluido: false,
         }, { merge: true });
         await batch.commit();
@@ -89,31 +99,326 @@ exports.createUserAccount = functions.https.onCall(async (request) => {
     }
     catch (error) {
         console.error("Erro ao criar/recuperar usuário:", error);
-        throw new functions.https.HttpsError("internal", error.message);
+        throw new https_1.HttpsError("internal", error.message);
     }
 });
-exports.assignTeacherToTurma = functions.https.onCall(async (request) => {
+exports.assignTeacherToTurma = (0, https_1.onCall)(async (request) => {
     var _a, _b;
     if (!request.auth) {
-        throw new functions.https.HttpsError("unauthenticated", "Autenticação necessária.");
+        throw new https_1.HttpsError("unauthenticated", "Autenticação necessária.");
     }
     const { professorId, turmaId, escolaId } = request.data;
     try {
         const turmaDoc = await db.collection("turmas").doc(turmaId).get();
         const profDoc = await db.collection("professores").doc(professorId).get();
         if (!turmaDoc.exists || !profDoc.exists) {
-            throw new functions.https.HttpsError("not-found", "Turma ou Professor não encontrado.");
+            throw new https_1.HttpsError("not-found", "Turma ou Professor não encontrado.");
         }
         if (((_a = turmaDoc.data()) === null || _a === void 0 ? void 0 : _a.escola_id) !== escolaId || ((_b = profDoc.data()) === null || _b === void 0 ? void 0 : _b.escola_id) !== escolaId) {
-            throw new functions.https.HttpsError("permission-denied", "Conflito de escola detectado.");
+            throw new https_1.HttpsError("permission-denied", "Conflito de escola detectado.");
         }
         await db.collection("turmas").doc(turmaId).update({
-            professoresIds: admin.firestore.FieldValue.arrayUnion(professorId),
+            professoresIds: firestore_1.FieldValue.arrayUnion(professorId),
         });
         return { success: true };
     }
     catch (error) {
-        throw new functions.https.HttpsError("internal", error.message);
+        throw new https_1.HttpsError("internal", error.message);
+    }
+});
+exports.checkEnrollmentStatus = (0, https_1.onCall)(async (request) => {
+    var _a, _b;
+    const { cpf } = request.data;
+    if (!cpf) {
+        throw new https_1.HttpsError("invalid-argument", "CPF é obrigatório.");
+    }
+    try {
+        const studentQuery = await db.collection("estudantes")
+            .where("cpf", "==", cpf)
+            .where("status", "==", "Frequentando")
+            .limit(1)
+            .get();
+        if (studentQuery.empty) {
+            return { found: false };
+        }
+        const student = studentQuery.docs[0].data();
+        let escolaNome = "Escola não identificada";
+        let turmaNome = "A definir";
+        if (student.escola_id) {
+            const escolaDoc = await db.collection("configuracoes").doc("escola").get();
+            if (escolaDoc.exists) {
+                const config = (_a = escolaDoc.data()) === null || _a === void 0 ? void 0 : _a.escolaConfig;
+                if (config && config.nome)
+                    escolaNome = config.nome;
+            }
+        }
+        if (student.turma_id) {
+            const turmaDoc = await db.collection("turmas").doc(student.turma_id).get();
+            if (turmaDoc.exists) {
+                turmaNome = ((_b = turmaDoc.data()) === null || _b === void 0 ? void 0 : _b.nome) || "A definir";
+            }
+        }
+        return {
+            found: true,
+            estudante: {
+                nome: student.nome,
+                escola: escolaNome,
+                turma: turmaNome,
+                turno: student.turno || "Não informado"
+            }
+        };
+    }
+    catch (error) {
+        throw new https_1.HttpsError("internal", error.message);
+    }
+});
+exports.submitReservation = (0, https_1.onCall)(async (request) => {
+    const data = request.data;
+    const required = ["cpf", "nome", "sexo", "endereco", "responsavel_nome"];
+    for (const field of required) {
+        if (!data[field]) {
+            throw new https_1.HttpsError("invalid-argument", `Campo '${field}' é obrigatório.`);
+        }
+    }
+    try {
+        const expirationDate = new Date();
+        expirationDate.setDate(expirationDate.getDate() + 7);
+        const reservation = Object.assign(Object.assign({}, data), { status: "pendente", data_criacao: firestore_1.FieldValue.serverTimestamp(), data_expiracao: firestore_1.Timestamp.fromDate(expirationDate), excluido: false });
+        const docRef = await db.collection("pre_matriculas").add(reservation);
+        return { success: true, id: docRef.id, data_expiracao: expirationDate.toISOString() };
+    }
+    catch (error) {
+        throw new https_1.HttpsError("internal", error.message);
+    }
+});
+exports.cleanupExpiredReservations = (0, scheduler_1.onSchedule)("0 0 * * *", async (event) => {
+    const now = firestore_1.Timestamp.now();
+    try {
+        const expiredQuery = await db.collection("pre_matriculas")
+            .where("status", "==", "pendente")
+            .where("data_expiracao", "<=", now)
+            .get();
+        if (expiredQuery.empty) {
+            console.log("Nenhuma reserva expirada para limpar.");
+            return;
+        }
+        const batch = db.batch();
+        expiredQuery.docs.forEach(doc => {
+            batch.update(doc.ref, {
+                status: "expirada",
+                updated_at: firestore_1.FieldValue.serverTimestamp()
+            });
+        });
+        await batch.commit();
+        console.log(`${expiredQuery.size} reservas foram marcadas como expiradas.`);
+    }
+    catch (error) {
+        console.error("Erro ao limpar reservas expiradas:", error);
+    }
+});
+exports.checkResponsibleByCPF = (0, https_1.onCall)(async (request) => {
+    const { cpf } = request.data;
+    if (!cpf) {
+        throw new https_1.HttpsError("invalid-argument", "CPF é obrigatório.");
+    }
+    const cleanCPF = cpf.replace(/\D/g, "");
+    const formattedCPF = formatToCPF(cleanCPF);
+    try {
+        let profileQuery = await db.collection("profiles")
+            .where("cpf", "==", cleanCPF)
+            .limit(1)
+            .get();
+        let profileData = !profileQuery.empty ? profileQuery.docs[0].data() : null;
+        let studentQuery = await db.collection("estudantes")
+            .where("responsavel_cpf", "==", cleanCPF)
+            .limit(1)
+            .get();
+        if (studentQuery.empty && formattedCPF !== cleanCPF) {
+            studentQuery = await db.collection("estudantes")
+                .where("responsavel_cpf", "==", formattedCPF)
+                .limit(1)
+                .get();
+        }
+        if (studentQuery.empty && !profileData) {
+            return { exists: false };
+        }
+        const studentData = !studentQuery.empty ? studentQuery.docs[0].data() : {};
+        const email = (profileData === null || profileData === void 0 ? void 0 : profileData.email) || studentData.responsavel_email || "";
+        const exists = true;
+        const hasEmail = !!email;
+        let canRecoverPassword = false;
+        if (hasEmail) {
+            try {
+                const userRecord = await admin.auth().getUserByEmail(email.toLowerCase());
+                if (userRecord) {
+                    canRecoverPassword = true;
+                }
+            }
+            catch (e) {
+            }
+        }
+        return {
+            exists,
+            hasEmail,
+            email: email,
+            canRecoverPassword,
+            data: {
+                nome: (profileData === null || profileData === void 0 ? void 0 : profileData.nome) || studentData.responsavel_nome || "",
+                contato: (profileData === null || profileData === void 0 ? void 0 : profileData.contato) || studentData.responsavel_contato || "",
+                rg: studentData.responsavel_rg || "",
+                relacao: studentData.responsavel_relacao || ""
+            }
+        };
+    }
+    catch (error) {
+        throw new https_1.HttpsError("internal", error.message);
+    }
+});
+exports.syncResponsibleData = (0, https_1.onCall)(async (request) => {
+    var _a, _b, _c, _d, _e;
+    const { cpf, nome, email, telefone } = request.data;
+    const cleanCPF = cpf.replace(/\D/g, "");
+    const formattedCPF = formatToCPF(cleanCPF);
+    console.log(`Iniciando sincronização para o CPF: ${cleanCPF} (${formattedCPF})`);
+    try {
+        const batch = db.batch();
+        let updatedCount = 0;
+        const studentQuery = await db.collection("estudantes")
+            .where("responsavel_cpf", "in", [cleanCPF, formattedCPF])
+            .get();
+        console.log(`Encontrados ${studentQuery.size} estudantes para o CPF.`);
+        studentQuery.docs.forEach(doc => {
+            batch.update(doc.ref, {
+                responsavel_nome: nome || doc.data().responsavel_nome,
+                responsavel_email: email ? email.trim().toLowerCase() : doc.data().responsavel_email,
+                responsavel_contato: telefone || doc.data().responsavel_contato,
+                updated_at: firestore_1.FieldValue.serverTimestamp()
+            });
+            updatedCount++;
+        });
+        const preMatriculaQuery = await db.collection("pre_matriculas")
+            .where("responsavel_cpf", "in", [cleanCPF, formattedCPF])
+            .get();
+        console.log(`Encontradas ${preMatriculaQuery.size} pré-matrículas para o CPF.`);
+        preMatriculaQuery.docs.forEach(doc => {
+            batch.update(doc.ref, {
+                responsavel_nome: nome || doc.data().responsavel_nome,
+                responsavel_email: email ? email.trim().toLowerCase() : doc.data().responsavel_email,
+                responsavel_contato: telefone || doc.data().responsavel_contato,
+                updated_at: firestore_1.FieldValue.serverTimestamp()
+            });
+            updatedCount++;
+        });
+        if (updatedCount > 0) {
+            console.log(`Commitando batch com ${updatedCount} atualizações.`);
+            await batch.commit();
+        }
+        let accountStatus = "existing";
+        const targetEmail = email === null || email === void 0 ? void 0 : email.trim().toLowerCase();
+        if (targetEmail) {
+            try {
+                const userRecord = await admin.auth().getUserByEmail(targetEmail);
+                const uid = userRecord.uid;
+                const updateProfileBatch = db.batch();
+                const userRolesDoc = await db.collection("user_roles").doc(uid).get();
+                if (!userRolesDoc.exists) {
+                    updateProfileBatch.set(db.collection("user_roles").doc(uid), {
+                        role: "responsavel",
+                        email: targetEmail,
+                        created_at: firestore_1.FieldValue.serverTimestamp(),
+                        updated_at: firestore_1.FieldValue.serverTimestamp()
+                    });
+                }
+                else if (((_a = userRolesDoc.data()) === null || _a === void 0 ? void 0 : _a.role) !== 'responsavel' && ((_b = userRolesDoc.data()) === null || _b === void 0 ? void 0 : _b.role) !== 'admin') {
+                    updateProfileBatch.update(db.collection("user_roles").doc(uid), {
+                        role: "responsavel",
+                        updated_at: firestore_1.FieldValue.serverTimestamp()
+                    });
+                }
+                const profileDoc = await db.collection("profiles").doc(uid).get();
+                if (!profileDoc.exists) {
+                    updateProfileBatch.set(db.collection("profiles").doc(uid), {
+                        nome: nome,
+                        email: targetEmail,
+                        role: "responsavel",
+                        cpf: cleanCPF,
+                        created_at: firestore_1.FieldValue.serverTimestamp(),
+                        updated_at: firestore_1.FieldValue.serverTimestamp()
+                    });
+                }
+                else {
+                    updateProfileBatch.update(db.collection("profiles").doc(uid), {
+                        nome: nome || ((_c = profileDoc.data()) === null || _c === void 0 ? void 0 : _c.nome),
+                        contato: telefone || ((_d = profileDoc.data()) === null || _d === void 0 ? void 0 : _d.contato),
+                        cpf: cleanCPF || ((_e = profileDoc.data()) === null || _e === void 0 ? void 0 : _e.cpf),
+                        updated_at: firestore_1.FieldValue.serverTimestamp()
+                    });
+                }
+                const currentClaims = userRecord.customClaims || {};
+                if (currentClaims.role !== 'responsavel' && currentClaims.role !== 'admin') {
+                    await admin.auth().setCustomUserClaims(uid, Object.assign(Object.assign({}, currentClaims), { role: "responsavel" }));
+                }
+                if (nome && userRecord.displayName !== nome) {
+                    await admin.auth().updateUser(uid, {
+                        displayName: nome
+                    });
+                }
+                const studentsToLink = await db.collection("estudantes")
+                    .where("responsavel_cpf", "in", [cleanCPF, formattedCPF])
+                    .get();
+                studentsToLink.docs.forEach(doc => {
+                    if (doc.data().usuario_id !== uid) {
+                        updateProfileBatch.update(doc.ref, {
+                            usuario_id: uid,
+                            updated_at: firestore_1.FieldValue.serverTimestamp()
+                        });
+                    }
+                });
+                await updateProfileBatch.commit();
+            }
+            catch (e) {
+                if (e.code === "auth/user-not-found") {
+                    const tempPassword = "EDUCAFACIL2026";
+                    const userRecord = await admin.auth().createUser({
+                        email: targetEmail,
+                        password: tempPassword,
+                        displayName: nome,
+                    });
+                    const uid = userRecord.uid;
+                    await admin.auth().setCustomUserClaims(uid, { role: "responsavel" });
+                    const newBatch = db.batch();
+                    newBatch.set(db.collection("user_roles").doc(uid), {
+                        role: "responsavel",
+                        email: targetEmail,
+                        created_at: firestore_1.FieldValue.serverTimestamp(),
+                        updated_at: firestore_1.FieldValue.serverTimestamp()
+                    });
+                    newBatch.set(db.collection("profiles").doc(uid), {
+                        nome: nome,
+                        email: targetEmail,
+                        role: "responsavel",
+                        cpf: cleanCPF,
+                        updated_at: firestore_1.FieldValue.serverTimestamp()
+                    });
+                    const studentsToLink = await db.collection("estudantes")
+                        .where("responsavel_cpf", "in", [cpf, formatToCPF(cpf)])
+                        .get();
+                    studentsToLink.docs.forEach(doc => {
+                        newBatch.update(doc.ref, {
+                            usuario_id: uid,
+                            updated_at: firestore_1.FieldValue.serverTimestamp()
+                        });
+                    });
+                    await newBatch.commit();
+                    accountStatus = "created";
+                }
+            }
+        }
+        return { success: true, updatedCount, accountStatus };
+    }
+    catch (error) {
+        console.error(`Erro na sincronização de dados do CPF ${cpf}:`, error);
+        throw new https_1.HttpsError("internal", `Erro durante o processamento: ${error.message}`);
     }
 });
 //# sourceMappingURL=adminFunctions.js.map

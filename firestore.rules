@@ -56,11 +56,13 @@ service cloud.firestore {
 
     match /estudantes/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow create: if isResponsavel() || isAdmin() || isGestor() || isSecretario();
+      allow update: if isAdmin() || isGestor() || isSecretario() || (isResponsavel() && resource.data.usuario_id == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
     match /professores/{id} {
-      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante(); // Admin, Gestor, Secretário e Professor podem ver as turmas
+      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante() || isResponsavel(); // Admin, Gestor, Secretário, Professor, Estudante e Responsável podem ver os professores
       allow write: if isAdmin() || isGestor() || isSecretario(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
     }
 
@@ -70,7 +72,7 @@ service cloud.firestore {
     }
 
     match /turmas/{id} {
-      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante(); // Admin, Gestor, Secretário e Professor podem ver as turmas
+      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante() || isResponsavel(); // Admin, Gestor, Secretário, Professor, Estudante e Responsável podem ver as turmas
       allow write: if isAdmin() || isGestor() || isSecretario(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
     }
 
@@ -144,6 +146,11 @@ service cloud.firestore {
     match /manual-uso/{id} {
       allow read, write: if hasAnyRole();
     }
+
+    match /pre_matriculas/{id} {
+      allow read, write: if isAdmin() || isGestor() || isSecretario();
+    }
+
 
 
    // match /atividades_recentes/{id} {

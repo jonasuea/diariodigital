@@ -527,6 +527,7 @@ export default function Usuarios() {
                 <SelectItem value="secretario">Secretário</SelectItem>
                 <SelectItem value="professor">Professor</SelectItem>
                 <SelectItem value="estudante">Estudante</SelectItem>
+                <SelectItem value="responsavel">Responsável</SelectItem>
               </SelectContent>
             </Select>
 
