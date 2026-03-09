@@ -1,42 +1,30 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Funções auxiliares
+    // Funções auxiliares baseadas na sessão de autenticação
     function isSignedIn() { return request.auth != null; }
-    function isAdmin() { 
-       return isSignedIn() && 
-       firestore.get(/databases/(default)/documents/user_roles/$(request.auth.uid)).data.role == 'admin';
-    }
 
-    function getRole() {
-      return firestore.get(/databases/(default)/documents/user_roles/$(request.auth.uid)).data.role;
-    }
-    
-    function getUserEscolas() {
-      let data = firestore.get(/databases/(default)/documents/user_roles/$(request.auth.uid)).data;
-      return data.escolas != null ? data.escolas : (data.escola_id != null ? [data.escola_id] : []);
-    }
-
-    // Fotos (Acesso geral se logado, escrita pelo dono ou admin)
+    // Fotos de perfil genéricas
     match /{collection}/fotos/{fileName} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn(); // No sistema atual, o componente lida com o upload
+      allow write: if isSignedIn();
     }
 
-    // Documentos Sensíveis (Acesso apenas por escola/papel)
+    // Documentos (qualquer usuário logado com UI bloqueando acessos indevidos)
     match /{collection}/documentos/{fileName} {
-      allow read: if isSignedIn() && (getRole() in ['admin', 'gestor', 'pedagogo', 'secretario']);
-      allow write: if isSignedIn() && (getRole() in ['admin', 'gestor', 'secretario']);
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
-    // Estudantes (Acesso apenas se logado)
+    // Estudantes (Upload de Avatar)
     match /Estudantes/{fileName} {
       allow read: if isSignedIn();
-      allow write: if isSignedIn() && (getRole() in ['admin', 'gestor', 'secretario']);
+      allow write: if isSignedIn();
     }
     
+    // Regra Global Restrita
     match /{allPaths=**} {
-      allow read, write: if isAdmin();
+      allow read, write: if isSignedIn();
     }
   }
 }

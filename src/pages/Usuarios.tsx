@@ -3,9 +3,9 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { DataTable } from '@/components/ui/data-table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { UserCog, Key, UserCheck, UserX, Trash2, Search, ChevronLeft, ChevronRight, RotateCcw, Trash } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -42,9 +42,9 @@ export default function Usuarios() {
   const [usuarioToDelete, setUsuarioToDelete] = useState<Usuario | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [usuarioToAssign, setUsuarioToAssign] = useState<Usuario | null>(null);
-  const [selectedRole, setSelectedRole] = useState<string>('');
+  // Pares cargo + escola (suporta múltiplos perfis por usuário)
+  const [profilePairs, setProfilePairs] = useState<{ role: string; escola_id: string }[]>([{ role: '', escola_id: '' }]);
   const [escolasDisponiveis, setEscolasDisponiveis] = useState<{ id: string, nome: string }[]>([]);
-  const [selectedEscolas, setSelectedEscolas] = useState<string[]>([]);
   const { role: currentUserRole, isMasterAdmin, isSecretario, isAdmin } = useUserRole();
 
   useEffect(() => {
@@ -266,40 +266,77 @@ export default function Usuarios() {
     }
   }
 
-  async function handleAssignRole() {
-    if (!usuarioToAssign || !selectedRole) return;
+  function addPair() {
+    setProfilePairs(prev => [...prev, { role: '', escola_id: '' }]);
+  }
 
-    if (selectedRole !== 'admin' && selectedEscolas.length === 0) {
-      toast.error('Selecione pelo menos uma escola para este usuário.');
-      return;
+  function removePair(index: number) {
+    setProfilePairs(prev => prev.filter((_, i) => i !== index));
+  }
+
+  function updatePair(index: number, field: 'role' | 'escola_id', value: string) {
+    setProfilePairs(prev => prev.map((p, i) => i === index ? { ...p, [field]: value } : p));
+  }
+
+  async function handleAssignRole() {
+    if (!usuarioToAssign) return;
+
+    const isAdmin = profilePairs.length === 1 && profilePairs[0].role === 'admin';
+
+    if (!isAdmin) {
+      const incomplete = profilePairs.some(p => !p.role || !p.escola_id);
+      if (incomplete || profilePairs.length === 0) {
+        toast.error('Preencha cargo e escola em todas as entradas.');
+        return;
+      }
     }
 
     try {
+      // O role principal é o primeiro cargo da lista
+      const primaryRole = profilePairs[0].role;
+
       const payload: any = {
-        role: selectedRole,
-        status: 'ativo'
+        role: primaryRole,
+        status: 'ativo',
       };
 
-      if (selectedRole !== 'admin') {
-        payload.escolas = selectedEscolas;
-        payload.escola_id = selectedEscolas[0];
+      if (isAdmin) {
+        payload.roles = [];
+        payload.escolas = [];
+        payload.escola_id = null;
+      } else {
+        // Constrói o array roles[] com { role, escola_id, escola_nome }
+        payload.roles = profilePairs.map(pair => {
+          const escola = (escolasDisponiveis || []).find(e => e.id === pair.escola_id);
+          return {
+            role: pair.role,
+            escola_id: pair.escola_id,
+            escola_nome: escola?.nome ?? 'Escola não encontrada',
+          };
+        });
+        // Campos legados
+        payload.escolas = [...new Set(profilePairs.map(p => p.escola_id))];
+        payload.escola_id = profilePairs[0].escola_id;
       }
 
       await setDoc(doc(db, 'user_roles', usuarioToAssign.id), payload, { merge: true });
-      await logActivity(`atribuiu o perfil "${selectedRole}" para o usuário "${usuarioToAssign.nome}".`);
+      await logActivity(`atribuiu perfis para o usuário "${usuarioToAssign.nome}": ${profilePairs.map(p => `${p.role}`).join(', ')}.`);
 
-      setUsuarios(prev => prev.map(u => (u.id === usuarioToAssign.id ? { ...u, role: selectedRole, status: 'ativo', escolas: selectedEscolas } : u)));
+      setUsuarios(prev => prev.map(u => u.id === usuarioToAssign.id
+        ? { ...u, role: primaryRole, status: 'ativo', escolas: payload.escolas }
+        : u
+      ));
 
-      toast.success(`Perfil "${selectedRole}" atribuído com sucesso!`);
+      toast.success('Perfis atribuídos com sucesso!');
       setAssignDialogOpen(false);
       setUsuarioToAssign(null);
-      setSelectedRole('');
-      setSelectedEscolas([]);
+      setProfilePairs([{ role: '', escola_id: '' }]);
     } catch (error) {
       console.error('Sem permissão para atribuir perfil:', error);
       toast.error('Sem permissão para atribuir perfil');
     }
   }
+
 
   const columns = [
     { key: 'nome', header: 'Nome' },
@@ -378,8 +415,13 @@ export default function Usuarios() {
                 disabled={!canAct}
                 onClick={() => {
                   setUsuarioToAssign(item);
-                  setSelectedRole(item.role);
-                  setSelectedEscolas(item.escolas || []);
+                  // Restaura pares existentes de roles[] se disponível, senão cria par inicial
+                  const existingRoles = (item as any).roles as Array<{ role: string; escola_id: string }> | undefined;
+                  if (existingRoles && existingRoles.length > 0) {
+                    setProfilePairs(existingRoles.map(r => ({ role: r.role, escola_id: r.escola_id })));
+                  } else {
+                    setProfilePairs([{ role: item.role || '', escola_id: (item.escolas?.[0]) || '' }]);
+                  }
                   setAssignDialogOpen(true);
                 }}
                 title={canAct ? "Atribuir/Alterar perfil" : "Permissão negada"}
@@ -506,65 +548,68 @@ export default function Usuarios() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Atribuir Perfil</AlertDialogTitle>
-            <AlertDialogDescription>
-              Selecione o perfil para o usuário "{usuarioToAssign?.nome}". Ao atribuir um
-              perfil, o usuário será ativado e poderá acessar o sistema.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="py-4 space-y-4">
-            <Select value={selectedRole} onValueChange={setSelectedRole}>
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione um perfil" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Administrador</SelectItem>
-                <SelectItem value="gestor">Gestor</SelectItem>
-                <SelectItem value="pedagogo">Pedagogo</SelectItem>
-                <SelectItem value="secretario">Secretário</SelectItem>
-                <SelectItem value="professor">Professor</SelectItem>
-                <SelectItem value="estudante">Estudante</SelectItem>
-                <SelectItem value="responsavel">Responsável</SelectItem>
-              </SelectContent>
-            </Select>
+      <Dialog open={assignDialogOpen} onOpenChange={(open) => { setAssignDialogOpen(open); }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Atribuir Perfis — {usuarioToAssign?.nome}</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              Adicione um ou mais pares <strong>Cargo + Escola</strong>. Usuários com mais de um perfil verão um seletor ao fazer login.
+            </p>
+          </DialogHeader>
 
-            {selectedRole && selectedRole !== 'admin' && (
-              <div className="space-y-2 border rounded-md p-3">
-                <p className="text-sm font-medium mb-2">Escolas Vinculadas</p>
-                <div className="max-h-40 overflow-y-auto space-y-3">
-                  {escolasDisponiveis.map(escola => (
-                    <div key={escola.id} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`escola-${escola.id}`}
-                        checked={selectedEscolas.includes(escola.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedEscolas([...selectedEscolas, escola.id]);
-                          } else {
-                            setSelectedEscolas(selectedEscolas.filter(id => id !== escola.id));
-                          }
-                        }}
-                      />
-                      <label htmlFor={`escola-${escola.id}`} className="text-sm font-medium leading-none cursor-pointer">
-                        {escola.nome}
-                      </label>
-                    </div>
-                  ))}
-                </div>
+          <div className="space-y-3 py-2">
+            {profilePairs.map((pair, idx) => (
+              <div key={idx} className="flex gap-2 items-center">
+                {/* Cargo */}
+                <Select value={pair.role} onValueChange={v => updatePair(idx, 'role', v)}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Cargo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Administrador</SelectItem>
+                    <SelectItem value="gestor">Gestor</SelectItem>
+                    <SelectItem value="pedagogo">Pedagogo</SelectItem>
+                    <SelectItem value="secretario">Secretário</SelectItem>
+                    <SelectItem value="professor">Professor</SelectItem>
+                    <SelectItem value="estudante">Estudante</SelectItem>
+                    <SelectItem value="responsavel">Responsável</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {/* Escola — oculta para admin */}
+                {pair.role !== 'admin' && (
+                  <Select value={pair.escola_id} onValueChange={v => updatePair(idx, 'escola_id', v)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Escola" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(escolasDisponiveis || []).map(e => (
+                        <SelectItem key={e.id} value={e.id}>{e.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Remover par */}
+                {profilePairs.length > 1 && (
+                  <Button variant="ghost" size="icon" onClick={() => removePair(idx)} title="Remover">
+                    <Trash2 className="h-4 w-4 text-destructive" />
+                  </Button>
+                )}
               </div>
-            )}
+            ))}
+
+            <Button variant="outline" size="sm" onClick={addPair} className="w-full gap-2">
+              <span className="text-lg leading-none">+</span> Adicionar outro cargo / escola
+            </Button>
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleAssignRole} disabled={!selectedRole}>
-              Atribuir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAssignDialogOpen(false)}>Cancelar</Button>
+            <Button onClick={handleAssignRole}>Salvar perfis</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

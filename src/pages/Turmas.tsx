@@ -65,6 +65,9 @@ interface Estudante {
   matricula?: string;
   status?: string;
   turma_id?: string | null;
+  estudante_pcd?: boolean;
+  escola_id?: string;
+  excluido?: boolean;
 }
 
 export default function Turmas() {
@@ -319,10 +322,15 @@ export default function Turmas() {
       const querySnapshot = await getDocs(collection(db, 'estudantes'));
       // Bloqueia apenas estudantes definitivamente inativos;
       // 'Transferido' é permitido pois o estudante pode retornar e ser re-enturmado
-      const STATUS_BLOQUEADOS = ['Desistente', 'Concludente', 'Inativo'];
+      const STATUS_BLOQUEADOS = ['Desistente', 'Concluído'];
       const semTurma = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Estudante))
-        .filter(e => !e.turma_id && !STATUS_BLOQUEADOS.includes(e.status || ''))
+        .filter(e =>
+          !e.turma_id &&
+          !STATUS_BLOQUEADOS.includes(e.status || '') &&
+          e.excluido !== true &&
+          e.escola_id === escolaAtivaId
+        )
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       setEstudantesParaEnturmar(semTurma);
     } catch (error) {
@@ -358,15 +366,13 @@ export default function Turmas() {
 
       const batch = writeBatch(db);
 
-      // Atualiza turma_id de cada estudante
+      // Atualiza turma_id e status de cada estudante
       estudantesIds.forEach(id => {
         const estudanteRef = doc(db, 'estudantes', id);
-        const estudante = estudantesParaEnturmar.find(e => e.id === id);
-        const updates: Record<string, any> = { turma_id: turmaParaEnturmar.id };
-        // Se estava com status Transferido, volta para Frequentando ao ser enturmado novamente
-        if (estudante?.status === 'Transferido') {
-          updates.status = 'Frequentando';
-        }
+        const updates: Record<string, any> = {
+          turma_id: turmaParaEnturmar.id,
+          status: 'Frequentando'
+        };
         batch.update(estudanteRef, updates);
       });
       await batch.commit();
@@ -898,9 +904,14 @@ export default function Turmas() {
                         checked={selecaoEstudantes[estudante.id] || false}
                         onCheckedChange={(checked) => handleSelecaoEstudante(estudante.id, !!checked)}
                       />
-                      <Label htmlFor={`estudante-${estudante.id}`} className="flex-1 cursor-pointer">
-                        {estudante.nome}
-                        {estudante.matricula && <span className="ml-2 text-xs text-muted-foreground">({estudante.matricula})</span>}
+                      <Label htmlFor={`estudante-${estudante.id}`} className="flex-1 cursor-pointer flex items-center gap-2">
+                        {estudante.estudante_pcd && (
+                          <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                            DEF
+                          </span>
+                        )}
+                        <span>{estudante.nome}</span>
+                        {estudante.matricula && <span className="text-xs text-muted-foreground">({estudante.matricula})</span>}
                       </Label>
                     </div>
                   ))}

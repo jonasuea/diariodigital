@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2, Upload, Camera, UserCog } from 'lucide-react';
+import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Building, Loader2, Upload, Camera, UserCog, ToggleLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -33,6 +33,14 @@ export default function Configuracoes() {
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [newVersionAvailable, setNewVersionAvailable] = useState<{ version: string, notes: string } | null>(null);
 
+  // System global controls (shared with matriculaonline)
+  const [systemConfig, setSystemConfig] = useState({
+    manutencao: false,
+    matriculas_abertas: true,
+    manutencao_mensagem: 'Sistema em manutenção. Retornaremos em breve.',
+    matriculas_fechadas_msg: 'O período de matrículas está encerrado. Aguarde a abertura.',
+  });
+  const [savingSystem, setSavingSystem] = useState(false);
   const [escolaConfig, setEscolaConfig] = useState({
     inep: '',
     nome: 'Escola Municipal Nome da Escola',
@@ -110,6 +118,13 @@ export default function Configuracoes() {
             setPreferencias(data.preferencias);
             localStorage.setItem('telaCheiaPadrao', JSON.stringify(data.preferencias.telaCheiaPadrao || false));
           }
+        }
+
+        // Carregar configurações do sistema global
+        const sistemaDocRef = doc(db, 'configuracoes', 'sistema');
+        const sistemaSnap = await getDoc(sistemaDocRef);
+        if (sistemaSnap.exists()) {
+          setSystemConfig(prev => ({ ...prev, ...sistemaSnap.data() }));
         }
 
         // Carregar dados reais da escola atual
@@ -227,6 +242,23 @@ export default function Configuracoes() {
     } catch (error) {
       toast.error('Sem permissão para salvar preferências');
       console.error(error);
+    }
+  };
+
+  const handleSaveSystemConfig = async (update: Partial<typeof systemConfig>) => {
+    const newConfig = { ...systemConfig, ...update };
+    setSystemConfig(newConfig);
+    setSavingSystem(true);
+    try {
+      const ref = doc(db, 'configuracoes', 'sistema');
+      await setDoc(ref, newConfig, { merge: true });
+      await logActivity('atualizou as configurações globais do sistema.');
+      toast.success('Configuração salva!');
+    } catch (error) {
+      toast.error('Sem permissão para alterar configurações do sistema.');
+      console.error(error);
+    } finally {
+      setSavingSystem(false);
     }
   };
 
@@ -1054,6 +1086,92 @@ export default function Configuracoes() {
                     </Button>
                   </CardContent>
                 </Card>
+
+                {/* Controle do Sistema — apenas admin */}
+                {role === 'admin' && (
+                  <Card className="border-amber-200 bg-amber-50/50">
+                    <CardHeader className="pb-4">
+                      <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                        <ToggleLeft className="h-5 w-5 text-amber-600" />
+                        Controle do Sistema
+                      </CardTitle>
+                      <p className="text-xs text-muted-foreground">Afeta os dois sistemas em tempo real</p>
+                    </CardHeader>
+                    <CardContent className="space-y-5">
+                      {/* Manutenção */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-start gap-3">
+                          <Wrench className={`h-5 w-5 mt-0.5 ${systemConfig.manutencao ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                          <div>
+                            <p className="font-semibold">Modo Manutenção</p>
+                            <p className="text-sm text-muted-foreground">
+                              Exibe tela de manutenção nos dois sistemas
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={systemConfig.manutencao}
+                          disabled={savingSystem}
+                          onCheckedChange={(checked) => handleSaveSystemConfig({ manutencao: checked })}
+                        />
+                      </div>
+
+                      {/* Mensagem de manutenção editável */}
+                      {systemConfig.manutencao && (
+                        <div className="space-y-1 pl-8">
+                          <label className="text-xs text-muted-foreground font-medium">Mensagem de manutenção</label>
+                          <input
+                            className="w-full border border-border rounded-lg px-3 py-2 text-sm"
+                            value={systemConfig.manutencao_mensagem}
+                            onChange={(e) => setSystemConfig(prev => ({ ...prev, manutencao_mensagem: e.target.value }))}
+                            onBlur={() => handleSaveSystemConfig({ manutencao_mensagem: systemConfig.manutencao_mensagem })}
+                          />
+                        </div>
+                      )}
+
+                      <div className="border-t border-amber-200 pt-4" />
+
+                      {/* Matrículas Abertas */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-start gap-3">
+                          <School className={`h-5 w-5 mt-0.5 ${systemConfig.matriculas_abertas ? 'text-green-500' : 'text-muted-foreground'}`} />
+                          <div>
+                            <p className="font-semibold">Matrículas Abertas</p>
+                            <p className="text-sm text-muted-foreground">
+                              {systemConfig.matriculas_abertas
+                                ? 'Responsáveis podem realizar matrículas online'
+                                : 'Apenas a escola pode matricular via EducaFácil'}
+                            </p>
+                          </div>
+                        </div>
+                        <Switch
+                          checked={systemConfig.matriculas_abertas}
+                          disabled={savingSystem}
+                          onCheckedChange={(checked) => handleSaveSystemConfig({ matriculas_abertas: checked })}
+                        />
+                      </div>
+
+                      {/* Mensagem de matrículas fechadas editável */}
+                      {!systemConfig.matriculas_abertas && (
+                        <div className="space-y-1 pl-8">
+                          <label className="text-xs text-muted-foreground font-medium">Mensagem para o responsável</label>
+                          <input
+                            className="w-full border border-border rounded-lg px-3 py-2 text-sm"
+                            value={systemConfig.matriculas_fechadas_msg}
+                            onChange={(e) => setSystemConfig(prev => ({ ...prev, matriculas_fechadas_msg: e.target.value }))}
+                            onBlur={() => handleSaveSystemConfig({ matriculas_fechadas_msg: systemConfig.matriculas_fechadas_msg })}
+                          />
+                        </div>
+                      )}
+
+                      {savingSystem && (
+                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* Sistema e Versão */}
                 <Card>

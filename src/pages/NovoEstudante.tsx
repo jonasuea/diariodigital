@@ -19,18 +19,54 @@ import { collection, getDocs, addDoc, getDoc, doc, updateDoc, query, where } fro
 import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
+import { generateMatricula } from '@/lib/matriculaUtils';
 
 const ESTADOS_BR = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
   'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'
 ];
 
+/**
+ * Formata uma data para o padrão YYYY-MM-DD exigido pelo <input type="date">.
+ * Lida com formatos ISO e DD/MM/AAAA.
+ */
+const formatForInput = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
+  if (typeof dateStr === 'string' && dateStr.includes('/')) {
+    const parts = dateStr.split('/');
+    if (parts.length === 3) {
+      const [d, m, y] = parts;
+      return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+  }
+  return dateStr || '';
+};
+
 const SEXO_OPTIONS = ['Masculino', 'Feminino', 'Outro'];
 const RACA_COR_OPTIONS = ['Branca', 'Preta', 'Parda', 'Amarela', 'Indígena', 'Não declarada'];
 const MOVIMENTACAO_OPTIONS = ['Matrícula', 'Transferência Entrada', 'Transferência Saída', 'Remanejamento', 'Reclassificação'];
-const STATUS_OPTIONS = ['Frequentando', 'Transferido', 'Desistente', 'Concluído'];
+const STATUS_OPTIONS = ['Matriculado', 'Frequentando', 'Transferido', 'Desistente', 'Concluído'];
 const VACINACAO_OPTIONS = ['Não', '1ª Dose', '2ª Dose', '3ª Dose', '4ª Dose', '5ª Dose'];
 const TAMANHO_FARDA_OPTIONS = ['Infantil', 'PP', 'P', 'M', 'G', 'GG', 'XG'];
+const SERIE_OPTIONS = [
+  'Crianças Bem Pequenas I',
+  'Crianças Bem Pequenas II',
+  'Crianças Pequenas I',
+  'Crianças Pequenas II',
+  '1º Ano',
+  '2º Ano',
+  '3º Ano',
+  '4º Ano',
+  '5º Ano',
+  '6º Ano',
+  '7º Ano',
+  '8º Ano',
+  '9º Ano',
+  'EJA - Fase I',
+  'EJA - Fase II',
+  'EJA - Fase III',
+  'EJA - Fase IV'
+];
 
 
 const RESTRICOES_OPTIONS = [
@@ -126,7 +162,8 @@ const initialState = {
   cep: '',
   // Outros
   ano: new Date().getFullYear(),
-  turma_id: null as string | null,
+  fase: '',
+  turma_id: '' as string | null,
   // Responsável pelo estudante (extra aos dados de mãe/pai)
   responsavel_relacao: '',
   responsavel_nome: '',
@@ -230,7 +267,10 @@ export default function NovoEstudante() {
           cpf: preData.cpf || '',
           sexo: preData.sexo || '',
           endereco: preData.endereco || '',
+          data_nascimento: formatForInput(preData.data_nascimento),
           responsavel_nome: preData.responsavel_nome || '',
+          fase: preData.fase || '',
+          turma_id: '',
           // Você pode adicionar outros mapeamentos aqui
         });
       } else {
@@ -302,9 +342,10 @@ export default function NovoEstudante() {
         setFormData({
           ...initialState,
           ...estudanteData,
+          data_nascimento: formatForInput(estudanteData.data_nascimento),
           historico_academico: historico,
           restricoes_alimentares: estudanteData.restricoes_alimentares || [],
-          turma_id: estudanteData.turma_id || null,
+          turma_id: estudanteData.turma_id || '',
           responsavel_relacao: estudanteData.responsavel_relacao || '',
           responsavel_nome: estudanteData.responsavel_nome || '',
           responsavel_rg: estudanteData.responsavel_rg || '',
@@ -366,7 +407,7 @@ export default function NovoEstudante() {
       const newFormData = { ...prevFormData, [field]: value };
       // Ao transferir o estudante, remove a turma do cadastro
       if (field === 'status' && value === 'Transferido') {
-        newFormData.turma_id = null;
+        newFormData.turma_id = '';
       }
       console.log(`Campo '${field}' atualizado para:`, value);
       return newFormData;
@@ -508,8 +549,8 @@ export default function NovoEstudante() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.matricula || !formData.nome) {
-      toast.error('Os campos Nome e Matrícula são obrigatórios.');
+    if (!formData.nome) {
+      toast.error('O campo Nome é obrigatório.');
       return;
     }
 
@@ -522,34 +563,20 @@ export default function NovoEstudante() {
         return;
       }
 
-      // Verificar a unicidade da matrícula
-      const q = query(collection(db, 'estudantes'), where('matricula', '==', formData.matricula), where('escola_id', '==', escolaAtivaId));
-      const querySnapshot = await getDocs(q);
-
-      let isDuplicate = false;
-      if (!querySnapshot.empty) {
-        if (isEditing) {
-          if (querySnapshot.docs.some(doc => doc.id !== id)) {
-            isDuplicate = true;
-          }
-        } else {
-          isDuplicate = true;
-        }
-      }
-
-      if (isDuplicate) {
-        toast.error('O número de matrícula já está em uso por outro estudante.');
-        setLoading(false);
-        return;
+      let finalMatricula = formData.matricula;
+      if (!isEditing && !finalMatricula) {
+        finalMatricula = await generateMatricula();
       }
 
       // Se há turma selecionada, cria automaticamente o histórico do ano vigente
       let historicoAtualizado = [...(formData.historico_academico || [])];
-      if (formData.turma_id) {
+      const actualTurmaId = formData.turma_id === 'sem_turma' ? '' : formData.turma_id;
+
+      if (actualTurmaId) {
         try {
           // Busca turma e nome da escola em paralelo
           const [turmaSnap, configSnap] = await Promise.all([
-            getDoc(doc(db, 'turmas', formData.turma_id)),
+            getDoc(doc(db, 'turmas', actualTurmaId)),
             getDoc(doc(db, 'configuracoes', 'escola')),
           ]);
 
@@ -601,14 +628,23 @@ export default function NovoEstudante() {
         }
       }
 
-      const finalFormData = {
+      const dataToSave = {
         ...formData,
+        matricula: finalMatricula,
+        turma_id: actualTurmaId,
         historico_academico: historicoAtualizado,
+        escola_id: escolaAtivaId,
         nome_lower: formData.nome.toLowerCase(),
+        excluido: false,
+        updated_at: new Date().toISOString()
+      };
+
+      const finalFormData = {
+        ...dataToSave,
         // Transferidos ficam sem escola para poder ser rematriculado em qualquer unidade
-        escola_id: formData.status === 'Transferido' ? '' : escolaAtivaId,
+        escola_id: formData.status === 'Transferido' ? '' : dataToSave.escola_id,
         // Tambem remove a turma ao transferir
-        turma_id: formData.status === 'Transferido' ? null : formData.turma_id,
+        turma_id: formData.status === 'Transferido' ? null : dataToSave.turma_id,
       };
 
       if (isEditing && id) {
@@ -726,7 +762,7 @@ export default function NovoEstudante() {
               {/* Status e Informações Básicas */}
               <div className="space-y-4">
                 <h3 className="text-sm font-semibold text-muted-foreground">Status e Informações Básicas</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>Status do Estudante</Label>
                     <Select value={formData.status} onValueChange={(v) => handleChange('status', v)}>
@@ -738,24 +774,58 @@ export default function NovoEstudante() {
                   </div>
                   <div className="space-y-2">
                     <Label>Matrícula</Label>
-                    <Input placeholder="Número da matrícula" value={formData.matricula} onChange={(e) => handleChange('matricula', e.target.value)} required />
+                    <Input
+                      placeholder="Gerada automaticamente"
+                      value={formData.matricula}
+                      onChange={(e) => handleChange('matricula', e.target.value)}
+                      disabled={!isEditing}
+                    />
                   </div>
+                  <div className="space-y-2 md:col-span-1">
+                    <Label>Ano Letivo</Label>
+                    <Input type="number" value={formData.ano} onChange={(e) => handleChange('ano', parseInt(e.target.value))} required />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Nome Completo</Label>
                     <Input placeholder="Nome do estudante" value={formData.nome} onChange={(e) => handleChange('nome', e.target.value)} required />
                   </div>
-                  <div className="space-y-2">
-                    <Label>Turma</Label>
-                    <Select
-                      value={formData.turma_id || '__none__'}
-                      onValueChange={(v) => handleChange('turma_id', v === '__none__' ? null : v)}
-                    >
-                      <SelectTrigger><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">— Sem turma —</SelectItem>
-                        {turmas.map(t => <SelectItem key={t.id} value={t.id}>{t.nome} - {t.serie}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Classificação (Série)</Label>
+                      <Select
+                        value={formData.fase || 'sem_serie'}
+                        onValueChange={(val) => {
+                          const novaFase = val === 'sem_serie' ? '' : val;
+                          setFormData({
+                            ...formData,
+                            fase: novaFase,
+                            ...(novaFase === '' ? { turma_id: 'sem_turma' } : {})
+                          });
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecione a série" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sem_serie">— Sem classificação —</SelectItem>
+                          {SERIE_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Turma</Label>
+                      <Select
+                        value={formData.turma_id || 'sem_turma'}
+                        onValueChange={(v) => handleChange('turma_id', v)}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Selecione a turma" /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="sem_turma">— Sem turma —</SelectItem>
+                          {turmas.map(t => <SelectItem key={t.id} value={t.id}>{t.nome} - {t.serie}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               </div>

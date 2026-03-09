@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { printElement } from '@/lib/print-utils';
 
@@ -58,6 +58,47 @@ function fmtNota(n?: number | null): string {
     return n != null ? n.toFixed(1) : '-';
 }
 
+/**
+ * Parses a date string that could be in YYYY-MM-DD or DD/MM/YYYY format.
+ * Returns null if the date is invalid.
+ */
+const safeParseDate = (dateVal: any): Date | null => {
+    if (!dateVal) return null;
+
+    // Se já for um objeto Date
+    if (dateVal instanceof Date) return isValid(dateVal) ? dateVal : null;
+
+    // Se for um Timestamp do Firestore
+    if (typeof dateVal.toDate === 'function') {
+        const d = dateVal.toDate();
+        return isValid(d) ? d : null;
+    }
+
+    if (typeof dateVal !== 'string') return null;
+
+    // Tenta formato ISO (YYYY-MM-DD)
+    const isoDate = parseISO(dateVal);
+    if (isValid(isoDate) && isoDate.getFullYear() > 1900) {
+        return isoDate;
+    }
+
+    // Tenta formato brasileiro (DD/MM/AAAA)
+    if (dateVal.includes('/')) {
+        const parts = dateVal.split('/');
+        if (parts.length === 3) {
+            const day = parseInt(parts[0], 10);
+            const month = parseInt(parts[1], 10) - 1;
+            const year = parseInt(parts[2], 10);
+            const date = new Date(year, month, day);
+            if (isValid(date) && date.getFullYear() > 1900) {
+                return date;
+            }
+        }
+    }
+
+    return null;
+};
+
 export function DocumentPrintDialog({
     open, onOpenChange, title, type,
     estudanteNome, estudanteMatricula, estudanteNascimento, rg, cpf, responsavelNome, responsavelRg,
@@ -66,8 +107,9 @@ export function DocumentPrintDialog({
 }: DocumentPrintDialogProps) {
     const printRef = useRef<HTMLDivElement>(null);
     const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
-    const dataNasc = estudanteNascimento
-        ? format(parseISO(estudanteNascimento), 'dd/MM/yyyy', { locale: ptBR })
+    const parsedNasc = safeParseDate(estudanteNascimento);
+    const dataNasc = parsedNasc
+        ? format(parsedNasc, 'dd/MM/yyyy', { locale: ptBR })
         : 'Não informado';
 
     const enderecoCompleto = [endereco, bairro, cidade, estado]

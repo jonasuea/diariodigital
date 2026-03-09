@@ -20,6 +20,7 @@ interface Estudante {
   id: string;
   nome: string;
   matricula: string;
+  estudante_pcd?: boolean;
 }
 
 interface Nota {
@@ -111,7 +112,7 @@ export default function Notas() {
       }
 
       // Load Estudantes da turma
-      const estudantesQuery = query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), where('turma_id', '==', turmaId), where('status', 'in', ['Ativo', 'Frequentando']), orderBy('nome'));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), where('turma_id', '==', turmaId), where('status', '==', 'Frequentando'), orderBy('nome'));
       const estudantesSnapshot = await getDocs(estudantesQuery);
       const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
       setEstudantes(estudantesData.sort((a, b) => a.nome.localeCompare(b.nome)));
@@ -501,7 +502,14 @@ export default function Notas() {
                       return (
                         <tr key={estudante.id} className="border-t">
                           <td className="p-3">
-                            <div className="font-medium">{estudante.nome}</div>
+                            <div className="font-medium flex items-center">
+                              {estudante.estudante_pcd && (
+                                <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mr-1.5 leading-none">
+                                  DEF
+                                </span>
+                              )}
+                              <span>{estudante.nome}</span>
+                            </div>
                             <div className="text-xs text-muted-foreground">{estudante.matricula}</div>
                           </td>
                           <td colSpan={4} className="p-4 text-center text-muted-foreground text-sm">-</td>
@@ -522,7 +530,14 @@ export default function Notas() {
                       return (
                         <tr key={estudante.id} className="border-t">
                           <td className="p-3">
-                            <div className="font-medium">{estudante.nome}</div>
+                            <div className="font-medium flex items-center">
+                              {estudante.estudante_pcd && (
+                                <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mr-1.5 leading-none">
+                                  DEF
+                                </span>
+                              )}
+                              <span>{estudante.nome}</span>
+                            </div>
                             <div className="text-xs text-muted-foreground">{estudante.matricula}</div>
                           </td>
                           <td className="p-4">

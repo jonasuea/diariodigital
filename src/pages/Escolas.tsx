@@ -192,7 +192,7 @@ export default function Escolas() {
 
     return (
         <AppLayout title="Gestão de Escolas">
-            <main className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+            <div className="space-y-6 animate-fade-in">
                 <div className="flex items-center justify-between">
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight">Escolas</h2>
@@ -216,16 +216,14 @@ export default function Escolas() {
                     </div>
                 </div>
 
-                <div className="mobile-safe-area">
-                    <DataTable
-                        columns={columns}
-                        data={escolas}
-                        loading={loading}
-                        emptyMessage="Nenhuma escola encontrada"
-                        mobileTitleKey="nome"
-                        mobileSubtitleKey="inep"
-                    />
-                </div>
+                <DataTable
+                    columns={columns}
+                    data={escolas}
+                    loading={loading}
+                    emptyMessage="Nenhuma escola encontrada"
+                    mobileTitleKey="nome"
+                    mobileSubtitleKey="inep"
+                />
 
                 {/* FAB for Nova Escola on Mobile */}
                 <div className="md:hidden fixed bottom-6 right-6 z-50">
@@ -341,7 +339,7 @@ export default function Escolas() {
                     </DialogContent>
                 </Dialog>
 
-            </main>
+            </div>
         </AppLayout>
     );
 }

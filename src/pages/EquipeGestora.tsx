@@ -10,12 +10,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Search, Eye, Pencil, Trash2, Upload, Download } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { RotateCcw, Trash } from 'lucide-react';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { useUserRole } from '@/hooks/useUserRole';
 import Papa from 'papaparse';
+import { generateMatriculasBatch } from '@/lib/matriculaUtils';
 
 interface Membro {
   id: string;
@@ -94,28 +95,78 @@ export default function EquipeGestora() {
     if (!membroToDelete) return;
 
     try {
+      const now = new Date();
+      const deletedBy = isMasterAdmin ? 'Master Admin' : 'Admin/Gestor';
+
       if (isMasterAdmin && showDeleted) {
+        // Exclusão permanente
         await deleteDoc(doc(db, 'equipe_gestora', membroToDelete.id));
+        // Remove conta de usuário vinculada (doc.id === uid para membros da equipe gestora)
+        try {
+          await deleteDoc(doc(db, 'user_roles', membroToDelete.id));
+          await deleteDoc(doc(db, 'profiles', membroToDelete.id));
+        } catch (_) { /* conta pode não existir */ }
         await logActivity(`Excluiu permanentemente o membro da equipe gestora "${membroToDelete.nome}"`);
         toast.success('Membro excluído permanentemente!');
       } else {
         const docRef = doc(db, 'equipe_gestora', membroToDelete.id);
         await updateDoc(docRef, {
           excluido: true,
-          excluido_em: new Date(),
-          excluido_por: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor'
+          excluido_em: now,
+          excluido_por: deletedBy
         } as any);
+        // Desativa conta de usuário vinculada
+        try {
+          const userRoleRef = doc(db, 'user_roles', membroToDelete.id);
+          const snap = await getDoc(userRoleRef);
+          if (snap.exists()) {
+            await setDoc(userRoleRef, { status: 'inativo', excluido: true, excluido_em: now, excluido_por: deletedBy }, { merge: true });
+          }
+          const profileRef = doc(db, 'profiles', membroToDelete.id);
+          const pSnap = await getDoc(profileRef);
+          if (pSnap.exists()) {
+            await updateDoc(profileRef, { excluido: true, excluido_em: now, excluido_por: deletedBy } as any);
+          }
+        } catch (_) { /* conta pode não existir */ }
         await logActivity(`Moveu o membro da equipe gestora "${membroToDelete.nome}" para a lixeira`);
         toast.success('Membro movido para a lixeira!');
       }
       fetchMembros();
-    } catch (error) {
-      toast.error('Sem permissão para excluir membro');
-      console.error(error);
     } finally {
       setDeleteDialogOpen(false);
       setMembroToDelete(null);
     }
+  }
+
+
+  async function fixMissingExcluido() {
+    if (!escolaAtivaId) return;
+    setLoading(true);
+    try {
+      // Busca todos os membros da escola ativa sem filtrar por excluido
+      const allDocs = await getDocs(query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId)));
+      let updatedCount = 0;
+
+      for (const d of allDocs.docs) {
+        const data = d.data();
+        // Se o campo excluido não existe, define como false
+        if (data.excluido === undefined) {
+          await updateDoc(doc(db, 'equipe_gestora', d.id), { excluido: false });
+          updatedCount++;
+        }
+      }
+
+      if (updatedCount > 0) {
+        toast.success(`${updatedCount} registros corrigidos!`);
+        fetchMembros();
+      } else {
+        toast.info('Nenhum registro precisava de correção.');
+      }
+    } catch (error) {
+      toast.error('Erro ao corrigir registros');
+      console.error(error);
+    }
+    setLoading(false);
   }
 
   async function handleReactivate(membro: Membro) {
@@ -177,56 +228,48 @@ export default function EquipeGestora() {
       const membrosData = result.data as any[];
       let successCount = 0;
       let errorCount = 0;
-      let skippedCount = 0;
 
-      // Otimização: Carregar matrículas existentes da escola local
-      const matriculasSnapshot = await getDocs(query(collection(db, 'equipe_gestora'), where('escola_id', '==', escolaAtivaId), where('matricula', '!=', '')));
-      const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
-      const matriculasInCsv = new Set();
-
+      // Coletar membros válidos antes de salvar
+      const validMembros: any[] = [];
       for (const row of membrosData) {
+        if (!row.nome || !row.email || !row.cargo) {
+          errorCount++;
+          continue;
+        }
+
+        let formacoes = [];
+        if (row.formacoes) {
+          try {
+            formacoes = JSON.parse(row.formacoes);
+            if (!Array.isArray(formacoes)) formacoes = [];
+          } catch (e) {
+            formacoes = [];
+          }
+        }
+
+        validMembros.push({
+          nome: row.nome.trim(),
+          email: row.email.trim(),
+          rg: row.rg?.trim() || '',
+          cpf: row.cpf?.trim() || '',
+          contato: row.contato?.trim() || '',
+          cargo: row.cargo.trim(),
+          status: row.status?.trim() || 'Lotado',
+          data_lotacao: row.data_lotacao?.trim() || '',
+          biografia: row.biografia?.trim() || '',
+          link_lattes: row.link_lattes?.trim() || '',
+          formacoes,
+          escola_id: escolaAtivaId,
+          excluido: false,
+        });
+      }
+
+      // Gerar matrículas em lote (GEST) para todos os válidos
+      const matriculas = await generateMatriculasBatch(validMembros.length, 'GEST', 'gestores');
+
+      for (let i = 0; i < validMembros.length; i++) {
         try {
-          if (!row.nome || !row.email || !row.cargo) {
-            errorCount++;
-            continue;
-          }
-
-          const matricula = row.matricula?.trim();
-          if (matricula) {
-            if (existingMatriculas.has(matricula) || matriculasInCsv.has(matricula)) {
-              skippedCount++;
-              continue; // Pula o registro
-            }
-            matriculasInCsv.add(matricula);
-          }
-
-          let formacoes = [];
-          if (row.formacoes) {
-            try {
-              formacoes = JSON.parse(row.formacoes);
-              if (!Array.isArray(formacoes)) formacoes = [];
-            } catch (e) {
-              formacoes = [];
-            }
-          }
-
-          const membroData = {
-            nome: row.nome.trim(),
-            email: row.email.trim(),
-            matricula: matricula || '',
-            rg: row.rg?.trim() || '',
-            cpf: row.cpf?.trim() || '',
-            contato: row.contato?.trim() || '',
-            cargo: row.cargo.trim(),
-            status: row.status?.trim() || 'Lotado',
-            data_lotacao: row.data_lotacao?.trim() || '',
-            biografia: row.biografia?.trim() || '',
-            link_lattes: row.link_lattes?.trim() || '',
-            formacoes,
-            escola_id: escolaAtivaId,
-            excluido: false,
-          };
-          await addDoc(collection(db, 'equipe_gestora'), membroData);
+          await addDoc(collection(db, 'equipe_gestora'), { ...validMembros[i], matricula: matriculas[i] });
           successCount++;
         } catch (error) {
           errorCount++;
@@ -234,7 +277,6 @@ export default function EquipeGestora() {
       }
 
       if (successCount > 0) toast.success(`${successCount} membros importados com sucesso!`);
-      if (skippedCount > 0) toast.info(`${skippedCount} membros foram ignorados por já terem uma matrícula existente.`);
       if (errorCount > 0) toast.warning(`${errorCount} linhas não puderam ser importadas.`);
 
       fetchMembros();

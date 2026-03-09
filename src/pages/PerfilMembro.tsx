@@ -9,7 +9,7 @@ import { ArrowLeft, Mail, Phone, GraduationCap, Calendar, FileText, User, Pencil
 import { db, storage } from '@/lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Formacao {

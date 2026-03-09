@@ -17,6 +17,7 @@ import { collection, doc, getDoc, addDoc, updateDoc, setDoc, getDocs, query, whe
 import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
+import { generateMatricula } from '@/lib/matriculaUtils';
 
 interface Formacao {
   id: string;
@@ -35,6 +36,7 @@ export default function NovoMembro() {
   const isEditing = !!id;
 
   const [loading, setLoading] = useState(false);
+  const [escolas, setEscolas] = useState<{ id: string; nome: string }[]>([]);
   const [uploadingPdf, setUploadingPdf] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const pdfInputRef = useRef<HTMLInputElement>(null);
@@ -54,6 +56,8 @@ export default function NovoMembro() {
     arquivo_url: '',
     biografia: '',
     link_lattes: '',
+    excluido: false,
+    escola_id: escolaAtivaId || '',
     role: 'gestor', // Adicionando o estado para o perfil de acesso
   });
 
@@ -125,10 +129,29 @@ export default function NovoMembro() {
   }
 
   useEffect(() => {
+    fetchEscolas();
     if (isEditing) {
       loadMembro();
     }
-  }, [id]);
+  }, [id, escolaAtivaId]);
+
+  async function fetchEscolas() {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'escolas'));
+      const escolasData = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        nome: doc.data().nome
+      }));
+      setEscolas(escolasData);
+
+      // Se estiver criando e já tiver escolaAtivaId, garante que está no formData
+      if (!isEditing && escolaAtivaId) {
+        setFormData(prev => ({ ...prev, escola_id: escolaAtivaId }));
+      }
+    } catch (error) {
+      console.error('Erro ao buscar escolas:', error);
+    }
+  }
 
   async function loadMembro() {
     if (!id) return;
@@ -152,6 +175,8 @@ export default function NovoMembro() {
           arquivo_url: data.arquivo_url || '',
           biografia: data.biografia || '',
           link_lattes: data.link_lattes || '',
+          excluido: data.excluido ?? false,
+          escola_id: data.escola_id || escolaAtivaId || '',
           role: data.role || 'gestor',
         });
         if (data.formacoes && Array.isArray(data.formacoes)) {
@@ -191,11 +216,12 @@ export default function NovoMembro() {
       ...formData,
       nome_lower: formData.nome.toLowerCase(),
       formacoes: formacoes.filter(f => f.curso),
-      escola_id: escolaAtivaId,
+      escola_id: formData.escola_id,
+      excluido: formData.excluido ?? false,
     };
 
     try {
-      if (!escolaAtivaId) {
+      if (!formData.escola_id) {
         toast.error('Nenhuma escola selecionada. Operação cancelada.');
         setLoading(false);
         return;
@@ -239,13 +265,16 @@ export default function NovoMembro() {
           password: 'EDUCAFACIL2026', // Senha padrão inicial
           nome: formData.nome,
           role: formData.role,
-          escola_id: escolaAtivaId
+          escola_id: formData.escola_id
         });
 
         const { uid } = result.data as { uid: string };
 
+        // Gera matrícula automática no padrão GEST
+        const novaMatricula = await generateMatricula('GEST', 'gestores');
+
         // Cria o documento na coleção equipe_gestora vinculado ao UID criado
-        await setDoc(doc(db, 'equipe_gestora', uid), payload);
+        await setDoc(doc(db, 'equipe_gestora', uid), { ...payload, matricula: novaMatricula });
 
         await logActivity(`cadastrou o novo membro da equipe "${formData.nome}".`);
         toast.success('Membro cadastrado com sucesso! O usuário já pode acessar o sistema.');
@@ -346,13 +375,12 @@ export default function NovoMembro() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="matricula">Matrícula*</Label>
+                    <Label htmlFor="matricula">Matrícula</Label>
                     <Input
                       id="matricula"
-                      placeholder="Número de matrícula"
+                      placeholder="Gerado automaticamente"
                       value={formData.matricula}
-                      onChange={(e) => setFormData({ ...formData, matricula: e.target.value })}
-                      required
+                      disabled
                     />
                   </div>
                 </div>
@@ -399,6 +427,20 @@ export default function NovoMembro() {
                       onChange={(e) => setFormData({ ...formData, contato: e.target.value })}
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="escola_id">Escola*</Label>
+                  <Select value={formData.escola_id} onValueChange={(value) => setFormData({ ...formData, escola_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione a escola de lotação" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {escolas.map((school) => (
+                        <SelectItem key={school.id} value={school.id}>{school.nome}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">

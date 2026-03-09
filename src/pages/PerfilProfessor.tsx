@@ -15,7 +15,7 @@ import {
 import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -120,6 +120,54 @@ export default function PerfilProfessor() {
       setLoading(false);
     }
   }
+
+  /**
+   * Parses a date string that could be in YYYY-MM-DD or DD/MM/YYYY format.
+   * Returns null if the date is invalid.
+   */
+  const safeParseDate = (dateVal: any): Date | null => {
+    if (!dateVal) return null;
+
+    // Se já for um objeto Date
+    if (dateVal instanceof Date) return isValid(dateVal) ? dateVal : null;
+
+    // Se for um Timestamp do Firestore
+    if (typeof dateVal.toDate === 'function') {
+      const d = dateVal.toDate();
+      return isValid(d) ? d : null;
+    }
+
+    if (typeof dateVal !== 'string') return null;
+
+    // Tenta formato ISO (YYYY-MM-DD)
+    const isoDate = parseISO(dateVal);
+    if (isValid(isoDate) && isoDate.getFullYear() > 1900) {
+      return isoDate;
+    }
+
+    // Tenta formato brasileiro (DD/MM/AAAA)
+    if (dateVal.includes('/')) {
+      const parts = dateVal.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const date = new Date(year, month, day);
+        if (isValid(date) && date.getFullYear() > 1900) {
+          return date;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return 'Não informada';
+    const parsed = safeParseDate(dateString);
+    if (!parsed) return 'Data inválida';
+    return format(parsed, 'dd/MM/yyyy');
+  };
 
   const getStatusColor = (status: string | null) => {
     switch (status) {

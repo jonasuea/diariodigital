@@ -19,6 +19,7 @@ interface Estudante {
   id: string;
   nome: string;
   matricula: string;
+  estudante_pcd?: boolean;
 }
 
 interface FrequenciaRecord {
@@ -463,8 +464,13 @@ export default function Frequencia() {
                       <tr key={estudante.id} className="hover:bg-muted/50 transition-colors group">
                         {/* Coluna Nome — sticky, bg sólido para os dias não transparecerem */}
                         <td className="px-3 py-2 border-b border-r bg-background sticky left-0 z-20 shadow-[2px_0_8px_-2px_rgba(0,0,0,0.12)] group-hover:bg-muted/60 transition-colors align-middle min-w-[150px] w-[150px] sm:min-w-[220px] sm:w-[220px]">
-                          <span className="font-medium truncate text-sm sm:text-sm block w-full overflow-hidden" title={estudante.nome}>
-                            {estudante.nome}
+                          <span className="font-medium truncate text-sm sm:text-sm flex items-center w-full overflow-hidden" title={estudante.nome}>
+                            {estudante.estudante_pcd && (
+                              <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 mr-1.5 leading-none">
+                                DEF
+                              </span>
+                            )}
+                            <span className="truncate">{estudante.nome}</span>
                           </span>
                         </td>
                         {/* Células dos dias */}

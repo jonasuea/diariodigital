@@ -1,4 +1,4 @@
-import { Search, Bell, Menu, User, School, Briefcase, Loader2 } from 'lucide-react';
+import { Search, Bell, Menu, User, School, Briefcase, Loader2, LogOut, Globe } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,10 +7,10 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useSidebar } from '@/components/ui/sidebar';
 import { useState, useEffect } from 'react';
 import { useDebounce } from '@/hooks/use-debounce';
-import { collection, query, where, getDocs, orderBy, limit, doc, getDoc, documentId } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, doc, getDoc, documentId } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { useAutoUpdate } from '@/hooks/useAutoUpdate';
@@ -34,7 +34,7 @@ interface UserProfile {
 }
 
 export function AppHeader({ title }: AppHeaderProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
   const { role, escolaAtivaId, setEscolaAtivaId, isAdmin, permittedEscolas } = useUserRole();
   const { toggleSidebar, isMobile } = useSidebar();
   const navigate = useNavigate();
@@ -209,172 +209,199 @@ export function AppHeader({ title }: AppHeaderProps) {
     return s.charAt(0).toUpperCase() + s.slice(1);
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate("/");
+    } catch (error) {
+      console.error("Erro ao sair:", error);
+    }
+  };
+
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b bg-card px-3 md:px-6">
-      {isMobile && (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          className="md:hidden"
-        >
-          <Menu className="h-5 w-5" />
-        </Button>
-      )}
-
-      {title && (
-        <h1 className="text-lg md:text-xl font-bold text-foreground truncate max-w-[120px] sm:max-w-none">
-          {title}
-        </h1>
-      )}
-
-      <div className="flex-1" />
-
-      {(isAdmin || (permittedEscolas && permittedEscolas.length > 1)) && (
-        <>
-          <div className="w-[300px] lg:w-[400px] hidden md:block mr-2">
-            <Select
-              value={escolaAtivaId || undefined}
-              onValueChange={(val) => {
-                setEscolaAtivaId(val);
-                sessionStorage.setItem('escolaAtivaId', val);
-                window.location.reload(); // Força recarregamento contextual
-              }}
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 w-full">
+        <div className="flex items-center gap-4">
+          {isMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleSidebar}
+              className="md:hidden text-primary hover:bg-primary/10 mr-1"
             >
-              <SelectTrigger className="h-9">
-                <div className="flex items-center gap-2 truncate">
-                  <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <span className="truncate">
-                    {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || 'Selecione uma Escola'}
-                  </span>
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                {escolasDisponiveis.map(esc => (
-                  <SelectItem key={esc.id} value={esc.id}>{esc.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          <div className="flex flex-col">
+            <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-tight sm:tracking-widest leading-tight line-clamp-1 max-w-[120px] xs:max-w-none">
+              Prefeitura de Itacoatiara – SEMED
+            </span>
           </div>
+        </div>
 
-          <div className="md:hidden mr-2">
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="icon" className="h-9 w-9" title="Trocar Escola">
-                  <School className="h-4 w-4 text-primary" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[90vw] rounded-lg">
-                <DialogHeader>
-                  <DialogTitle>Trocar de Escola</DialogTitle>
-                  <DialogDescription>
-                    Selecione a unidade escolar que deseja acessar.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-2 py-4">
-                  {escolasDisponiveis.map(esc => (
-                    <Button
-                      key={esc.id}
-                      variant={escolaAtivaId === esc.id ? "default" : "outline"}
-                      className="justify-start h-12"
-                      onClick={() => {
-                        setEscolaAtivaId(esc.id);
-                        sessionStorage.setItem('escolaAtivaId', esc.id);
-                        window.location.reload();
-                      }}
-                    >
-                      <School className="mr-2 h-4 w-4" />
-                      <span className="truncate">{esc.nome}</span>
-                    </Button>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </>
-      )}
-
-      {role !== 'estudante' && (
-        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-
-          <PopoverTrigger asChild>
-            <div className="relative flex-1 max-w-[12rem] sm:max-w-none md:max-w-[32rem]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                type="search"
-                placeholder="Buscar..."
-                className="w-full pl-9 bg-secondary border-0 transition-all h-9"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                onFocus={() => {
-                  if (searchQuery.length > 1) {
-                    setIsPopoverOpen(true);
-                  }
-                }}
-              />
-            </div>
-          </PopoverTrigger>
-          <PopoverContent className="w-40 sm:w-64 lg:w-[32rem] p-0" align="start" onOpenAutoFocus={(e) => e.preventDefault()}>
-            {isSearching ? (
-              <div className="flex items-center justify-center p-4">
-                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-              </div>
-            ) : searchResults.length > 0 ? (
-              <div className="py-2">
-                {searchResults.map(result => (
-                  <div
-                    key={result.id}
-                    className="flex items-center gap-3 px-3 py-2 hover:bg-muted cursor-pointer"
-                    onClick={() => handleResultClick(result)}
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={result.foto_url} />
-                      <AvatarFallback>{result.nome.substring(0, 2).toUpperCase()}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">{result.nome}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{result.tipo}</p>
+        <div className="flex items-center gap-2 sm:gap-4 flex-1 justify-end">
+          {(isAdmin || (permittedEscolas && permittedEscolas.length > 1)) && (
+            <>
+              {/* Desktop School Select */}
+              <div className="w-[300px] lg:w-[400px] hidden md:block mr-2">
+                <Select
+                  value={escolaAtivaId || undefined}
+                  onValueChange={(val) => {
+                    setEscolaAtivaId(val);
+                    sessionStorage.setItem('escolaAtivaId', val);
+                    window.location.reload(); // Força recarregamento contextual
+                  }}
+                >
+                  <SelectTrigger className="h-9">
+                    <div className="flex items-center gap-2 truncate">
+                      <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <span className="truncate">
+                        {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || 'Selecione uma Escola'}
+                      </span>
                     </div>
-                    {getTipoIcon(result.tipo)}
-                  </div>
-                ))}
+                  </SelectTrigger>
+                  <SelectContent>
+                    {escolasDisponiveis.map(esc => (
+                      <SelectItem key={esc.id} value={esc.id}>{esc.nome}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <p className="p-4 text-sm text-center text-muted-foreground">
-                {debouncedSearchQuery.length > 1 ? 'Nenhum resultado encontrado.' : 'Digite para buscar...'}
-              </p>
+
+              <div className="md:hidden mr-2">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-9 w-9" title="Trocar Escola">
+                      <School className="h-4 w-4 text-primary" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-[90vw] rounded-lg">
+                    <DialogHeader>
+                      <DialogTitle>Trocar de Escola</DialogTitle>
+                      <DialogDescription>
+                        Selecione a unidade escolar que deseja acessar.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2 py-4">
+                      {escolasDisponiveis.map(esc => (
+                        <Button
+                          key={esc.id}
+                          variant={escolaAtivaId === esc.id ? "default" : "outline"}
+                          className="justify-start h-12"
+                          onClick={() => {
+                            setEscolaAtivaId(esc.id);
+                            sessionStorage.setItem('escolaAtivaId', esc.id);
+                            window.location.reload();
+                          }}
+                        >
+                          <School className="mr-2 h-4 w-4" />
+                          <span className="truncate">{esc.nome}</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </>
+          )}
+
+          {role !== 'estudante' && (
+            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+              <PopoverTrigger asChild>
+                <div className="relative w-full sm:w-64 max-w-[100px] xs:max-w-[140px] sm:max-w-none md:max-w-[16rem] ml-1 sm:ml-2">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    placeholder="Busca..."
+                    className="w-full pl-8 bg-gray-100 border-transparent focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    onFocus={() => {
+                      if (searchQuery.length > 1) {
+                        setIsPopoverOpen(true);
+                      }
+                    }}
+                  />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 sm:w-80 p-0" align="end" onOpenAutoFocus={(e) => e.preventDefault()}>
+                {isSearching ? (
+                  <div className="flex items-center justify-center p-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="py-2">
+                    {searchResults.map(result => (
+                      <div
+                        key={result.id}
+                        className="flex items-center gap-3 px-3 py-2 hover:bg-muted cursor-pointer"
+                        onClick={() => handleResultClick(result)}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={result.foto_url} />
+                          <AvatarFallback>{result.nome.substring(0, 2).toUpperCase()}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{result.nome}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{result.tipo}</p>
+                        </div>
+                        {getTipoIcon(result.tipo)}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="p-4 text-sm text-center text-muted-foreground">
+                    {debouncedSearchQuery.length > 1 ? 'Nenhum resultado encontrado.' : 'Digite para buscar...'}
+                  </p>
+                )}
+              </PopoverContent>
+            </Popover>
+          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="relative hidden sm:flex text-gray-500 hover:text-primary hover:bg-gray-100"
+            onClick={() => navigate('/configuracoes')}
+          >
+            <Bell className="h-5 w-5" />
+            {hasUpdate && (
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
             )}
-          </PopoverContent>
-        </Popover>
-      )}
+          </Button>
 
+          {/* Language Indicator GovBR */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 border-l border-gray-200">
+            <Globe className="w-4 h-4 text-gray-400" />
+            <span className="text-xs font-bold text-gray-600">PT-BR</span>
+          </div>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        className="relative"
-        onClick={() => navigate('/configuracoes')}
-      >
-        <Bell className="h-5 w-5" />
-        {hasUpdate && (
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
-        )}
-      </Button>
+          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-gray-200">
+            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-gray-200 shadow-sm shrink-0">
+              <AvatarImage src={userProfile?.foto_url} />
+              <AvatarFallback className="bg-primary/10 text-primary text-[10px] sm:text-sm font-bold">
+                {getInitials(userProfile?.nome || user?.email)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="hidden lg:block mr-2">
+              <p className="text-sm font-bold text-gray-900 truncate max-w-[120px]">
+                {userProfile?.nome || user?.email}
+              </p>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{capitalize(role)}</p>
+            </div>
 
-      <div className="flex items-center gap-3">
-        <Avatar className="h-9 w-9">
-          <AvatarImage src={userProfile?.foto_url} />
-          <AvatarFallback className="bg-primary text-primary-foreground text-sm font-medium">
-            {getInitials(userProfile?.nome || user?.email)}
-          </AvatarFallback>
-        </Avatar>
-        <div className="hidden lg:block">
-          <p className="text-sm font-medium text-foreground truncate max-w-[150px]">
-            {userProfile?.nome || user?.email}
-          </p>
-          <p className="text-xs text-muted-foreground">{capitalize(role)}</p>
+            <button
+              onClick={handleLogout}
+              className="font-body font-semibold text-gray-600 hover:text-primary hover:bg-gray-100 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden md:flex"
+            >
+              Sair
+            </button>
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="md:hidden text-gray-500 hover:text-primary">
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
-    </header>
+    </header >
   );
 }

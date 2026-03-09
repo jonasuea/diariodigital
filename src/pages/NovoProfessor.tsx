@@ -18,6 +18,7 @@ import { collection, doc, getDoc, addDoc, updateDoc, query, where, getDocs, setD
 import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
+import { generateMatricula } from '@/lib/matriculaUtils';
 
 interface Formacao {
   id: string;
@@ -297,9 +298,13 @@ export default function NovoProfessor() {
 
         const { uid } = result.data as { uid: string };
 
+        // Gera matrícula automática no padrão PROF
+        const novaMatricula = await generateMatricula('PROF', 'professores');
+
         // Cria o documento na coleção professores vinculado ao UID criado
         await setDoc(doc(db, 'professores', uid), {
           ...payload,
+          matricula: novaMatricula,
           usuario_id: uid
         });
 
@@ -402,13 +407,12 @@ export default function NovoProfessor() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="matricula">Matrícula*</Label>
+                    <Label htmlFor="matricula">Matrícula</Label>
                     <Input
                       id="matricula"
-                      placeholder="Número de matrícula"
+                      placeholder="Gerado automaticamente"
                       value={formData.matricula}
-                      onChange={(e) => setFormData({ ...formData, matricula: e.target.value })}
-                      required
+                      disabled
                     />
                   </div>
                 </div>

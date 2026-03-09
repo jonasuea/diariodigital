@@ -255,7 +255,7 @@ export default function DiarioDigital() {
             <h3 className="font-bold text-sm text-foreground">Filtros do Diário</h3>
             {selectedTurmaId && (
               <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                Ativo
+                Frequentando
               </span>
             )}
           </div>

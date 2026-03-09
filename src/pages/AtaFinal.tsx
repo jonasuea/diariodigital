@@ -60,7 +60,7 @@ export default function AtaFinal() {
         setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
       }
 
-      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', turmaId), where('status', '==', 'Ativo'), orderBy('nome'));
+      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', turmaId), where('status', '==', 'Frequentando'), orderBy('nome'));
       const estudantesSnapshot = await getDocs(estudantesQuery);
       const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
       setestudantes(estudantesData);
@@ -148,7 +148,7 @@ export default function AtaFinal() {
                   <p><strong>INEP:</strong> ________________</p>
                   <p><strong>CURSO:</strong> ENSINO FUNDAMENTAL</p>
                   <p><strong>TURMA:</strong> {turma?.nome}</p>
-                  <p><strong>Estudantes Ativos:</strong> {Estudantes.length}</p>
+                  <p><strong>Estudantes Frequentando:</strong> {Estudantes.length}</p>
                 </div>
                 <div className="space-y-2">
                   <p><strong>ESTABELECIMENTO DE ENSINO:</strong> ________________</p>

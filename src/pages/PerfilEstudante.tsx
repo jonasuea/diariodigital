@@ -18,8 +18,51 @@ import {
 import { doc, getDoc, collection, query, where, getDocs, Timestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { toast } from 'sonner';
-import { format, parseISO, startOfMonth, endOfMonth, addMonths } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, addMonths, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+
+/**
+ * Parses a date string that could be in YYYY-MM-DD or DD/MM/YYYY format.
+ * Returns null if the date is invalid.
+ */
+const safeParseDate = (dateVal: any): Date | null => {
+  if (!dateVal) return null;
+
+  // Se já for um objeto Date
+  if (dateVal instanceof Date) return isValid(dateVal) ? dateVal : null;
+
+  // Se for um Timestamp do Firestore
+  if (typeof dateVal.toDate === 'function') {
+    const d = dateVal.toDate();
+    return isValid(d) ? d : null;
+  }
+
+  if (typeof dateVal !== 'string') return null;
+
+  // Tenta formato ISO (YYYY-MM-DD)
+  const isoDate = parseISO(dateVal);
+  if (isValid(isoDate) && isoDate.getFullYear() > 1900) {
+    return isoDate;
+  }
+
+  // Tenta formato brasileiro (DD/MM/AAAA)
+  if (dateVal.includes('/')) {
+    const parts = dateVal.split('/');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const year = parseInt(parts[2], 10);
+      const date = new Date(year, month, day);
+      if (isValid(date) && date.getFullYear() > 1900) {
+        return date;
+      }
+    }
+  }
+
+  // Tentativa genérica
+  const genericDate = new Date(dateVal);
+  return isValid(genericDate) ? genericDate : null;
+};
 
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -521,7 +564,11 @@ export default function PerfilEstudante() {
                           Sem turma
                         </Badge>
                       )}
-                      <Badge variant="default" className="bg-green-100 text-green-800 font-semibold text-xs px-3 py-1">
+                      <Badge variant="default" className={`font-semibold text-xs px-3 py-1 ${estudante.status === 'Frequentando' ? 'bg-green-100 text-green-800' :
+                          estudante.status === 'Desistente' || estudante.status === 'Transferido' ? 'bg-muted text-muted-foreground' :
+                            estudante.status === 'Concluído' ? 'bg-blue-100 text-blue-800' :
+                              'bg-warning/10 text-warning'
+                        }`}>
                         {estudante.status}
                       </Badge>
                     </div>
@@ -534,7 +581,12 @@ export default function PerfilEstudante() {
                       <Calendar className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
                       <div>
                         <p className="text-xs font-medium text-muted-foreground">Data de Nascimento</p>
-                        <p className="font-medium text-sm">{estudante.data_nascimento ? format(parseISO(estudante.data_nascimento), "dd/MM/yyyy", { locale: ptBR }) : 'Não informado'}</p>
+                        <p className="font-medium text-sm">
+                          {(() => {
+                            const date = safeParseDate(estudante.data_nascimento);
+                            return date ? format(date, "dd/MM/yyyy", { locale: ptBR }) : 'Não informado';
+                          })()}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
@@ -628,7 +680,7 @@ export default function PerfilEstudante() {
                               {Array.from(new Set([
                                 String(estudante?.ano || new Date().getFullYear()),
                                 ...(estudante?.historico_academico?.map(h => h.ano_letivo) || [])
-                              ])).sort((a, b) => b.localeCompare(a)).map(year => (
+                              ].filter(Boolean))).sort((a, b) => b.localeCompare(a)).map(year => (
                                 <SelectItem key={year} value={String(year)}>{year}</SelectItem>
                               ))}
                             </SelectContent>

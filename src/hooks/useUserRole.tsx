@@ -45,6 +45,12 @@ const allMenuItems: MenuItem[] = [
   { title: 'Manual de Uso', url: '/manual-uso', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante'] },
 ];
 
+export interface UserProfile {
+  role: string;
+  escola_id: string;
+  escola_nome: string;
+}
+
 interface UserRoleContextType {
   role: string | null;
   escolaAtivaId: string | null;
@@ -61,9 +67,16 @@ interface UserRoleContextType {
   permittedEscolas: string[];
   menuItems: MenuItem[];
   isInMaintenance: boolean;
+  // Multi-profile support
+  availableProfiles: UserProfile[];
+  activeProfile: UserProfile | null;
+  setActiveProfile: (profile: UserProfile) => void;
+  needsProfileSelection: boolean;
 }
 
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined);
+
+const SESSION_ACTIVE_PROFILE_KEY = 'activeProfile';
 
 export function UserRoleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -74,12 +87,29 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [isInMaintenance, setIsInMaintenance] = useState(false);
+  const [availableProfiles, setAvailableProfiles] = useState<UserProfile[]>([]);
+  const [activeProfile, setActiveProfileState] = useState<UserProfile | null>(null);
+
+  // Persist and apply a chosen profile
+  function setActiveProfile(profile: UserProfile) {
+    setActiveProfileState(profile);
+    setRole(profile.role);
+    setEscolaAtivaId(profile.escola_id);
+    setPermittedEscolas([profile.escola_id]);
+    sessionStorage.setItem(SESSION_ACTIVE_PROFILE_KEY, JSON.stringify(profile));
+    sessionStorage.setItem('escolaAtivaId', profile.escola_id);
+
+    const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes(profile.role));
+    setMenuItems(accessibleItems);
+  }
 
   useEffect(() => {
     async function fetchUserRole() {
       if (!user) {
         setRole(null);
         setMenuItems([]);
+        setAvailableProfiles([]);
+        setActiveProfileState(null);
         setLoading(false);
         return;
       }
@@ -100,6 +130,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         let userRole = null;
         let dbEscolaId = null;
         let dbEscolas: string[] = [];
+        let dbRoles: UserProfile[] = [];
 
         if (userDoc.exists()) {
           const data = userDoc.data();
@@ -107,11 +138,43 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           setIsMaster(data.is_master || false);
           dbEscolaId = data.escola_id || null;
           dbEscolas = data.escolas || [];
+          dbRoles = data.roles || [];
         }
 
+        // ─── Multi-profile path ───────────────────────────────────────────────
+        if (dbRoles.length > 1) {
+          setAvailableProfiles(dbRoles);
+
+          // Restore saved profile from session if still valid
+          const savedJson = sessionStorage.getItem(SESSION_ACTIVE_PROFILE_KEY);
+          if (savedJson) {
+            try {
+              const saved: UserProfile = JSON.parse(savedJson);
+              const isValid = dbRoles.some(p => p.role === saved.role && p.escola_id === saved.escola_id);
+              if (isValid) {
+                setActiveProfile(saved);
+                setLoading(false);
+                return;
+              }
+            } catch (_) { /* invalid data — ignore */ }
+          }
+
+          // No valid saved profile → picker needed; leave role null
+          setLoading(false);
+          return;
+        }
+
+        // ─── Single-profile shortcut: roles array with exactly 1 entry ───────
+        if (dbRoles.length === 1) {
+          setAvailableProfiles(dbRoles);
+          setActiveProfile(dbRoles[0]);
+          setLoading(false);
+          return;
+        }
+
+        // ─── Legacy path (no roles[] array) ──────────────────────────────────
         setRole(userRole);
 
-        // Se o usuário tiver array de escolas (professores em múltiplas escolas)
         if (dbEscolas.length > 0) {
           setPermittedEscolas(dbEscolas);
           const savedEscola = sessionStorage.getItem('escolaAtivaId');
@@ -121,16 +184,12 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
             setEscolaAtivaId(dbEscolas[0]);
             sessionStorage.setItem('escolaAtivaId', dbEscolas[0]);
           }
-        }
-        // fallback para o campo antigo escola_id (gestores etc)
-        else if (dbEscolaId && userRole !== 'admin') {
+        } else if (dbEscolaId && userRole !== 'admin') {
           setEscolaAtivaId(dbEscolaId);
           setPermittedEscolas([dbEscolaId]);
           sessionStorage.setItem('escolaAtivaId', dbEscolaId);
-        }
-        else if (userRole === 'admin') {
+        } else if (userRole === 'admin') {
           setPermittedEscolas([]);
-          // Se for admin, tenta pegar a última vista, senão null
           const savedEscola = sessionStorage.getItem('escolaAtivaId');
           if (savedEscola) {
             setEscolaAtivaId(savedEscola);
@@ -143,11 +202,9 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
             let snap = await getDocs(q);
 
             if (snap.empty && user.email) {
-              // Busca por email do próprio estudante
               q = query(collection(db, 'estudantes'), where('email', '==', user.email.toLowerCase()), limit(1));
               snap = await getDocs(q);
 
-              // Se não encontrou e for responsável, busca pelo email_responsavel
               if (snap.empty) {
                 q = query(collection(db, 'estudantes'), where('email_responsavel', '==', user.email.toLowerCase()), limit(1));
                 snap = await getDocs(q);
@@ -155,7 +212,6 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
             }
 
             const estId = snap.empty ? 'not-found' : snap.docs[0].id;
-            const roleLabel = userRole === 'estudante' ? 'estudante' : 'responsavel';
 
             setMenuItems([
               { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['estudante', 'responsavel'] },
@@ -182,8 +238,6 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
 
       } catch (error) {
         console.error('Error fetching user role data:', error);
-        // Só limpa tudo se o erro acontecer ANTES de definirmos menus de um user logado, ou se realmente for crítico.
-        // O log acima vai nos guiar se tiver alguma permissão caindo aqui.
       } finally {
         setLoading(false);
       }
@@ -200,6 +254,9 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const isProfessor = role === 'professor';
   const isEstudante = role === 'estudante';
   const isResponsavel = role === 'responsavel';
+
+  // True when user has multiple profiles but hasn't selected one yet for this session
+  const needsProfileSelection = availableProfiles.length > 1 && activeProfile === null && !loading;
 
   return (
     <UserRoleContext.Provider
@@ -218,7 +275,11 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         isResponsavel,
         permittedEscolas,
         menuItems,
-        isInMaintenance
+        isInMaintenance,
+        availableProfiles,
+        activeProfile,
+        setActiveProfile,
+        needsProfileSelection,
       }}
     >
       {children}

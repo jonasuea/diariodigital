@@ -20,7 +20,7 @@ export default function Auth() {
   const [estudanteId, setEstudanteId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
-  const { role, loading: loadingRole } = useUserRole();
+  const { role, loading: loadingRole, needsProfileSelection } = useUserRole();
 
   useEffect(() => {
     if (user && role === 'estudante') {
@@ -51,6 +51,10 @@ export default function Auth() {
   }
 
   if (user) {
+    if (needsProfileSelection) {
+      return <Navigate to="/escolha-perfil" replace />;
+    }
+
     if (role === 'estudante') {
       if (!estudanteId) {
         return (

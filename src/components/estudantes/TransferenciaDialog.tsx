@@ -1,7 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Printer } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { printContainer } from '@/lib/print-utils';
 
@@ -49,13 +49,79 @@ interface TransferenciaDialogProps {
     estudante: Estudante;
 }
 
+/**
+ * Parses a date string that could be in YYYY-MM-DD or DD/MM/YYYY format.
+ * Returns null if the date is invalid.
+ */
+const safeParseDate = (dateVal: any): Date | null => {
+    if (!dateVal) return null;
+
+    try {
+        // Se já for um objeto Date
+        if (dateVal instanceof Date) {
+            return isValid(dateVal) ? dateVal : null;
+        }
+
+        // Se for um Timestamp do Firestore
+        if (dateVal && typeof dateVal.toDate === 'function') {
+            const d = dateVal.toDate();
+            return isValid(d) ? d : null;
+        }
+
+        if (typeof dateVal !== 'string') return null;
+
+        // Se for string vazia ou apenas espaços
+        if (!dateVal.trim()) return null;
+
+        // Tenta formato ISO (YYYY-MM-DD)
+        const isoDate = parseISO(dateVal);
+        if (isValid(isoDate) && isoDate.getFullYear() > 1900) {
+            return isoDate;
+        }
+
+        // Tenta formato brasileiro (DD/MM/AAAA)
+        if (dateVal.includes('/')) {
+            const parts = dateVal.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+
+                if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                    const date = new Date(year, month, day);
+                    if (isValid(date) && date.getFullYear() > 1900) {
+                        return date;
+                    }
+                }
+            }
+        }
+
+        // Tentativa generica com new Date()
+        const generic = new Date(dateVal);
+        if (isValid(generic) && generic.getFullYear() > 1900) {
+            return generic;
+        }
+
+    } catch (e) {
+        console.error("Erro ao processar data:", e);
+    }
+
+    return null;
+};
+
 export function TransferenciaDialog({ open, onOpenChange, estudante }: TransferenciaDialogProps) {
 
     const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
 
-    const dataNasc = estudante.data_nascimento
-        ? format(parseISO(estudante.data_nascimento), 'dd/MM/yyyy', { locale: ptBR })
-        : 'Não informado';
+    let dataNasc = 'Não informado';
+    try {
+        const parsedNasc = safeParseDate(estudante.data_nascimento);
+        if (parsedNasc && isValid(parsedNasc)) {
+            dataNasc = format(parsedNasc, 'dd/MM/yyyy', { locale: ptBR });
+        }
+    } catch (error) {
+        console.error("Erro ao formatar data de nascimento:", error);
+    }
 
     const endereco = [estudante.endereco, estudante.bairro, estudante.cidade, estudante.estado]
         .filter(Boolean)

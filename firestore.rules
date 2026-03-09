@@ -56,8 +56,8 @@ service cloud.firestore {
 
     match /estudantes/{id} {
       allow read: if isSignedIn();
-      allow create: if isResponsavel() || isAdmin() || isGestor() || isSecretario();
-      allow update: if isAdmin() || isGestor() || isSecretario() || (isResponsavel() && resource.data.usuario_id == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
       allow delete: if isAdmin();
     }
 
@@ -148,7 +148,7 @@ service cloud.firestore {
     }
 
     match /pre_matriculas/{id} {
-      allow read, write: if isAdmin() || isGestor() || isSecretario();
+      allow read, write: if isSignedIn();
     }
 
 

@@ -26,6 +26,7 @@ interface DataTableProps<T> {
   loading?: boolean;
   mobileTitleKey?: string;
   mobileSubtitleKey?: string;
+  rowClassName?: (item: T) => string;
 }
 
 export function DataTable<T extends { id: number | string }>({
@@ -36,6 +37,7 @@ export function DataTable<T extends { id: number | string }>({
   loading = false,
   mobileTitleKey,
   mobileSubtitleKey,
+  rowClassName,
 }: DataTableProps<T>) {
   if (loading) {
     return (
@@ -79,7 +81,8 @@ export function DataTable<T extends { id: number | string }>({
                   onClick={() => onRowClick?.(item)}
                   className={cn(
                     "transition-colors",
-                    onRowClick && "cursor-pointer hover:bg-muted/50"
+                    onRowClick && "cursor-pointer hover:bg-muted/50",
+                    rowClassName && rowClassName(item)
                   )}
                 >
                   {columns.map((column) => (
@@ -116,7 +119,7 @@ export function DataTable<T extends { id: number | string }>({
             const detailCols = columns.filter(c => c.key !== titleCol?.key && c.key !== subtitleCol?.key && c.key !== 'actions');
 
             return (
-              <Card key={item.id} className="overflow-hidden border-border shadow-sm">
+              <Card key={item.id} className={cn("overflow-hidden border-border shadow-sm", rowClassName && rowClassName(item))}>
                 <CardHeader className="p-4 pb-2">
                   <div className="flex justify-between items-start">
                     <div className="space-y-1">

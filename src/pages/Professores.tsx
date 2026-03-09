@@ -9,12 +9,13 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Search, Eye, Pencil, Trash2, Upload, Download } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, deleteDoc, addDoc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { RotateCcw, Trash } from 'lucide-react';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 import { useUserRole } from '@/hooks/useUserRole';
+import { generateMatriculasBatch } from '@/lib/matriculaUtils';
 
 interface Professor {
   id: string;
@@ -100,17 +101,39 @@ export default function Professores() {
     if (!professorToDelete) return;
 
     try {
+      const now = new Date();
+      const deletedBy = isMasterAdmin ? 'Master Admin' : 'Admin/Gestor';
+
       if (isMasterAdmin && showDeleted) {
+        // Exclusão permanente
         await deleteDoc(doc(db, 'professores', professorToDelete.id));
+        // Remove conta de usuário vinculada (doc.id === uid para professores)
+        try {
+          await deleteDoc(doc(db, 'user_roles', professorToDelete.id));
+          await deleteDoc(doc(db, 'profiles', professorToDelete.id));
+        } catch (_) { /* conta pode não existir */ }
         await logActivity(`Excluiu permanentemente o professor "${professorToDelete.nome}"`);
         toast.success('Professor excluído permanentemente!');
       } else {
         const docRef = doc(db, 'professores', professorToDelete.id);
         await updateDoc(docRef, {
           excluido: true,
-          excluido_em: new Date(),
-          excluido_por: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor'
+          excluido_em: now,
+          excluido_por: deletedBy
         } as any);
+        // Desativa conta de usuário vinculada
+        try {
+          const userRoleRef = doc(db, 'user_roles', professorToDelete.id);
+          const snap = await getDoc(userRoleRef);
+          if (snap.exists()) {
+            await setDoc(userRoleRef, { status: 'inativo', excluido: true, excluido_em: now, excluido_por: deletedBy }, { merge: true });
+          }
+          const profileRef = doc(db, 'profiles', professorToDelete.id);
+          const pSnap = await getDoc(profileRef);
+          if (pSnap.exists()) {
+            await updateDoc(profileRef, { excluido: true, excluido_em: now, excluido_por: deletedBy } as any);
+          }
+        } catch (_) { /* conta pode não existir */ }
         await logActivity(`Moveu o professor "${professorToDelete.nome}" para a lixeira`);
         toast.success('Professor movido para a lixeira!');
       }
@@ -123,6 +146,7 @@ export default function Professores() {
       setProfessorToDelete(null);
     }
   }
+
 
   async function handleReactivate(professor: Professor) {
     try {
@@ -188,69 +212,60 @@ export default function Professores() {
       const professoresData = result.data as any[];
       let successCount = 0;
       let errorCount = 0;
-      let skippedCount = 0;
 
-      // Otimização: Carregar matrículas existentes do tenant
-      const matriculasSnapshot = await getDocs(query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('matricula', '!=', '')));
-      const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
-      const matriculasInCsv = new Set();
-
+      // Coletar professores válidos antes de salvar
+      const validProfessores: any[] = [];
       for (const row of professoresData) {
+        if (!row.nome || !row.email) {
+          errorCount++;
+          continue;
+        }
+
+        let formacoes = [];
+        if (row.formacoes) {
+          try {
+            formacoes = JSON.parse(row.formacoes);
+            if (!Array.isArray(formacoes)) formacoes = [];
+          } catch (e) {
+            formacoes = [];
+          }
+        }
+
+        validProfessores.push({
+          nome: row.nome.trim(),
+          email: row.email.trim(),
+          rg: row.rg?.trim() || '',
+          cpf: row.cpf?.trim() || '',
+          contato: row.contato?.trim() || null,
+          status_funcional: row.status_funcional?.trim() || 'Lotado',
+          data_lotacao: row.data_lotacao?.trim() || '',
+          link_lattes: row.link_lattes?.trim() || '',
+          biografia: row.biografia?.trim() || '',
+          componentes: row.componentes ? row.componentes.split(',').map((d: string) => d.trim()) : [],
+          series: row.series ? row.series.split(',').map((s: string) => s.trim()) : [],
+          formacoes,
+          ativo: row.ativo ? (row.ativo.toLowerCase() === 'true' || row.ativo === '1') : true,
+          componente: row.componentes ? row.componentes.split(',')[0].trim() : '',
+          escola_id: escolaAtivaId,
+          excluido: false,
+        });
+      }
+
+      // Gerar matrículas em lote (PROF) para todos os válidos
+      const matriculas = await generateMatriculasBatch(validProfessores.length, 'PROF', 'professores');
+
+      for (let i = 0; i < validProfessores.length; i++) {
         try {
-          if (!row.nome || !row.email) {
-            errorCount++;
-            continue;
-          }
-
-          const matricula = row.matricula?.trim();
-          if (matricula) {
-            if (existingMatriculas.has(matricula) || matriculasInCsv.has(matricula)) {
-              skippedCount++;
-              continue; // Pula o registro
-            }
-            matriculasInCsv.add(matricula);
-          }
-
-          let formacoes = [];
-          if (row.formacoes) {
-            try {
-              formacoes = JSON.parse(row.formacoes);
-              if (!Array.isArray(formacoes)) formacoes = [];
-            } catch (e) {
-              formacoes = [];
-            }
-          }
-
-          const professorData = {
-            nome: row.nome.trim(),
-            email: row.email.trim(),
-            matricula: matricula || '',
-            rg: row.rg?.trim() || '',
-            cpf: row.cpf?.trim() || '',
-            contato: row.contato?.trim() || null,
-            status_funcional: row.status_funcional?.trim() || 'Lotado',
-            data_lotacao: row.data_lotacao?.trim() || '',
-            link_lattes: row.link_lattes?.trim() || '',
-            biografia: row.biografia?.trim() || '',
-            componentes: row.componentes ? row.componentes.split(',').map((d: string) => d.trim()) : [],
-            series: row.series ? row.series.split(',').map((s: string) => s.trim()) : [],
-            formacoes,
-            ativo: row.ativo ? (row.ativo.toLowerCase() === 'true' || row.ativo === '1') : true,
-            componente: row.componentes ? row.componentes.split(',')[0].trim() : '',
-            escola_id: escolaAtivaId,
-            excluido: false,
-          };
-          await addDoc(collection(db, 'professores'), professorData);
+          await addDoc(collection(db, 'professores'), { ...validProfessores[i], matricula: matriculas[i] });
           successCount++;
         } catch (error) {
           errorCount++;
-          console.error('Sem permissão para importar linha:', row, error);
+          console.error('Erro ao importar professor:', validProfessores[i], error);
         }
       }
 
       if (successCount > 0) toast.success(`${successCount} professores importados com sucesso!`);
-      if (skippedCount > 0) toast.info(`${skippedCount} professores foram ignorados por já terem uma matrícula existente.`);
-      if (errorCount > 0) toast.warning(`${errorCount} linhas não puderam ser importadas. Verifique a consola para mais detalhes.`);
+      if (errorCount > 0) toast.warning(`${errorCount} linhas não puderam ser importadas.`);
 
       fetchProfessores();
     } catch (error) {
@@ -409,9 +424,7 @@ export default function Professores() {
           </div>
         </div>
 
-        <div className="mobile-safe-area">
-          <DataTable columns={columns} data={professores} loading={loading} emptyMessage="Nenhum professor encontrado" />
-        </div>
+        <DataTable columns={columns} data={professores} loading={loading} emptyMessage="Nenhum professor encontrado" />
 
         {/* Dialog de Importação CSV */}
         <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>

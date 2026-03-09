@@ -8,18 +8,21 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Plus, Search, Pencil, Trash2, Eye, Upload, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc, updateDoc, addDoc, limit, startAfter } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, doc, getDoc, deleteDoc, updateDoc, addDoc, limit, startAfter, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import Papa from 'papaparse';
 import { useUserRole } from '@/hooks/useUserRole';
 import { logActivity } from '@/lib/logger';
-import { RotateCcw, Trash } from 'lucide-react';
+import { generateMatriculasBatch } from '@/lib/matriculaUtils';
+import { RotateCcw, Trash, ListFilter } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Estudante {
   id: string;
   nome: string;
   matricula: string;
   ano: number;
+  fase?: string;
   status: string;
   turma_id: string | null;
   turma_nome?: string;
@@ -40,80 +43,182 @@ export default function Estudantes() {
   const [estudanteToDelete, setEstudanteToDelete] = useState<Estudante | null>(null);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'escola' | 'sem-turma' | 'rede'>('escola');
+  const [statusFilter, setStatusFilter] = useState<string>('todos');
 
   const PAGE_SIZE = 20;
 
   useEffect(() => {
     fetchEstudantes();
-  }, [search, escolaAtivaId, showDeleted]);
+  }, [search, escolaAtivaId, showDeleted, activeTab, statusFilter]);
 
   async function fetchEstudantes(next = false) {
     setLoading(true);
     try {
       const searchLower = search.trim().toLowerCase();
-      let estudantesQuery;
+      const currentYear = new Date().getFullYear();
 
-      if (searchLower) {
-        // Busca global por nome na rede (qualquer escola, com ou sem turma)
-        estudantesQuery = query(
+      // ── Aba REDE DE ENSINO ── admin only, query simples, todos os estudantes ──
+      if (activeTab === 'rede') {
+        let redeQuery = query(
           collection(db, 'estudantes'),
-          where('nome_lower', '>=', searchLower),
-          where('nome_lower', '<=', searchLower + '\uf8ff'),
-          orderBy('nome_lower'),
-          limit(PAGE_SIZE + 1)
-        );
-      } else {
-        if (!escolaAtivaId) {
-          setLoading(false);
-          return;
-        }
-
-        // Comportamento padrão: Estudantes da escola ativa OU transferidos OR sem escola
-        estudantesQuery = query(
-          collection(db, 'estudantes'),
-          where('escola_id', 'in', [escolaAtivaId, '']),
           where('excluido', '==', showDeleted),
           orderBy('nome'),
           limit(PAGE_SIZE + 1)
         );
-      }
 
-      if (next && lastVisible) {
-        estudantesQuery = query(estudantesQuery, startAfter(lastVisible));
-      }
-
-      const snap = await getDocs(estudantesQuery);
-      let docs = snap.docs;
-
-      const hasNext = docs.length > PAGE_SIZE;
-      const displayDocs = hasNext ? docs.slice(0, PAGE_SIZE) : docs;
-
-      setHasMore(hasNext);
-      if (displayDocs.length > 0) {
-        setLastVisible(displayDocs[displayDocs.length - 1]);
-      }
-
-      const estudantesData = await Promise.all(displayDocs.map(async (estudanteDoc) => {
-        const data = estudanteDoc.data() as Omit<Estudante, 'id' | 'turma_nome'>;
-        let turma_nome: string | undefined = '-';
-
-        if (data.turma_id) {
-          const turmaDocRef = doc(db, 'turmas', data.turma_id);
-          const turmaDoc = await getDoc(turmaDocRef);
-          if (turmaDoc.exists()) {
-            turma_nome = turmaDoc.data().nome;
-          }
+        if (searchLower) {
+          redeQuery = query(
+            collection(db, 'estudantes'),
+            where('nome_lower', '>=', searchLower),
+            where('nome_lower', '<=', searchLower + '\uf8ff'),
+            orderBy('nome_lower'),
+            limit(PAGE_SIZE + 1)
+          );
         }
 
-        return {
-          id: estudanteDoc.id,
-          ...data,
-          turma_nome,
-        };
-      }));
+        if (next && lastVisible) redeQuery = query(redeQuery, startAfter(lastVisible));
 
-      setEstudantes(estudantesData);
-      if (!next) setPage(1);
+        const snap = await getDocs(redeQuery);
+        const docs = snap.docs;
+        const hasNext = docs.length > PAGE_SIZE;
+        const displayDocs = hasNext ? docs.slice(0, PAGE_SIZE) : docs;
+        setHasMore(hasNext);
+        if (displayDocs.length > 0) setLastVisible(displayDocs[displayDocs.length - 1]);
+
+        const data = await Promise.all(displayDocs.map(async (d) => {
+          const dd = d.data() as any;
+          let turma_nome = '-';
+          if (dd.turma_id) {
+            const tDoc = await getDoc(doc(db, 'turmas', dd.turma_id));
+            if (tDoc.exists()) turma_nome = tDoc.data().nome;
+          }
+          return { id: d.id, ...dd, turma_nome };
+        }));
+        setEstudantes(data);
+        if (!next) setPage(1);
+        setLoading(false);
+        return;
+      }
+
+      // ── Aba SEM TURMA (REDE) ─────────────────────────────────────────────────
+      // Estudantes livres: sem turma (turma_id == '') OU com status Transferido
+      if (activeTab === 'sem-turma') {
+        // Firestore não suporta OR entre campos diferentes, então fazemos 2 queries e mesclamos
+        const [semTurmaSnap, transferidosSnap] = await Promise.all([
+          getDocs(query(
+            collection(db, 'estudantes'),
+            where('turma_id', '==', ''),
+            where('excluido', '==', false),
+            orderBy('nome'),
+            limit(200) // razoável para rede
+          )),
+          getDocs(query(
+            collection(db, 'estudantes'),
+            where('status', '==', 'Transferido'),
+            where('excluido', '==', false),
+            orderBy('nome'),
+            limit(200)
+          ))
+        ]);
+
+        // Mescla e deduplica por doc.id
+        const allDocs = new Map<string, any>();
+        [...semTurmaSnap.docs, ...transferidosSnap.docs].forEach(d => allDocs.set(d.id, d));
+        let merged = Array.from(allDocs.values());
+
+        // Filtro por nome (client-side, pois veio de 2 queries)
+        if (searchLower) {
+          merged = merged.filter(d => (d.data().nome_lower || d.data().nome?.toLowerCase() || '').includes(searchLower));
+        }
+
+        merged.sort((a, b) => (a.data().nome || '').localeCompare(b.data().nome || ''));
+
+        const data = await Promise.all(merged.map(async (d) => {
+          const dd = d.data() as any;
+          return { id: d.id, ...dd, turma_nome: '-' }; // sem turma por definição
+        }));
+        setEstudantes(data);
+        setHasMore(false);
+        if (!next) setPage(1);
+        setLoading(false);
+        return;
+      }
+
+      // ── Aba ESTUDANTES DA ESCOLA ─────────────────────────────────────────────
+      // Enturmados na escola ativa no ano corrente (status: Matriculado, Frequentando, Desistente)
+      if (activeTab === 'escola') {
+        if (!escolaAtivaId) {
+          setEstudantes([]);
+          setLoading(false);
+          return;
+        }
+
+        let baseQuery = query(
+          collection(db, 'estudantes'),
+          where('escola_id', '==', escolaAtivaId),
+          where('ano', '==', currentYear),
+          where('excluido', '==', showDeleted)
+        );
+
+        // Filtro de status configurável pelo usuário
+        if (statusFilter !== 'todos') {
+          if (statusFilter === 'sem_status') {
+            // Não é possível filtrar por "campo ausente" no Firestore com query simples.
+            // Vamos trazer todos e filtrar no client.
+          } else {
+            baseQuery = query(baseQuery, where('status', '==', statusFilter));
+          }
+        } else {
+          // Padrão: apenas enturmados com status ativos (excluímos Transferido e Concluído da view da escola)
+          baseQuery = query(baseQuery, where('status', 'in', ['Matriculado', 'Frequentando', 'Desistente', '']));
+        }
+
+        let estudantesQuery = query(baseQuery, orderBy('nome'), limit(PAGE_SIZE + 1));
+
+        if (searchLower) {
+          estudantesQuery = query(
+            collection(db, 'estudantes'),
+            where('escola_id', '==', escolaAtivaId),
+            where('nome_lower', '>=', searchLower),
+            where('nome_lower', '<=', searchLower + '\uf8ff'),
+            where('excluido', '==', showDeleted),
+            orderBy('nome_lower'),
+            limit(PAGE_SIZE + 1)
+          );
+        }
+
+        if (next && lastVisible) estudantesQuery = query(estudantesQuery, startAfter(lastVisible));
+
+        const snap = await getDocs(estudantesQuery);
+        let docs = snap.docs;
+
+        // Filtro client-side para sem_status (quando os outros filtros não conseguem cobrir)
+        if (statusFilter === 'sem_status') {
+          docs = docs.filter(d => {
+            const s = d.data().status;
+            return !s || s === '' || s === 'pendente';
+          });
+        }
+
+        const hasNext = docs.length > PAGE_SIZE;
+        const displayDocs = hasNext ? docs.slice(0, PAGE_SIZE) : docs;
+        setHasMore(hasNext);
+        if (displayDocs.length > 0) setLastVisible(displayDocs[displayDocs.length - 1]);
+
+        const estudantesData = await Promise.all(displayDocs.map(async (estudanteDoc) => {
+          const data = estudanteDoc.data() as any;
+          let turma_nome: string | undefined = '-';
+          if (data.turma_id) {
+            const turmaDoc = await getDoc(doc(db, 'turmas', data.turma_id));
+            if (turmaDoc.exists()) turma_nome = turmaDoc.data().nome;
+          }
+          return { id: estudanteDoc.id, ...data, turma_nome };
+        }));
+
+        setEstudantes(estudantesData);
+        if (!next) setPage(1);
+      }
     } catch (error) {
       toast.error('Sem permissão para carregar estudantes');
       console.error(error);
@@ -121,6 +226,7 @@ export default function Estudantes() {
       setLoading(false);
     }
   }
+
 
   const handleNextPage = () => {
     setPage(prev => prev + 1);
@@ -145,10 +251,10 @@ export default function Estudantes() {
     if (!estudanteToDelete) return;
 
     try {
-      if (isMasterAdmin && showDeleted) {
-        // Exclusão definitiva apenas para Master Admin na lixeira
+      if (showDeleted) {
+        // Exclusão definitiva se o estudante já estiver na lixeira
         await deleteDoc(doc(db, 'estudantes', estudanteToDelete.id));
-        await logActivity(`Estudante ${estudanteToDelete.nome} excluído permanentemente por ${isMasterAdmin ? 'Master Admin' : 'Admin'}`);
+        await logActivity(`Estudante ${estudanteToDelete.nome} excluído permanentemente por ${isMasterAdmin ? 'Master Admin' : (isAdmin ? 'Admin' : 'Gestor')}`);
         toast.success('Estudante excluído permanentemente!');
       } else {
         // Soft delete para os demais ou se não estiver na lixeira
@@ -175,6 +281,56 @@ export default function Estudantes() {
     } catch (error) {
       toast.error('Sem permissão para excluir estudante');
       console.error(error);
+    }
+  }
+
+  async function handleMigration() {
+    if (!isAdmin) return;
+    setLoading(true);
+    try {
+      console.log("--- INICIANDO DIAGNÓSTICO E CORREÇÃO DE ESTUDANTES ---");
+      const snapshot = await getDocs(collection(db, 'estudantes'));
+      let updatedCount = 0;
+
+      console.log(`Total de estudantes na coleção 'estudantes': ${snapshot.size}`);
+
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        console.log(`DEBUG [${doc.id}]:`, {
+          nome: data.nome,
+          status: data.status,
+          escola_id: data.escola_id,
+          excluido: data.excluido,
+          nome_lower: !!data.nome_lower,
+          escola_match: data.escola_id === escolaAtivaId || data.escola_id === ''
+        });
+      });
+
+      for (const studentDoc of snapshot.docs) {
+        const data = studentDoc.data();
+        const needsExcluido = data.excluido === undefined;
+        const needsNomeLower = !data.nome_lower && data.nome;
+        const needsTurmaId = data.turma_id === undefined || data.turma_id === null;
+
+        if (needsExcluido || needsNomeLower || needsTurmaId) {
+          const updateData: any = {};
+          if (needsExcluido) updateData.excluido = false;
+          if (needsNomeLower) updateData.nome_lower = (data.nome || "").toLowerCase();
+          if (needsTurmaId) updateData.turma_id = "";
+
+          await updateDoc(doc(db, "estudantes", studentDoc.id), updateData);
+          console.log(`Corrigido estudante: ${data.nome} (ID: ${studentDoc.id})`);
+          updatedCount++;
+        }
+      }
+
+      toast.success(`${updatedCount} registros corrigidos. VEJA O CONSOLE (F12) PARA O DIAGNÓSTICO!`);
+      fetchEstudantes();
+    } catch (error) {
+      console.error("Erro na migração:", error);
+      toast.error("Erro ao processar. Veja o console.");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -302,7 +458,7 @@ export default function Estudantes() {
 
       const availableColumns = Object.keys(firstRow).map(col => col.toLowerCase().trim());
 
-      const requiredColumns = ['nome', 'matricula'];
+      const requiredColumns = ['nome'];
       const missingColumns = requiredColumns.filter(col => !availableColumns.includes(col));
 
       if (missingColumns.length > 0) {
@@ -314,10 +470,7 @@ export default function Estudantes() {
       let errorCount = 0;
       let errorMessages: string[] = [];
 
-      // Otimização: Carregar todas as matrículas existentes para a memória do tenant ativo
-      const matriculasSnapshot = await getDocs(query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId), where('matricula', '!=', '')));
-      const existingMatriculas = new Set(matriculasSnapshot.docs.map(doc => doc.data().matricula));
-      const matriculasInCsv = new Set();
+      const validStudentsToImport: any[] = [];
 
       for (let i = 0; i < estudantesData.length; i++) {
         const row = estudantesData[i];
@@ -326,27 +479,12 @@ export default function Estudantes() {
         try {
           // Validações básicas
           const nome = (row.nome || '').toString().trim();
-          const matricula = (row.matricula || '').toString().trim();
 
           if (!nome) {
             errorMessages.push(`Linha ${rowNumber}: Campo 'nome' é obrigatório`);
             errorCount++;
             continue;
           }
-
-          if (!matricula) {
-            errorMessages.push(`Linha ${rowNumber}: Campo 'matricula' é obrigatório`);
-            errorCount++;
-            continue;
-          }
-
-          // Verificar duplicados no sistema ou no próprio CSV
-          if (existingMatriculas.has(matricula) || matriculasInCsv.has(matricula)) {
-            errorMessages.push(`Linha ${rowNumber}: Matrícula '${matricula}' já existe e foi ignorada`);
-            errorCount++;
-            continue;
-          }
-          matriculasInCsv.add(matricula);
 
           // Validar formato da data se presente
           let dataNascimento = null;
@@ -399,18 +537,13 @@ export default function Estudantes() {
             }
           }
 
-          // Validar matrícula (apenas números e letras)
-          if (!/^[A-Za-z0-9]+$/.test(matricula)) {
-            errorMessages.push(`Linha ${rowNumber}: Matrícula '${matricula}' deve conter apenas letras e números`);
-            errorCount++;
-            continue;
-          }
+
 
           // Mapeamento dos dados
           const estudanteData = {
             // Status e Informações Básicas
             status: (row.status || 'Frequentando').toString().trim() || 'Frequentando',
-            matricula,
+            matricula: '',
             nome,
             foto_url: row.foto_url ? row.foto_url.toString().trim() : null,
             // Informações Pessoais
@@ -473,17 +606,38 @@ export default function Estudantes() {
             cep: row.cep ? row.cep.toString().trim() : null,
             // Outros
             ano,
-            turma_id: row.turma_id ? row.turma_id.toString().trim() : null,
+            fase: row.classificacao || row.fase || row.serie || '',
+            turma_id: row.turma_id ? row.turma_id.toString().trim() : '',
             escola_id: escolaAtivaId,
             excluido: false,
           };
 
-          await addDoc(collection(db, 'estudantes'), estudanteData);
-          successCount++;
+          validStudentsToImport.push({ estudanteData, rowNumber });
         } catch (error) {
-          errorMessages.push(`Linha ${rowNumber}: Sem permissão para salvar - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          errorMessages.push(`Linha ${rowNumber}: Falha no parsing - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
           errorCount++;
           console.error(`Erro na linha ${rowNumber}:`, error);
+        }
+      }
+
+      if (validStudentsToImport.length > 0) {
+        try {
+          const generatedMatriculas = await generateMatriculasBatch(validStudentsToImport.length);
+          for (let i = 0; i < validStudentsToImport.length; i++) {
+            const { estudanteData, rowNumber } = validStudentsToImport[i];
+            estudanteData.matricula = generatedMatriculas[i];
+
+            try {
+              await addDoc(collection(db, 'estudantes'), estudanteData);
+              successCount++;
+            } catch (error) {
+              errorMessages.push(`Linha ${rowNumber}: Sem permissão para salvar - ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+              errorCount++;
+            }
+          }
+        } catch (error) {
+          errorMessages.push(`Erro ao gerar matrículas em lote: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          errorCount += validStudentsToImport.length;
         }
       }
 
@@ -539,6 +693,7 @@ export default function Estudantes() {
           status: estudanteData.status || '',
           matricula: estudanteData.matricula || '',
           nome: estudanteData.nome || '',
+          fase: estudanteData.fase || '',
           foto_url: estudanteData.foto_url || '',
           // Informações Pessoais
           sexo: estudanteData.sexo || '',
@@ -634,9 +789,23 @@ export default function Estudantes() {
   }
 
   const columns = [
-    { key: 'nome', header: 'Nome' },
+    {
+      key: 'nome',
+      header: 'Nome',
+      render: (estudante: any) => (
+        <div className="flex items-center gap-2">
+          {estudante.estudante_pcd && (
+            <span className="bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded">
+              DEF
+            </span>
+          )}
+          <span>{estudante.nome}</span>
+        </div>
+      )
+    },
     { key: 'matricula', header: 'Matrícula' },
     { key: 'ano', header: 'Ano' },
+    { key: 'fase', header: 'Classificação' },
     { key: 'turma_nome', header: 'Turma', render: (estudante: Estudante) => estudante.turma_nome && estudante.turma_nome !== '-' ? estudante.turma_nome : <span className="rounded-full px-2.5 py-1 text-xs font-medium bg-warning/10 text-warning">Sem turma</span> },
     {
       key: 'cpf',
@@ -651,11 +820,12 @@ export default function Estudantes() {
       key: 'status',
       header: 'Status',
       render: (estudante: Estudante) => (
-        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${estudante.status === 'Ativo' || estudante.status === 'Frequentando' ? 'bg-success/10 text-success' :
-          estudante.status === 'Inativo' || estudante.status === 'Desistente' ? 'bg-muted text-muted-foreground' :
-            'bg-warning/10 text-warning'
+        <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${estudante.status === 'Frequentando' ? 'bg-success/10 text-success' :
+          estudante.status === 'Desistente' || estudante.status === 'Transferido' ? 'bg-muted text-muted-foreground' :
+            estudante.status === 'Concluído' ? 'bg-blue-100 text-blue-800' :
+              'bg-warning/10 text-warning'
           }`}>
-          {estudante.status}
+          {estudante.status || 'Sem status'}
         </span>
       )
     },
@@ -690,6 +860,16 @@ export default function Estudantes() {
   return (
     <AppLayout title="Estudantes">
       <div className="space-y-6 animate-fade-in">
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+          <TabsList className={`grid w-full ${isAdmin ? 'grid-cols-3' : 'grid-cols-2'} max-w-3xl`}>
+            <TabsTrigger value="escola" className="font-bold text-[10px] sm:text-xs md:text-sm">ESTUDANTES DA ESCOLA</TabsTrigger>
+            <TabsTrigger value="sem-turma" className="font-bold text-[10px] sm:text-xs md:text-sm">SEM TURMA (REDE)</TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="rede" className="font-bold text-[10px] sm:text-xs md:text-sm">REDE DE ENSINO</TabsTrigger>
+            )}
+          </TabsList>
+        </Tabs>
+
         <div className="flex flex-col sm:flex-row gap-4 justify-between">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -701,26 +881,46 @@ export default function Estudantes() {
             />
           </div>
 
+          {activeTab === 'escola' && (
+            <div className="flex items-center gap-2 w-full sm:w-auto min-w-[200px]">
+              <ListFilter className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="todos">Todos os Status</option>
+                <option value="sem_status">Sem status (Pendente)</option>
+                <option value="Matriculado">Matriculados</option>
+                <option value="Frequentando">Frequentando</option>
+                <option value="Desistente">Desistentes</option>
+              </select>
+            </div>
+          )}
+
+
           <div className="flex flex-wrap gap-2">
             {isAdmin && (
-              <>
-                <Button
-                  variant={showDeleted ? "destructive" : "outline"}
-                  onClick={() => setShowDeleted(!showDeleted)}
-                >
-                  <Trash className="h-4 w-4 mr-2" />
-                  {showDeleted ? 'Ver Ativos' : 'Ver Lixeira'}
-                </Button>
-                <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importar CSV
-                </Button>
-                <Button variant="outline" onClick={handleExportCSV}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Exportar CSV
-                </Button>
-              </>
+              <Button variant="outline" onClick={handleMigration} className="border-warning text-warning hover:bg-warning/10">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Corrigir Dados (Migration)
+              </Button>
             )}
+            <Button
+              variant={showDeleted ? "destructive" : "outline"}
+              onClick={() => setShowDeleted(!showDeleted)}
+            >
+              <Trash className="h-4 w-4 mr-2" />
+              {showDeleted ? 'Ver Ativos' : 'Ver Lixeira'}
+            </Button>
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Importar CSV
+            </Button>
+            <Button variant="outline" onClick={handleExportCSV}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
             <Button onClick={() => navigate('/estudantes/novo')}>
               <Plus className="h-4 w-4 mr-2" />
               Adicionar Estudante
@@ -728,7 +928,13 @@ export default function Estudantes() {
           </div>
         </div>
 
-        <DataTable columns={columns} data={estudantes} loading={loading} emptyMessage="Nenhum estudante encontrado" />
+        <DataTable
+          columns={columns}
+          data={estudantes}
+          loading={loading}
+          emptyMessage="Nenhum estudante encontrado"
+          rowClassName={(item) => (activeTab === 'escola' && !item.turma_id) ? 'bg-red-500/10 hover:bg-red-500/20 border-l-4 border-l-red-500' : ''}
+        />
 
         <div className="flex items-center justify-between py-4">
           <p className="text-sm text-muted-foreground">
@@ -770,7 +976,7 @@ export default function Estudantes() {
                 </p>
               </div>
               <p className="text-sm text-muted-foreground">
-                Selecione um arquivo CSV com os dados dos estudantes. As colunas obrigatórias são <strong>nome</strong> e <strong>matricula</strong>.
+                Selecione um arquivo CSV com os dados dos estudantes. A coluna obrigatória é <strong>nome</strong>.
                 <br />
                 Use ponto e vírgula (;) como separador de campos.
               </p>
@@ -820,7 +1026,7 @@ export default function Estudantes() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </div>
-    </AppLayout>
+      </div >
+    </AppLayout >
   );
 }
