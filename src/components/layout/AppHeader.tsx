@@ -227,7 +227,7 @@ export function AppHeader({ title }: AppHeaderProps) {
               variant="ghost"
               size="icon"
               onClick={toggleSidebar}
-              className="md:hidden text-primary hover:bg-primary/10 mr-1"
+              className="lg:hidden text-primary hover:bg-primary/10 mr-1"
             >
               <Menu className="h-5 w-5" />
             </Button>
@@ -243,7 +243,7 @@ export function AppHeader({ title }: AppHeaderProps) {
           {(isAdmin || (permittedEscolas && permittedEscolas.length > 1)) && (
             <>
               {/* Desktop School Select */}
-              <div className="w-[300px] lg:w-[400px] hidden md:block mr-2">
+              <div className="w-[300px] lg:w-[400px] hidden lg:block mr-2">
                 <Select
                   value={escolaAtivaId || undefined}
                   onValueChange={(val) => {
@@ -268,7 +268,7 @@ export function AppHeader({ title }: AppHeaderProps) {
                 </Select>
               </div>
 
-              <div className="md:hidden mr-2">
+              <div className="lg:hidden mr-2">
                 <Dialog>
                   <DialogTrigger asChild>
                     <Button variant="outline" size="icon" className="h-9 w-9" title="Trocar Escola">
@@ -392,11 +392,11 @@ export function AppHeader({ title }: AppHeaderProps) {
 
             <button
               onClick={handleLogout}
-              className="font-body font-semibold text-gray-600 hover:text-primary hover:bg-gray-100 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden md:flex"
+              className="font-body font-semibold text-gray-600 hover:text-primary hover:bg-gray-100 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
             >
               Sair
             </button>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="md:hidden text-gray-500 hover:text-primary">
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-gray-500 hover:text-primary">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

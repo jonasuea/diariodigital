@@ -326,7 +326,7 @@ export default function Painel() {
       const querySnapshot = await getDocs(q);
       const activitiesData = querySnapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...(doc.data() as any)
       } as ActivityLog));
       setAtividadesRecentes(activitiesData);
     } catch (error) {
@@ -353,22 +353,7 @@ export default function Painel() {
         </div>
       ) : (
         <div className="space-y-6 animate-fade-in">
-          {/* Cartão de Boas-Vindas Institucional GovBR */}
-          <div className="bg-white rounded-[20px] p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 border border-gray-200/60 shadow-sm relative overflow-hidden mb-6">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
 
-            <div className="relative z-10 space-y-2">
-              <h1 className="font-heading font-black text-2xl md:text-3xl text-gray-900 tracking-tight">
-                Olá, {user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'Usuário'}
-              </h1>
-              <p className="font-medium text-gray-600">
-                Acompanhe o <span className="text-primary font-bold">desempenho escolar</span> e as métricas da instituição.
-              </p>
-              <div className="inline-flex items-center mt-2 px-2.5 py-1 rounded-full bg-secondary text-primary font-semibold text-xs uppercase tracking-wider">
-                {role ? `Perfil: ${role}` : 'Perfil do Sistema'}
-              </div>
-            </div>
-          </div>
 
           {!isEstudante && (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

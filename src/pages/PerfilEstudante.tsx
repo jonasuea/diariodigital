@@ -117,6 +117,11 @@ interface Estudante {
   responsavel_contato?: string;
   responsavel_email?: string;
   responsavel_cpf?: string;
+  estudante_pcd?: boolean;
+  deficiencias?: string[];
+  estudante_aee?: boolean;
+  cid_aee?: string;
+  laudo_aee_url?: string;
 }
 
 interface Nota {
@@ -565,9 +570,9 @@ export default function PerfilEstudante() {
                         </Badge>
                       )}
                       <Badge variant="default" className={`font-semibold text-xs px-3 py-1 ${estudante.status === 'Frequentando' ? 'bg-green-100 text-green-800' :
-                          estudante.status === 'Desistente' || estudante.status === 'Transferido' ? 'bg-muted text-muted-foreground' :
-                            estudante.status === 'Concluído' ? 'bg-blue-100 text-blue-800' :
-                              'bg-warning/10 text-warning'
+                        estudante.status === 'Desistente' || estudante.status === 'Transferido' ? 'bg-muted text-muted-foreground' :
+                          estudante.status === 'Concluído' ? 'bg-blue-100 text-blue-800' :
+                            'bg-warning/10 text-warning'
                         }`}>
                         {estudante.status}
                       </Badge>
@@ -656,6 +661,51 @@ export default function PerfilEstudante() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Saúde e Acessibilidade */}
+                  {(estudante.estudante_pcd || estudante.estudante_aee) && (
+                    <div className="space-y-5">
+                      <h4 className="font-semibold text-sm">Saúde e Acessibilidade</h4>
+                      {estudante.estudante_pcd && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">PCD - Deficiências</p>
+                          <div className="flex flex-wrap gap-1">
+                            {estudante.deficiencias && estudante.deficiencias.length > 0 ? (
+                              estudante.deficiencias.map(def => (
+                                <Badge key={def} variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                                  {def}
+                                </Badge>
+                              ))
+                            ) : (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">PCD</Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      {estudante.estudante_aee && (
+                        <div className="space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground">AEE - Atendimento Especializado</p>
+                          <div className="flex items-center gap-2">
+                            <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[10px]">AEE</Badge>
+                            {estudante.cid_aee && (
+                              <span className="text-xs font-bold text-muted-foreground">CID: {estudante.cid_aee}</span>
+                            )}
+                          </div>
+                          {estudante.laudo_aee_url && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full mt-1 text-xs h-8 border-dashed"
+                              onClick={() => window.open(estudante.laudo_aee_url, '_blank')}
+                            >
+                              <FileText className="h-3.5 w-3.5 mr-2 text-primary" />
+                              Ver Laudo PDF
+                            </Button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

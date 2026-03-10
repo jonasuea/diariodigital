@@ -16,6 +16,7 @@ import {
   User,
   Building2,
   UserCheck,
+  MessageSquare,
   LucideIcon
 } from 'lucide-react';
 
@@ -31,11 +32,13 @@ const allMenuItems: MenuItem[] = [
   { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
   { title: 'Escolas', url: '/escolas', icon: Building2, allowedRoles: ['admin'] },
   { title: 'Estudantes', url: '/Estudantes', icon: Users, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+  { title: 'Responsáveis', url: '/responsaveis', icon: Users, allowedRoles: ['admin', 'gestor'] },
   { title: 'Pré-Matrículas', url: '/pre-matriculas', icon: UserCheck, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
 
   { title: 'Professores', url: '/professores', icon: GraduationCap, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
   { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
   { title: 'Turmas', url: '/turmas', icon: School, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
+  { title: 'Mensagens', url: '/mensagens', icon: MessageSquare, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
   { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
   { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
   { title: 'Relatórios', url: '/relatorios', icon: FileText, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },

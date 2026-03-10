@@ -325,12 +325,19 @@ export default function Turmas() {
       const STATUS_BLOQUEADOS = ['Desistente', 'Concluído'];
       const semTurma = querySnapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() } as Estudante))
-        .filter(e =>
-          !e.turma_id &&
-          !STATUS_BLOQUEADOS.includes(e.status || '') &&
-          e.excluido !== true &&
-          e.escola_id === escolaAtivaId
-        )
+        .filter(e => {
+          const status = (e.status || '').toLowerCase();
+          const isTransferido = status === 'transferido';
+          const isMatriculado = status === 'matriculado';
+          const isFrequentando = status === 'frequentando' || status === '';
+
+          return (
+            !e.turma_id &&
+            !STATUS_BLOQUEADOS.includes(e.status || '') &&
+            e.excluido !== true &&
+            (e.escola_id === escolaAtivaId || (isTransferido && (e.escola_id === '' || !e.escola_id)))
+          );
+        })
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
       setEstudantesParaEnturmar(semTurma);
     } catch (error) {

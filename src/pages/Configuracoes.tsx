@@ -50,6 +50,7 @@ export default function Configuracoes() {
     zona: '',
     endereco: 'Rua das Flores, 123 - São Paulo',
     horarioFuncionamento: 'Segunda a Sexta, 7h às 18h',
+    matriculas_abertas: true,
   });
 
   const [instalacoes, setInstalacoes] = useState({
@@ -143,6 +144,7 @@ export default function Configuracoes() {
               zona: d.zona || prev.zona,
               endereco: d.endereco || prev.endereco,
               horarioFuncionamento: d.horario_funcionamento || prev.horarioFuncionamento,
+              matriculas_abertas: d.matriculas_abertas !== undefined ? d.matriculas_abertas : true,
             }));
             setInstalacoes(prev => ({
               ...prev,
@@ -197,7 +199,8 @@ export default function Configuracoes() {
         contato: escolaConfig.contato,
         zona: escolaConfig.zona,
         endereco: escolaConfig.endereco,
-        horario_funcionamento: escolaConfig.horarioFuncionamento
+        horario_funcionamento: escolaConfig.horarioFuncionamento,
+        matriculas_abertas: escolaConfig.matriculas_abertas,
       }, { merge: true });
       await logActivity('atualizou as informações da escola.');
       toast.success('Informações da escola salvas com sucesso!');
@@ -922,7 +925,8 @@ export default function Configuracoes() {
                         </div>
                       </div>
                     </div>
-                    <div className="space-y-1">
+
+                    <div className="space-y-1 mt-4">
                       <Label className="text-xs text-muted-foreground">Horário de Funcionamento</Label>
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
@@ -933,6 +937,25 @@ export default function Configuracoes() {
                         />
                       </div>
                     </div>
+
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-green-50/30 border-green-100 mt-4">
+                      <div className="flex items-start gap-3">
+                        <ToggleLeft className={`h-5 w-5 mt-0.5 ${escolaConfig.matriculas_abertas ? 'text-green-600' : 'text-muted-foreground'}`} />
+                        <div>
+                          <p className="font-semibold text-sm">Matrículas Abertas nesta Escola</p>
+                          <p className="text-xs text-muted-foreground">
+                            {escolaConfig.matriculas_abertas
+                              ? 'Responsáveis podem matricular nesta unidade online.'
+                              : 'Matrículas online suspensas para esta escola.'}
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={escolaConfig.matriculas_abertas}
+                        onCheckedChange={(checked) => setEscolaConfig({ ...escolaConfig, matriculas_abertas: checked })}
+                      />
+                    </div>
+
                     <Button onClick={handleSaveEscola} className="mt-2">
                       Salvar Alterações
                     </Button>
@@ -1088,90 +1111,92 @@ export default function Configuracoes() {
                 </Card>
 
                 {/* Controle do Sistema — apenas admin */}
-                {role === 'admin' && (
-                  <Card className="border-amber-200 bg-amber-50/50">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                        <ToggleLeft className="h-5 w-5 text-amber-600" />
-                        Controle do Sistema
-                      </CardTitle>
-                      <p className="text-xs text-muted-foreground">Afeta os dois sistemas em tempo real</p>
-                    </CardHeader>
-                    <CardContent className="space-y-5">
-                      {/* Manutenção */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-start gap-3">
-                          <Wrench className={`h-5 w-5 mt-0.5 ${systemConfig.manutencao ? 'text-amber-500' : 'text-muted-foreground'}`} />
-                          <div>
-                            <p className="font-semibold">Modo Manutenção</p>
-                            <p className="text-sm text-muted-foreground">
-                              Exibe tela de manutenção nos dois sistemas
-                            </p>
+                {
+                  role === 'admin' && (
+                    <Card className="border-amber-200 bg-amber-50/50">
+                      <CardHeader className="pb-4">
+                        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                          <ToggleLeft className="h-5 w-5 text-amber-600" />
+                          Controle do Sistema
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground">Afeta os dois sistemas em tempo real</p>
+                      </CardHeader>
+                      <CardContent className="space-y-5">
+                        {/* Manutenção */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-start gap-3">
+                            <Wrench className={`h-5 w-5 mt-0.5 ${systemConfig.manutencao ? 'text-amber-500' : 'text-muted-foreground'}`} />
+                            <div>
+                              <p className="font-semibold">Modo Manutenção</p>
+                              <p className="text-sm text-muted-foreground">
+                                Exibe tela de manutenção nos dois sistemas
+                              </p>
+                            </div>
                           </div>
-                        </div>
-                        <Switch
-                          checked={systemConfig.manutencao}
-                          disabled={savingSystem}
-                          onCheckedChange={(checked) => handleSaveSystemConfig({ manutencao: checked })}
-                        />
-                      </div>
-
-                      {/* Mensagem de manutenção editável */}
-                      {systemConfig.manutencao && (
-                        <div className="space-y-1 pl-8">
-                          <label className="text-xs text-muted-foreground font-medium">Mensagem de manutenção</label>
-                          <input
-                            className="w-full border border-border rounded-lg px-3 py-2 text-sm"
-                            value={systemConfig.manutencao_mensagem}
-                            onChange={(e) => setSystemConfig(prev => ({ ...prev, manutencao_mensagem: e.target.value }))}
-                            onBlur={() => handleSaveSystemConfig({ manutencao_mensagem: systemConfig.manutencao_mensagem })}
+                          <Switch
+                            checked={systemConfig.manutencao}
+                            disabled={savingSystem}
+                            onCheckedChange={(checked) => handleSaveSystemConfig({ manutencao: checked })}
                           />
                         </div>
-                      )}
 
-                      <div className="border-t border-amber-200 pt-4" />
-
-                      {/* Matrículas Abertas */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-start gap-3">
-                          <School className={`h-5 w-5 mt-0.5 ${systemConfig.matriculas_abertas ? 'text-green-500' : 'text-muted-foreground'}`} />
-                          <div>
-                            <p className="font-semibold">Matrículas Abertas</p>
-                            <p className="text-sm text-muted-foreground">
-                              {systemConfig.matriculas_abertas
-                                ? 'Responsáveis podem realizar matrículas online'
-                                : 'Apenas a escola pode matricular via EducaFácil'}
-                            </p>
+                        {/* Mensagem de manutenção editável */}
+                        {systemConfig.manutencao && (
+                          <div className="space-y-1 pl-8">
+                            <label className="text-xs text-muted-foreground font-medium">Mensagem de manutenção</label>
+                            <input
+                              className="w-full border border-border rounded-lg px-3 py-2 text-sm"
+                              value={systemConfig.manutencao_mensagem}
+                              onChange={(e) => setSystemConfig(prev => ({ ...prev, manutencao_mensagem: e.target.value }))}
+                              onBlur={() => handleSaveSystemConfig({ manutencao_mensagem: systemConfig.manutencao_mensagem })}
+                            />
                           </div>
-                        </div>
-                        <Switch
-                          checked={systemConfig.matriculas_abertas}
-                          disabled={savingSystem}
-                          onCheckedChange={(checked) => handleSaveSystemConfig({ matriculas_abertas: checked })}
-                        />
-                      </div>
+                        )}
 
-                      {/* Mensagem de matrículas fechadas editável */}
-                      {!systemConfig.matriculas_abertas && (
-                        <div className="space-y-1 pl-8">
-                          <label className="text-xs text-muted-foreground font-medium">Mensagem para o responsável</label>
-                          <input
-                            className="w-full border border-border rounded-lg px-3 py-2 text-sm"
-                            value={systemConfig.matriculas_fechadas_msg}
-                            onChange={(e) => setSystemConfig(prev => ({ ...prev, matriculas_fechadas_msg: e.target.value }))}
-                            onBlur={() => handleSaveSystemConfig({ matriculas_fechadas_msg: systemConfig.matriculas_fechadas_msg })}
+                        <div className="border-t border-amber-200 pt-4" />
+
+                        {/* Matrículas Abertas */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-start gap-3">
+                            <School className={`h-5 w-5 mt-0.5 ${systemConfig.matriculas_abertas ? 'text-green-500' : 'text-muted-foreground'}`} />
+                            <div>
+                              <p className="font-semibold">Matrículas Abertas (Rede Inteira)</p>
+                              <p className="text-sm text-muted-foreground">
+                                {systemConfig.matriculas_abertas
+                                  ? 'Responsáveis podem realizar matrículas online na rede'
+                                  : 'Bloqueia matrículas online em TODAS as escolas'}
+                              </p>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={systemConfig.matriculas_abertas}
+                            disabled={savingSystem}
+                            onCheckedChange={(checked) => handleSaveSystemConfig({ matriculas_abertas: checked })}
                           />
                         </div>
-                      )}
 
-                      {savingSystem && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
-                        </p>
-                      )}
-                    </CardContent>
-                  </Card>
-                )}
+                        {/* Mensagem de matrículas fechadas editável */}
+                        {!systemConfig.matriculas_abertas && (
+                          <div className="space-y-1 pl-8">
+                            <label className="text-xs text-muted-foreground font-medium">Mensagem para o responsável</label>
+                            <input
+                              className="w-full border border-border rounded-lg px-3 py-2 text-sm"
+                              value={systemConfig.matriculas_fechadas_msg}
+                              onChange={(e) => setSystemConfig(prev => ({ ...prev, matriculas_fechadas_msg: e.target.value }))}
+                              onBlur={() => handleSaveSystemConfig({ matriculas_fechadas_msg: systemConfig.matriculas_fechadas_msg })}
+                            />
+                          </div>
+                        )}
+
+                        {savingSystem && (
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
+                          </p>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                }
 
                 {/* Sistema e Versão */}
                 <Card>
@@ -1205,7 +1230,7 @@ export default function Configuracoes() {
                       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="font-bold text-primary">Nova Versão Disponí­vel: v{newVersionAvailable.version}</p>
+                            <p className="font-bold text-primary">Nova Versão Disponível: v{newVersionAvailable.version}</p>
                             <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
                           </div>
                           <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
@@ -1227,7 +1252,7 @@ export default function Configuracoes() {
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between border-b pb-4 mb-2">
                           <div className="flex items-start gap-3">
                             <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
                             <div>
@@ -1242,12 +1267,15 @@ export default function Configuracoes() {
                             onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, modoManutencao: checked })}
                           />
                         </div>
-                        <div>
+
+                        <div className="space-y-2">
                           <p className="text-sm text-muted-foreground mb-2 mt-4">
-                            Se a busca por nome não encontrar registros antigos, clique no botão abaixo para sincronizar os dados.
+                            Ferramentas de sincronização e correção de dados legados.
                           </p>
+
                           <Button
-                            className="w-full"
+                            className="w-full justify-start"
+                            variant="outline"
                             onClick={handleSyncSearchData}
                             disabled={isSyncing || isMigrating}
                           >
@@ -1260,59 +1288,43 @@ export default function Configuracoes() {
                           </Button>
 
                           <Button
-                            className="w-full mt-4"
-                            variant="destructive"
-                            onClick={handleMigrateData}
-                            disabled={isSyncing || isMigrating}
-                          >
-                            {isMigrating ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Wrench className="h-4 w-4 mr-2" />
-                            )}
-                            {isMigrating ? 'Migrando...' : 'Injetar INEP 13034243 nos dados antigos'}
-                          </Button>
-
-                          <Button
-                            className="w-full mt-4"
-                            variant="outline"
-                            onClick={handleLimparTransferidos}
-                            disabled={isSyncing || isMigrating}
-                          >
-                            {isMigrating ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Wrench className="h-4 w-4 mr-2" />
-                            )}
-                            {isMigrating ? 'Limpando...' : 'Limpar Escola dos Transferidos'}
-                          </Button>
-
-                          <Button
-                            className="w-full mt-4"
-                            variant="secondary"
-                            onClick={handleCriarUsuariosFaltantes}
-                            disabled={isSyncing || isMigrating}
-                          >
-                            {isMigrating ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <UserCog className="h-4 w-4 mr-2" />
-                            )}
-                            {isMigrating ? 'Criando usuários...' : 'Criar Usuários a partir de Cadastros (E-mail)'}
-                          </Button>
-
-                          <Button
-                            className="w-full mt-4"
+                            className="w-full justify-start"
                             variant="outline"
                             onClick={handleFixMissingExcluido}
                             disabled={isSyncing || isMigrating}
                           >
-                            {isMigrating ? (
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            ) : (
-                              <Shield className="h-4 w-4 mr-2" />
-                            )}
-                            {isMigrating ? 'Corrigindo...' : 'Corrigir Campo "Excluído" nos Usuários'}
+                            <Shield className="h-4 w-4 mr-2" />
+                            Corrigir Campo "Excluído" nos Usuários
+                          </Button>
+
+                          <Button
+                            className="w-full justify-start"
+                            variant="outline"
+                            onClick={handleCriarUsuariosFaltantes}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            <UserCog className="h-4 w-4 mr-2" />
+                            Criar Usuários a partir de Cadastros
+                          </Button>
+
+                          <Button
+                            className="w-full justify-start text-amber-600 border-amber-200 hover:bg-amber-50"
+                            variant="outline"
+                            onClick={handleLimparTransferidos}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            <MapPin className="h-4 w-4 mr-2" />
+                            Limpar Escola dos Transferidos
+                          </Button>
+
+                          <Button
+                            className="w-full justify-start"
+                            variant="destructive"
+                            onClick={handleMigrateData}
+                            disabled={isSyncing || isMigrating}
+                          >
+                            <Wrench className="h-4 w-4 mr-2" />
+                            {isMigrating ? 'Migrando...' : 'Injetar INEP 13034243 nos dados antigos'}
                           </Button>
                         </div>
                       </div>

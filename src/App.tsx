@@ -25,6 +25,8 @@ import Calendario from "./pages/Calendario";
 import DiarioDigital from "./pages/DiarioDigital";
 import Relatorios from "./pages/Relatorios";
 import Configuracoes from "./pages/Configuracoes";
+import Responsaveis from "./pages/Responsaveis";
+import Mensagens from "./pages/Mensagens";
 import Usuarios from "./pages/Usuarios";
 import NotFound from "./pages/NotFound";
 import Logs from "./pages/Logs";
@@ -94,6 +96,8 @@ const router = createBrowserRouter([
       { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Relatorios /></ProtectedRoute> },
       { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Configuracoes /></ProtectedRoute> },
       { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Usuarios /></ProtectedRoute> },
+      { path: "/responsaveis", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Responsaveis /></ProtectedRoute> },
+      { path: "/mensagens", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Mensagens /></ProtectedRoute> },
       { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Logs /></ProtectedRoute> },
       { path: "/manual-uso", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><ManualUso /></ProtectedRoute> },
 

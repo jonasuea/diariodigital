@@ -501,6 +501,8 @@ export default function NovoMembro() {
                       type="date"
                       value={formData.data_lotacao}
                       onChange={(e) => setFormData({ ...formData, data_lotacao: e.target.value })}
+                      onFocus={(e) => e.target.showPicker && e.target.showPicker()}
+                      className="w-full"
                     />
                   </div>
                   <div className="space-y-2">

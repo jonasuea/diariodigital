@@ -11,7 +11,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 
 export default function Auth() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, resetPassword } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -94,6 +94,8 @@ export default function Auth() {
               description: 'Apenas administradores podem fazer login no momento.',
               duration: 6000,
             });
+          } else if (error.name === 'InactiveUser') {
+            toast.error(error.message);
           } else if (error.message.includes('Invalid login credentials')) {
             toast.error('E-mail ou senha incorretos');
           } else {
@@ -120,6 +122,28 @@ export default function Auth() {
       }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast.error('Por favor, informe seu e-mail para recuperar a senha');
+      return;
+    }
+
+    try {
+      const { error } = await resetPassword(email);
+      if (error) {
+        if (error.message.includes('user-not-found')) {
+          toast.error('Usuário não encontrado');
+        } else {
+          toast.error('Erro ao enviar e-mail de recuperação: ' + error.message);
+        }
+      } else {
+        toast.info('E-mail de recuperação enviado! Verifique sua caixa de entrada.');
+      }
+    } catch (e) {
+      toast.error('Erro ao processar solicitação');
     }
   };
 
@@ -195,6 +219,17 @@ export default function Auth() {
                   )}
                 </button>
               </div>
+              {isLogin && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    className="text-xs font-medium text-primary hover:underline transition-colors"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                </div>
+              )}
             </div>
 
             <Button
