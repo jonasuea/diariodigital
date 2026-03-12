@@ -55,7 +55,7 @@ A componente Estágio Curricular Supervisionado em Engenharia de Software tem co
 
 Neste contexto, o presente relatório descreve as atividades desenvolvidas durante o período de estágio, cujo foco foi a concepção, desenvolvimento e implantação da plataforma web EducaFácil, um sistema de gestão escolar voltado à organização das rotinas de secretaria e gestão pedagógica de instituições de ensino. A plataforma foi projetada para atender às demandas administrativas e acadêmicas de escolas, oferecendo módulos integrados para cadastro de Estudantes, professores, turmas e equipe gestora, além de funcionalidades para gerenciamento de horários, calendário escolar, diário digital, frequência, notas e geração de relatórios.
 
-O desenvolvimento da plataforma EducaFácil foi realizado utilizando tecnologias modernas de desenvolvimento web, incluindo React com Vite para a construção da interface do usuário, Tailwind CSS para estilização responsiva, e Lovable Cloud com Supabase para o gerenciamento do banco de dados PostgreSQL, autenticação de usuários e operações de persistência de dados. Essa escolha tecnológica permitiu a construção de uma aplicação robusta, escalável e de fácil manutenção, alinhada às melhores práticas da indústria de software.
+O desenvolvimento da plataforma EducaFácil foi realizado utilizando tecnologias modernas de desenvolvimento web, incluindo React com Vite para a construção da interface do usuário, Tailwind CSS para estilização responsiva, e CriaLab_Studios Cloud com Supabase para o gerenciamento do banco de dados PostgreSQL, autenticação de usuários e operações de persistência de dados. Essa escolha tecnológica permitiu a construção de uma aplicação robusta, escalável e de fácil manutenção, alinhada às melhores práticas da indústria de software.
 
 Este relatório tem como objetivo apresentar de forma detalhada o contexto do projeto, os objetivos gerais e específicos estabelecidos, a metodologia de desenvolvimento adotada, as atividades realizadas ao longo do estágio e os resultados alcançados. Além disso, são apresentados os aprendizados técnicos e profissionais obtidos durante a experiência, bem como as considerações sobre possíveis evoluções futuras do sistema.
 
@@ -115,7 +115,7 @@ Inicialmente, foi realizado um estudo aprofundado do fluxo de trabalho escolar e
 
 **2. Definição da Arquitetura e Modelagem de Dados**
 
-Com base nos requisitos identificados, foi definida a arquitetura do sistema, optando-se por uma separação entre frontend e backend. Para o frontend, foram escolhidos React com Vite como framework de desenvolvimento, e Tailwind CSS para estilização. Para o backend, foi utilizado o Lovable Cloud com Supabase, que oferece banco de dados PostgreSQL, autenticação integrada e API para operações de dados.
+Com base nos requisitos identificados, foi definida a arquitetura do sistema, optando-se por uma separação entre frontend e backend. Para o frontend, foram escolhidos React com Vite como framework de desenvolvimento, e Tailwind CSS para estilização. Para o backend, foi utilizado o CriaLab_Studios Cloud com Supabase, que oferece banco de dados PostgreSQL, autenticação integrada e API para operações de dados.
 
 A modelagem de dados resultou na criação das seguintes tabelas principais: Estudantes, professores, turmas, equipe_gestora, eventos, horarios, frequencia, notas, anotacoes, usuarios e profiles. Foram definidas as relações entre as tabelas, incluindo chaves estrangeiras para associação de Estudantes a turmas, turmas a professores, entre outras.
 

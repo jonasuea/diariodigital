@@ -1,5 +1,5 @@
 # DOCUMENTAÇÃO TÉCNICA
-## EducaFácil - Sistema de Gestão Escolar
+## Diário Digital - Sistema de Gestão Escolar
 
 **Versão:** 1.0  
 **Data:** Dezembro de 2024  
@@ -11,13 +11,13 @@
 
 ## 1.1. Nome do Sistema
 
-**EducaFácil** - Sistema de Gestão Escolar
+**Diário Digital** - Sistema de Gestão Escolar
 
 ## 1.2. Resumo
 
-O EducaFácil é um sistema web completo para gestão escolar, desenvolvido para atender às necessidades de instituições de ensino fundamental. O sistema centraliza todas as operações acadêmicas e administrativas em uma única plataforma, permitindo o gerenciamento eficiente de Estudantes, professores, turmas, frequência, notas e equipe gestora.
+O Diário Digital é um sistema web completo para gestão escolar, desenvolvido para atender às necessidades de instituições de ensino fundamental. O sistema centraliza todas as operações acadêmicas e administrativas em uma única plataforma, permitindo o gerenciamento eficiente de Estudantes, professores, turmas, frequência, notas e equipe gestora.
 
-A aplicação foi construída utilizando tecnologias modernas de desenvolvimento web, com foco em usabilidade, responsividade e performance. O backend é totalmente gerenciado pela plataforma Lovable Cloud (baseada em Supabase), oferecendo autenticação segura, banco de dados PostgreSQL e APIs REST automáticas.
+A aplicação foi construída utilizando tecnologias modernas de desenvolvimento web, com foco em usabilidade, responsividade e performance. O backend é totalmente gerenciado pela plataforma CriaLab Studios Cloud (baseada em Supabase), oferecendo autenticação segura, banco de dados PostgreSQL e APIs REST automáticas.
 
 O sistema implementa controle de acesso baseado em autenticação, garantindo que apenas usuários autorizados possam acessar as funcionalidades do sistema.
 
@@ -63,7 +63,7 @@ O sistema utiliza uma arquitetura moderna de aplicação web Single Page Applica
 └───────────────────────────┬─────────────────────────────────┘
                             │ HTTPS/REST
 ┌───────────────────────────▼─────────────────────────────────┐
-│                  LOVABLE CLOUD (Supabase)                    │
+│                  CriaLab Studios Cloud (Supabase)                    │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
 │  │   Auth      │  │  Database   │  │   Edge Functions    │  │
 │  │  (Supabase) │  │ (PostgreSQL)│  │   (se necessário)   │  │
@@ -96,7 +96,7 @@ O sistema utiliza uma arquitetura moderna de aplicação web Single Page Applica
 - `@radix-ui/react-dropdown-menu` - Menus dropdown
 - E diversos outros componentes Radix
 
-### 2.2.3. Backend (Lovable Cloud / Supabase)
+### 2.2.3. Backend (CriaLab Studios Cloud / Supabase)
 
 | Tecnologia | Descrição |
 |------------|-----------|
@@ -140,7 +140,7 @@ O sistema utiliza uma arquitetura moderna de aplicação web Single Page Applica
 - **Node.js** versão 18.x ou superior
 - **npm** ou **bun** como gerenciador de pacotes
 - **Git** para clonagem do repositório
-- Conta no **GitHub** (para clonar via integração Lovable)
+- Conta no **GitHub** (para clonar via integração CriaLab Studios)
 
 ## 3.2. Passo a Passo
 
@@ -168,7 +168,7 @@ bun install
 
 ### 3.2.3. Configurar Variáveis de Ambiente
 
-O projeto já possui um arquivo `.env` configurado automaticamente pelo Lovable Cloud com as seguintes variáveis:
+O projeto já possui um arquivo `.env` configurado automaticamente pelo CriaLab Studios Cloud com as seguintes variáveis:
 
 ```env
 VITE_SUPABASE_PROJECT_ID="gawuozkqutikslqqxaum"
@@ -916,7 +916,7 @@ SELECT EXISTS (
 
 ### 9.1.1. Uso do Supabase como BaaS
 
-**Decisão:** Utilizar Supabase/Lovable Cloud em vez de backend Node.js tradicional.
+**Decisão:** Utilizar Supabase/CriaLab Studios Cloud em vez de backend Node.js tradicional.
 
 **Vantagens:**
 - Redução significativa de código backend

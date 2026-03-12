@@ -219,7 +219,7 @@ export function AppHeader({ title }: AppHeaderProps) {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-secondary/50 backdrop-blur-sm border-b border-yellow-200/50 sticky top-0 z-50">
       <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 w-full">
         <div className="flex items-center gap-4">
           {isMobile && (
@@ -233,7 +233,7 @@ export function AppHeader({ title }: AppHeaderProps) {
             </Button>
           )}
           <div className="flex flex-col">
-            <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-tight sm:tracking-widest leading-tight line-clamp-1 max-w-[120px] xs:max-w-none">
+            <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-[#8B6508]/60 uppercase tracking-tight sm:tracking-widest leading-tight line-clamp-1 max-w-[120px] xs:max-w-none">
               Prefeitura de Itacoatiara – SEMED
             </span>
           </div>
@@ -313,7 +313,7 @@ export function AppHeader({ title }: AppHeaderProps) {
                   <Input
                     type="search"
                     placeholder="Busca..."
-                    className="w-full pl-8 bg-gray-100 border-transparent focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
+                    className="w-full pl-8 bg-white/60 border-yellow-100 focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
                     value={searchQuery}
                     onChange={handleSearchChange}
                     onFocus={() => {
@@ -371,32 +371,32 @@ export function AppHeader({ title }: AppHeaderProps) {
           </Button>
 
           {/* Language Indicator GovBR */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 border-l border-gray-200">
-            <Globe className="w-4 h-4 text-gray-400" />
-            <span className="text-xs font-bold text-gray-600">PT-BR</span>
+          <div className="hidden sm:flex items-center gap-1.5 px-3 border-l border-yellow-200/30">
+            <Globe className="w-4 h-4 text-[#8B6508]/40" />
+            <span className="text-xs font-bold text-[#8B6508]/60">PT-BR</span>
           </div>
 
-          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-gray-200">
-            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-gray-200 shadow-sm shrink-0">
+          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-yellow-200/30">
+            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-yellow-200/50 shadow-sm shrink-0">
               <AvatarImage src={userProfile?.foto_url} />
               <AvatarFallback className="bg-primary/10 text-primary text-[10px] sm:text-sm font-bold">
                 {getInitials(userProfile?.nome || user?.email)}
               </AvatarFallback>
             </Avatar>
             <div className="hidden lg:block mr-2">
-              <p className="text-sm font-bold text-gray-900 truncate max-w-[120px]">
+              <p className="text-sm font-bold text-[#8B6508] truncate max-w-[120px]">
                 {userProfile?.nome || user?.email}
               </p>
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{capitalize(role)}</p>
+              <p className="text-[10px] font-semibold text-[#8B6508]/60 uppercase tracking-wider">{capitalize(role)}</p>
             </div>
 
             <button
               onClick={handleLogout}
-              className="font-body font-semibold text-gray-600 hover:text-primary hover:bg-gray-100 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
+              className="font-body font-semibold text-[#8B6508]/70 hover:text-primary hover:bg-yellow-50 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
             >
               Sair
             </button>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-gray-500 hover:text-primary">
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-[#8B6508]/60 hover:text-primary">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

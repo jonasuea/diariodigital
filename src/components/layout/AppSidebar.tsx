@@ -36,15 +36,15 @@ export function AppSidebar() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className={`fixed top-0 h-full bg-white shadow-lg z-40 transition-all duration-300 ${isExpanded ? 'w-64 left-0' : isMobile ? 'w-64 -left-64' : 'w-16 left-0'}`}>
-        <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border bg-white">
+      <div className={`fixed top-0 h-full bg-sidebar-background shadow-lg z-40 transition-all duration-300 ${isExpanded ? 'w-64 left-0' : isMobile ? 'w-64 -left-64' : 'w-16 left-0'}`}>
+        <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border bg-sidebar-background">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary flex-shrink-0">
-              <GraduationCap className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary flex-shrink-0">
+              <GraduationCap className="h-5 w-5 text-sidebar-primary-foreground" />
             </div>
             {isExpanded && (
-              <span className="text-lg font-bold text-foreground whitespace-nowrap">
-                EducaFácil
+              <span className="text-lg font-bold text-sidebar-foreground whitespace-nowrap">
+                Diário Digital
               </span>
             )}
           </div>
@@ -53,7 +53,7 @@ export function AppSidebar() {
               variant="ghost"
               size="icon"
               onClick={toggleSidebar}
-              className="h-8 w-8 text-muted-foreground hover:text-foreground flex-shrink-0"
+              className="h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground flex-shrink-0"
               title="Fechar menu"
             >
               <PanelLeftClose className="h-4 w-4" />
@@ -61,7 +61,7 @@ export function AppSidebar() {
           )}
         </div>
 
-        <div className="px-3 py-4 scrollbar-thin bg-white flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 60px)' }}>
+        <div className="px-3 py-4 scrollbar-thin bg-sidebar-background flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 60px)' }}>
           <div className="space-y-1">
             {menuItems.map((item) => (
               <NavLink
@@ -75,8 +75,8 @@ export function AppSidebar() {
                     sessionStorage.removeItem('diario_filtros');
                   }
                 }}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-foreground/70 transition-all hover:bg-primary/10 hover:text-primary"
-                activeClassName="bg-primary text-primary-foreground font-medium hover:bg-primary hover:text-primary-foreground"
+                className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-sidebar-accent/40 text-sidebar-foreground font-medium transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground shadow-sm mb-1"
+                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-bold shadow-md hover:bg-sidebar-primary hover:text-sidebar-primary-foreground scale-[1.02]"
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
                 {isExpanded && <span className="whitespace-nowrap">{item.title}</span>}
@@ -85,10 +85,10 @@ export function AppSidebar() {
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-sidebar-border p-3 bg-white">
+        <div className="absolute bottom-0 left-0 right-0 border-t border-sidebar-border p-3 bg-sidebar-background">
           <button
             onClick={signOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-foreground/70 transition-all hover:bg-destructive hover:text-destructive-foreground"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sidebar-foreground transition-all hover:bg-destructive hover:text-destructive-foreground"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
             {isExpanded && <span className="whitespace-nowrap">Sair</span>}

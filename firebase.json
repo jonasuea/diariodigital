@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "diariodigital",
     "public": "dist",
     "ignore": [
       "firebase.json",

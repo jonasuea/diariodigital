@@ -6,50 +6,53 @@
 
 @layer base {
   :root {
-    --background: 0 0% 96.1%;
-    /* #F5F5F5 */
-    --foreground: 215 27.9% 16.9%;
-    /* #1F2937 */
+    --background: 44 100% 98%;
+    /* #FFFDF0 */
+    --foreground: 42 78% 15%;
+    /* #2B1F04 */
 
     --card: 0 0% 100%;
-    --card-foreground: 215 27.9% 16.9%;
+    --card-foreground: 42 78% 15%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 215 27.9% 16.9%;
+    --popover-foreground: 42 78% 15%;
 
-    --primary: 217 80.9% 39.2%;
-    /* #1351B4 */
-    --primary-foreground: 210 40% 98%;
+    --primary: 42 81% 47%;
+    /* #D4A017 Golden */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 215 100% 95.3%;
-    /* #E7F1FF */
-    --secondary-foreground: 217 80.9% 39.2%;
+    --secondary: 44 87% 92%;
+    /* #FFF9E0 Light Yellow */
+    --secondary-foreground: 42 81% 47%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 44 40% 96%;
+    --muted-foreground: 42 30% 40%;
 
-    --accent: 215 100% 95.3%;
-    /* #E7F1FF */
-    --accent-foreground: 217 80.9% 39.2%;
-    /* #1351B4 */
+    --accent: 44 87% 92%;
+    /* #FFF9E0 */
+    --accent-foreground: 42 81% 47%;
+    /* #D4A017 */
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 217 91% 60%;
+    --border: 44 30% 90%;
+    --input: 44 30% 90%;
+    --ring: 42 81% 47%;
 
     --radius: 0.75rem;
 
-    --sidebar-background: 222 47% 11%;
-    --sidebar-foreground: 220 14% 96%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 16%;
-    --sidebar-accent-foreground: 220 14% 96%;
-    --sidebar-border: 222 47% 16%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-background: 42 85% 18%;
+    /* Darker, more saturated golden */
+    --sidebar-foreground: 42 100% 98%; 
+    /* Almost white for high contrast */
+    --sidebar-primary: 42 95% 55%;
+    --sidebar-primary-foreground: 42 78% 10%;
+    --sidebar-accent: 42 95% 45%; 
+    /* Vibrant golden accent */
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 42 80% 25%;
+    --sidebar-ring: 42 95% 55%;
 
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
@@ -59,6 +62,17 @@
 
     --info: 199 89% 48%;
     --info-foreground: 0 0% 100%;
+
+    /* Diário Digital Branding */
+    --dd-primary: 42 81% 47%;
+    /* #D4A017 Golden */
+    --dd-secondary: 44 87% 61%;
+    /* #FBC02D Yellowish */
+    --dd-accent: 42 78% 28%;
+    /* #8B6508 Darker Gold */
+    --dd-bg-light: 44 100% 95%;
+    /* #FFF9C4 Very light yellow */
+    --dd-bg-gradient: linear-gradient(135deg, #FDEFB2 0%, #F6E27A 50%, #EFD152 100%);
   }
 
   .dark {
@@ -90,14 +104,14 @@
     --input: 222 47% 16%;
     --ring: 217 91% 60%;
 
-    --sidebar-background: 222 47% 8%;
-    --sidebar-foreground: 220 14% 96%;
-    --sidebar-primary: 217 91% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 222 47% 13%;
-    --sidebar-accent-foreground: 220 14% 96%;
-    --sidebar-border: 222 47% 13%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-background: 48 50% 98%;
+    --sidebar-foreground: 36 60% 20%;
+    --sidebar-primary: 43 90% 45%;
+    --sidebar-primary-foreground: 48 80% 98%;
+    --sidebar-accent: 43 90% 55%;
+    --sidebar-accent-foreground: 48 80% 98%;
+    --sidebar-border: 45 60% 88%;
+    --sidebar-ring: 43 90% 45%;
   }
 }
 
@@ -204,7 +218,7 @@
   .day-nao-ministrado:hover {
     background-color: #fecaca !important;
   }
-  
+
   .day-avaliacao {
     background-color: #f3e8ff !important;
     color: #6b21a8 !important;
@@ -266,6 +280,73 @@
 
   .form-label-compact {
     @apply text-xs font-semibold text-muted-foreground mb-1 block md:text-sm;
+  }
+
+  /* 🟡 Diário Digital Login Specific Styles */
+  .auth-bg-main {
+    background-color: #f2f3cd;
+    background-image:
+      radial-gradient(circle at 0% 0%, #FBF4D7 0%, transparent 50%),
+      radial-gradient(circle at 100% 100%, #F5E8B7 0%, transparent 50%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-header-strip {
+    height: 40px;
+    background: linear-gradient(to right, #D8BF5B, #EED177, #D8BF5B);
+    border-bottom: 2px solid #C8A440;
+    width: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
+  }
+
+  .auth-shape-left {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 60%;
+    background-color: #e6d3aa;
+    border-radius: 0 100% 100% 0 / 0 50% 50% 0;
+    z-index: 1;
+    box-shadow: 20px 0 50px rgba(0, 0, 0, 0.05);
+  }
+
+  .auth-card-premium {
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(212, 160, 23, 0.2);
+    border-radius: 2rem;
+    padding: 2.5rem;
+    box-shadow: 0 25px 50px -12px rgba(184, 134, 11, 0.15);
+  }
+
+  .dd-input {
+    @apply h-12 bg-white/60 border-yellow-200 focus:border-yellow-500 focus:ring-yellow-500 rounded-xl transition-all;
+  }
+
+  .dd-button {
+    background: linear-gradient(to bottom, #D4A017, #B8860B);
+    @apply h-12 text-white font-bold rounded-xl shadow-lg hover:shadow-xl hover:opacity-90 active:scale-95 transition-all;
+  }
+
+  .dd-text-gold {
+    color: #8B6508;
+  }
+
+  /* Educational Icons background pattern */
+  .auth-icons-pattern {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0.05;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%238B6508' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM6 30V20h82v10H6zm0-10V10h82v10H6zM6 10V0h82v10H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
   }
 }
 

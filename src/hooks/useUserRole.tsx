@@ -29,24 +29,13 @@ interface MenuItem {
 }
 
 const allMenuItems: MenuItem[] = [
-  { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
-  { title: 'Escolas', url: '/escolas', icon: Building2, allowedRoles: ['admin'] },
-  { title: 'Estudantes', url: '/Estudantes', icon: Users, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
-  { title: 'Responsáveis', url: '/responsaveis', icon: Users, allowedRoles: ['admin', 'gestor'] },
-  { title: 'Pré-Matrículas', url: '/pre-matriculas', icon: UserCheck, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
-
-  { title: 'Professores', url: '/professores', icon: GraduationCap, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
-  { title: 'Equipe Gestora', url: '/equipe-gestora', icon: UserCog, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
-  { title: 'Turmas', url: '/turmas', icon: School, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
-  { title: 'Mensagens', url: '/mensagens', icon: MessageSquare, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
-  { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
-  { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
-  { title: 'Relatórios', url: '/relatorios', icon: FileText, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario'] },
-  { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
-  { title: 'Usuários', url: '/usuarios', icon: UserCog, allowedRoles: ['admin'] },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor'] },
-  { title: 'Base Curricular', url: '/configuracoes/base-curricular', icon: BookOpen, allowedRoles: ['admin', 'gestor'] },
-  { title: 'Manual de Uso', url: '/manual-uso', icon: BookOpen, allowedRoles: ['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante'] },
+  { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['admin', 'professor'] },
+  { title: 'Mensagens', url: '/mensagens', icon: MessageSquare, allowedRoles: ['admin', 'professor'] },
+  { title: 'Diário Digital', url: '/diario-digital', icon: BookOpen, allowedRoles: ['admin', 'professor'] },
+  { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['admin', 'professor'] },
+  { title: 'Calendário', url: '/calendario', icon: Calendar, allowedRoles: ['admin', 'professor'] },
+  { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['admin', 'professor'] },
+  { title: 'Manual de Uso', url: '/manual-uso', icon: BookOpen, allowedRoles: ['admin', 'professor'] },
 ];
 
 export interface UserProfile {

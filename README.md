@@ -1,4 +1,4 @@
-# EducaFácil - Sistema de Gestão Escolar
+# Diário Digital - Sistema de Gestão Escolar
 
 Sistema completo de gestão escolar desenvolvido para facilitar a administração de instituições de ensino.
 

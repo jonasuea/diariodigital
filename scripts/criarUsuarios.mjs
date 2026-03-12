@@ -28,7 +28,7 @@ admin.initializeApp({
 const db = admin.firestore();
 const auth = admin.auth();
 
-const SENHA_PADRAO = 'EDUCAFACIL2026';
+const SENHA_PADRAO = 'DIARIODIGITAL2026';
 
 // Mapeia as coleções para os perfis do sistema
 const COLECOES = [

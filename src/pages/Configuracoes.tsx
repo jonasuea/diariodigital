@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -470,7 +470,7 @@ export default function Configuracoes() {
 
   const handleCriarUsuariosFaltantes = async () => {
     const confirmado = window.confirm(
-      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃƒO sejam um usuário terão um usuário criado no Firebase Authentication com senha "EDUCAFACIL2026".\n\nIsso pode demorar vários minutos. Você tem certeza que quer rodar isso?'
+      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃO sejam um usuário terão um usuário criado no Firebase Authentication com senha "DIARIODIGITAL2026".\n\nIsso pode demorar vários minutos. Você tem certeza que quer rodar isso?'
     );
     if (!confirmado) return;
 
@@ -530,7 +530,7 @@ export default function Configuracoes() {
                 const createUser = httpsCallable(functions, 'createUserAccount');
                 const result = await createUser({
                   email: emailLower,
-                  password: 'EDUCAFACIL2026',
+                  password: 'DIARIODIGITAL2026',
                   nome: nome || 'Sem nome',
                   role: colInfo.role,
                   escola_id: escola_id

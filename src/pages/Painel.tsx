@@ -70,10 +70,10 @@ const DIAS_SEMANA_CHART = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
 
 function StatCard({ title, value, icon: Icon, onClick }: { title: string, value: string | number, icon: React.ElementType, onClick?: () => void }) {
   return (
-    <Card onClick={onClick} className={cn(onClick ? 'cursor-pointer hover:bg-muted/50 transition-colors' : '')}>
+    <Card onClick={onClick} className={cn('border-yellow-200/50 shadow-sm', onClick ? 'cursor-pointer hover:bg-yellow-50/50 transition-colors' : '')}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium">{title}</CardTitle>
-        <Icon className="h-4 w-4 text-muted-foreground" />
+        <CardTitle className="text-sm font-medium text-[#8B6508]">{title}</CardTitle>
+        <Icon className="h-4 w-4 text-[#D4A017]" />
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">{value}</div>
@@ -445,9 +445,9 @@ export default function Painel() {
                     {proximosEventos.length > 0 ? (
                       proximosEventos.map(evento => (
                         <div key={evento.id} className="flex items-start gap-3">
-                          <div className="flex-shrink-0 text-center font-semibold bg-muted p-2 rounded-lg min-w-[56px]">
+                          <div className="flex-shrink-0 text-center font-semibold bg-yellow-50 border border-yellow-100 p-2 rounded-lg min-w-[56px]">
                             <div className="text-[10px] uppercase text-red-500 font-bold">{format(evento.data.toDate(), 'MMM', { locale: ptBR })}</div>
-                            <div className="text-xl">{format(evento.data.toDate(), 'dd')}</div>
+                            <div className="text-xl text-[#8B6508]">{format(evento.data.toDate(), 'dd')}</div>
                           </div>
                           <div className="flex-1">
                             <p className="text-sm font-semibold leading-tight">{evento.titulo}</p>

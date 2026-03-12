@@ -262,7 +262,7 @@ export default function NovoMembro() {
         const createUser = httpsCallable(functions, 'createUserAccount');
         const result = await createUser({
           email: formData.email,
-          password: 'EDUCAFACIL2026', // Senha padrão inicial
+          password: 'DIARIODIGITAL2026', // Senha padrão inicial
           nome: formData.nome,
           role: formData.role,
           escola_id: formData.escola_id

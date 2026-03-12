@@ -40,7 +40,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-background/50">
         <AppSidebar />
         <MainContent title={title}>{children}</MainContent>
       </div>
