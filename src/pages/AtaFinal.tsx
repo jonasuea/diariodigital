@@ -108,18 +108,20 @@ export default function AtaFinal() {
   }
 
   return (
-    <AppLayout title={`Ata Final - ${turma?.nome || ''}`}>
+    <AppLayout>
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <p className="text-muted-foreground">Resultados finais e frequência dos Estudantes</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <Button variant="outline" onClick={() => navigate('/turmas')} className="gap-2">
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Ata Final - {turma?.nome || ''}</h1>
+            <p className="text-xs md:text-sm text-muted-foreground truncate">Resultados finais e frequência dos Estudantes</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate('/turmas')} className="shrink-0 gap-2">
             <ArrowLeft className="h-4 w-4" />
-            Voltar para Turmas
+            <span className="hidden xs:inline">Voltar para Turmas</span>
+            <span className="xs:hidden">Voltar</span>
           </Button>
-
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
           <div className="flex-1" />
 
           <Button variant="outline" className="gap-2">

@@ -61,6 +61,7 @@ export default function Frequencia() {
   const [justificativaDialogOpen, setJustificativaDialogOpen] = useState(false);
   const [justificativaText, setJustificativaText] = useState('');
   const [frequenciaParaJustificar, setFrequenciaParaJustificar] = useState<FrequenciaRecord | null>(null);
+  const [entradasDiario, setEntradasDiario] = useState<Set<string>>(new Set());
 
   const currentDayRef = useRef<HTMLTableCellElement>(null);
 
@@ -143,8 +144,25 @@ export default function Frequencia() {
           freqData[`${data.estudante_id}-${data.data}`] = { id: doc.id, ...data };
         });
         setFrequencias(freqData);
+
+        // Buscar entradas no diário (cliques nas datas)
+        const entradasQuery = query(
+          collection(db, 'entradas_diario'),
+          where('escola_id', '==', escolaAtivaId),
+          where('turma_id', '==', turmaId),
+          where('componente', '==', componente),
+          where('data', '>=', format(startDate, 'yyyy-MM-dd')),
+          where('data', '<=', format(endDate, 'yyyy-MM-dd'))
+        );
+        const entradasSnapshot = await getDocs(entradasQuery);
+        const entradasSet = new Set<string>();
+        entradasSnapshot.forEach(doc => {
+          entradasSet.add(doc.data().data);
+        });
+        setEntradasDiario(entradasSet);
       } else {
         setFrequencias({});
+        setEntradasDiario(new Set());
       }
 
     } catch (error) {
@@ -256,6 +274,41 @@ export default function Frequencia() {
     }
   };
 
+  const handleDateClick = async (date: Date) => {
+    if (!turmaId || !componente || !escolaAtivaId) return;
+    
+    const dateStr = format(date, 'yyyy-MM-dd');
+    if (entradasDiario.has(dateStr)) return;
+
+    if (!canEditDate(date)) {
+      toast.error('Você não pode marcar entrada em datas futuras ou fora do prazo permitido.');
+      return;
+    }
+
+    // Otimista
+    setEntradasDiario(prev => new Set(prev).add(dateStr));
+
+    try {
+      await addDoc(collection(db, 'entradas_diario'), {
+        escola_id: escolaAtivaId,
+        turma_id: turmaId,
+        componente,
+        data: dateStr,
+        timestamp: new Date(),
+      });
+      toast.success(`Entrada registrada para o dia ${format(date, 'dd/MM')}`);
+      logActivity(`marcou entrada no diário para o dia ${dateStr} na turma "${turma?.nome}" (${componente}).`);
+    } catch (error) {
+      console.error("Erro ao salvar entrada no diário:", error);
+      setEntradasDiario(prev => {
+        const next = new Set(prev);
+        next.delete(dateStr);
+        return next;
+      });
+      toast.error("Erro ao registrar entrada no diário");
+    }
+  };
+
   const handleJustificativa = async () => {
     if (!frequenciaParaJustificar) return;
     const key = `${frequenciaParaJustificar.estudante_id}-${frequenciaParaJustificar.data}`;
@@ -333,15 +386,17 @@ export default function Frequencia() {
   });
 
   return (
-    <AppLayout title={`Frequência - ${turma?.nome || ''}`}>
+    <AppLayout>
       <div className="space-y-4 animate-fade-in w-full" style={{ maxWidth: '100%', overflowX: 'hidden' }}>
-        <p className="text-muted-foreground -mt-1 text-sm">Controle de frequência dos Estudantes - Ano {turma?.ano}</p>
-
-        {/* Linha 1: Voltar */}
-        <div>
-          <Button variant="outline" onClick={() => navigate(origem === 'diario' ? '/diario-digital' : '/turmas')} className="gap-2">
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Frequência - {turma?.nome || ''}</h1>
+            <p className="text-xs md:text-sm text-muted-foreground truncate">Controle de frequência dos Estudantes - Ano {turma?.ano}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate(origem === 'diario' ? '/diario-digital' : '/turmas')} className="shrink-0 gap-2">
             <ArrowLeft className="h-4 w-4" />
-            {origem === 'diario' ? 'Voltar para Diário Digital' : 'Voltar para Turmas'}
+            <span className="hidden xs:inline">{origem === 'diario' ? 'Voltar para Diário Digital' : 'Voltar para Turmas'}</span>
+            <span className="xs:hidden">Voltar</span>
           </Button>
         </div>
 
@@ -433,19 +488,27 @@ export default function Frequencia() {
                       );
                       // Mobile: mostrar hoje (0) e até 2 dias anteriores (-1, -2)
                       const visibleMobile = diffDays >= -2 && diffDays <= 0;
+                      const dateStr = format(dayObj.date, 'yyyy-MM-dd');
+                      const hasEntrada = entradasDiario.has(dateStr);
 
                       return (
                         <th
                           key={dayObj.date.toISOString()}
                           ref={isToday ? currentDayRef : null}
-                          className={`p-1 text-center min-w-[44px] border-b
-                            ${isToday ? 'bg-blue-100 border-x border-blue-300' : 'bg-muted'}
+                          onClick={() => handleDateClick(dayObj.date)}
+                          className={`p-1 text-center min-w-[44px] border-b cursor-pointer transition-colors
+                            ${hasEntrada 
+                              ? 'bg-green-500 text-white' 
+                              : isToday 
+                                ? 'bg-blue-100 border-x border-blue-300' 
+                                : 'bg-muted hover:bg-muted/80'}
                             ${!visibleMobile ? 'hidden sm:table-cell' : ''}`}
                         >
-                          <div className={`text-[10px] uppercase tracking-tighter ${isToday ? 'text-blue-700 font-bold' : 'text-muted-foreground'}`}>
+                          <div className={`text-[10px] uppercase tracking-tighter 
+                            ${hasEntrada ? 'text-green-50' : isToday ? 'text-blue-700 font-bold' : 'text-muted-foreground'}`}>
                             {dayObj.dayName}
                           </div>
-                          <div className={`text-sm font-semibold ${isToday ? 'text-blue-800' : ''}`}>
+                          <div className={`text-sm font-semibold ${hasEntrada ? 'text-white' : isToday ? 'text-blue-800' : ''}`}>
                             {dayObj.dayStr}
                           </div>
                         </th>

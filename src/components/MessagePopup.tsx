@@ -49,6 +49,48 @@ export function MessagePopup() {
     const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
     const [open, setOpen] = useState(false);
 
+    // 0. Load acknowledged messages from localStorage onto justReadIds (persistence across remounts)
+    useEffect(() => {
+        const stored = localStorage.getItem('acknowledged_messages');
+        if (stored) {
+            try {
+                const parsed = JSON.parse(stored);
+                // Filter out entries older than 24 hours
+                const now = Date.now();
+                const oneDay = 24 * 60 * 60 * 1000;
+                const validIds = Object.entries(parsed)
+                    .filter(([_, timestamp]) => now - (timestamp as number) < oneDay)
+                    .map(([id, _]) => id);
+
+                if (validIds.length > 0) {
+                    setJustReadIds(validIds);
+                }
+            } catch (e) {
+                console.error("Erro ao carregar mensagens lidas do localStorage:", e);
+            }
+        }
+    }, []);
+
+    // Helper to add to justReadIds and localStorage
+    const markAsJustRead = (id: string) => {
+        setJustReadIds(prev => {
+            if (prev.includes(id)) return prev;
+            const updated = [...prev, id];
+            
+            // Persist to localStorage
+            const now = Date.now();
+            const stored = localStorage.getItem('acknowledged_messages');
+            let parsed = {};
+            if (stored) {
+                try { parsed = JSON.parse(stored); } catch(e) {}
+            }
+            (parsed as any)[id] = now;
+            localStorage.setItem('acknowledged_messages', JSON.stringify(parsed));
+            
+            return updated;
+        });
+    };
+
     useEffect(() => {
         if (!user || !escolaAtivaId) return;
 
@@ -114,7 +156,7 @@ export function MessagePopup() {
             const isDirect = currentMessage.tipo === 'direta';
 
             // 1. Update local state immediately to avoid race condition/re-opening
-            setJustReadIds(prev => [...prev, msgId]);
+            markAsJustRead(msgId);
             setOpen(false);
             setCurrentMessage(null);
 

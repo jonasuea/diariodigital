@@ -86,6 +86,21 @@ service cloud.firestore {
       allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
     }
 
+    match /entradas_diario/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
+    match /notas_parciais/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
+    match /notas_parciais_config/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
     match /activity_log/{id} {
       // Admin, Gestor e Secretário podem ver as turmas
       allow read: if isAdmin() || isGestor() || isSecretario();
@@ -135,6 +150,11 @@ service cloud.firestore {
       allow write: if isAdmin() || isGestor() || isSecretario();
     }
 
+    match /registros_aulas/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+    }
+
     match /avaliacoes/{id} { 
       // Admin, Gestor, Secretário e Professor podem ver as turmas
       allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor();
@@ -153,9 +173,15 @@ service cloud.firestore {
 
 
 
-   // match /atividades_recentes/{id} {
-   //   allow read, write: if hasAnyRole();
-    //}
+    match /mensagens/{id} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isAdmin() || isGestor() || isSecretario() || isProfessor() ||
+                    (isSignedIn() && resource.data.tipo == 'direta' && 
+                     (request.auth.uid == resource.data.destinatario_id || request.auth.token.email == resource.data.get('destinatario_email', '')) &&
+                     request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lido', 'data_leitura']));
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == resource.data.remetente_id);
+    }
 
     // =========================================================================
     // 4. REGRA RESIDUAL (COLEÇÕES NÃO LISTADAS ACIMA)

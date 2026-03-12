@@ -23,6 +23,20 @@ import {
     SelectValue
 } from '@/components/ui/select';
 import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandInput,
+    CommandItem,
+    CommandList,
+} from "@/components/ui/command";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+import { Check, ChevronsUpDown } from "lucide-react";
+import {
     MessageSquare,
     Send,
     Inbox,
@@ -51,13 +65,15 @@ import {
     getDocs,
     getDoc,
     limit,
-    Timestamp
+    Timestamp,
+    deleteDoc
 } from 'firebase/firestore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from "@/lib/utils";
 
 interface Message {
     id: string;
@@ -86,6 +102,9 @@ export default function Mensagens() {
     const [messages, setMessages] = useState<Message[]>([]);
     const [sentMessages, setSentMessages] = useState<Message[]>([]);
     const [allMessages, setAllMessages] = useState<Message[]>([]);
+    const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [isComboboxOpen, setIsComboboxOpen] = useState(false);
     const [seenIds, setSeenIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -101,10 +120,6 @@ export default function Mensagens() {
     const [subject, setSubject] = useState('');
     const [content, setContent] = useState('');
     const [sending, setSending] = useState(false);
-
-    // List of potential recipients for direct messages
-    const [availableUsers, setAvailableUsers] = useState<{ id: string, nome: string, role: string, email: string }[]>([]);
-    const [loadingUsers, setLoadingUsers] = useState(false);
 
     // View Message Details
     const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
@@ -178,15 +193,29 @@ export default function Mensagens() {
         async function fetchRecipients() {
             setLoadingUsers(true);
             try {
-                // Simple strategy: Fetch profiles. In production, this should be a more filtered list.
+                // Fetch profiles
                 const q = query(
                     collection(db, 'profiles'),
                     where('excluido', '==', false),
-                    limit(100)
+                    limit(500) // Increased limit for search
                 );
                 const snap = await getDocs(q);
 
-                // Fetch current roles for status/role verification
+                // Fetch students to link with responsibles
+                const studentsSnap = await getDocs(
+                    query(collection(db, 'estudantes'), where('excluido', '==', false))
+                );
+                
+                const studentMap = new Map();
+                studentsSnap.docs.forEach(d => {
+                    const data = d.data();
+                    if (data.usuario_id) {
+                        const existing = studentMap.get(data.usuario_id) || [];
+                        studentMap.set(data.usuario_id, [...existing, data.nome]);
+                    }
+                });
+
+                // Fetch current roles
                 const rolesSnap = await getDocs(collection(db, 'user_roles'));
                 const rolesMap = new Map();
                 rolesSnap.docs.forEach(d => rolesMap.set(d.id, d.data().role));
@@ -194,16 +223,20 @@ export default function Mensagens() {
                 const users = snap.docs
                     .map(d => {
                         const profileData = d.data();
-                        // Prefer role from user_roles, fallback to profile.role
                         const profileRole = rolesMap.get(d.id) || profileData.role || 'unknown';
+                        const linkedStudents = studentMap.get(d.id) || [];
+                        
                         return {
                             id: d.id,
                             nome: profileData.nome,
                             role: profileRole,
-                            email: profileData.email || 'N/A'
+                            email: profileData.email || 'N/A',
+                            estudantes: linkedStudents,
+                            // Search string for command filter
+                            searchString: `${profileData.nome} ${profileData.email} ${linkedStudents.join(' ')}`.toLowerCase()
                         };
                     })
-                    .filter(u => u.id !== user?.uid); // Don't send to self
+                    .filter(u => u.id !== user?.uid);
 
                 setAvailableUsers(users);
             } catch (error) {
@@ -521,16 +554,66 @@ export default function Mensagens() {
                             ) : (
                                 <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
                                     <Label>Destinatário</Label>
-                                    <Select value={targetUserId} onValueChange={setTargetUserId} disabled={loadingUsers}>
-                                        <SelectTrigger><SelectValue placeholder={loadingUsers ? "Carregando..." : "Selecione o usuário"} /></SelectTrigger>
-                                        <SelectContent>
-                                            {availableUsers.map(u => (
-                                                <SelectItem key={u.id} value={u.id}>
-                                                    {u.nome} ({u.role}) - {u.email}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    <Popover open={isComboboxOpen} onOpenChange={setIsComboboxOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={isComboboxOpen}
+                                                className="w-full justify-between font-normal text-muted-foreground"
+                                                disabled={loadingUsers}
+                                            >
+                                                {targetUserId
+                                                    ? availableUsers.find((u) => u.id === targetUserId)?.nome
+                                                    : loadingUsers ? "Carregando..." : "Selecione o usuário..."}
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[400px] p-0" align="start">
+                                            <Command filter={(value, search) => {
+                                                const user = availableUsers.find(u => u.id === value);
+                                                if (user?.searchString.includes(search.toLowerCase())) return 1;
+                                                return 0;
+                                            }}>
+                                                <CommandInput placeholder="Buscar por nome, e-mail ou aluno..." />
+                                                <CommandList>
+                                                    <CommandEmpty>Nenhum usuário encontrado.</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {availableUsers.map((u) => (
+                                                            <CommandItem
+                                                                key={u.id}
+                                                                value={u.id}
+                                                                onSelect={(currentValue) => {
+                                                                    setTargetUserId(currentValue === targetUserId ? "" : currentValue);
+                                                                    setIsComboboxOpen(false);
+                                                                }}
+                                                            >
+                                                                <Check
+                                                                    className={cn(
+                                                                        "mr-2 h-4 w-4",
+                                                                        targetUserId === u.id ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                                <div className="flex flex-col">
+                                                                    <span>
+                                                                        {u.nome} <span className="text-[10px] text-muted-foreground uppercase ml-1">({u.role})</span>
+                                                                    </span>
+                                                                    <div className="flex flex-col text-[11px] text-muted-foreground">
+                                                                        <span>{u.email}</span>
+                                                                        {u.estudantes && u.estudantes.length > 0 && (
+                                                                            <span className="text-primary font-medium">
+                                                                                Estudante(s): {u.estudantes.join(', ')}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
                             )}
                         </div>

@@ -373,18 +373,20 @@ export default function Notas() {
   const isInputDisabled = componente === 'todos';
 
   return (
-    <AppLayout title={`Notas da Turma ${turma?.nome || ''}`}>
+    <AppLayout>
       <div className="space-y-6 animate-fade-in">
-        <div>
-          <p className="text-muted-foreground">Lançamento e gerenciamento de notas bimestrais</p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-4">
-          <Button variant="outline" onClick={() => navigate(origem === 'diario' ? '/diario-digital' : '/turmas')} className="gap-2">
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Notas da Turma {turma?.nome || ''}</h1>
+            <p className="text-xs md:text-sm text-muted-foreground truncate">Lançamento e gerenciamento de notas bimestrais</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate(origem === 'diario' ? '/diario-digital' : '/turmas')} className="shrink-0 gap-2">
             <ArrowLeft className="h-4 w-4" />
-            {origem === 'diario' ? 'Voltar para Diário Digital' : 'Voltar para Turmas'}
+            <span className="hidden xs:inline">{origem === 'diario' ? 'Voltar para Diário Digital' : 'Voltar para Turmas'}</span>
+            <span className="xs:hidden">Voltar</span>
           </Button>
-
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
           <div className="relative flex-1 max-w-xs">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input

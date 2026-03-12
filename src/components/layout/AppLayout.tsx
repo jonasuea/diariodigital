@@ -43,7 +43,6 @@ export function AppLayout({ children, title }: AppLayoutProps) {
       <div className="min-h-screen flex w-full">
         <AppSidebar />
         <MainContent title={title}>{children}</MainContent>
-        <MessagePopup />
       </div>
     </SidebarProvider>
   );

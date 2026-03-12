@@ -222,7 +222,7 @@ export default function DiarioDigital() {
       icon: ClipboardList,
       color: 'text-purple-500',
       bgColor: 'bg-purple-50',
-      action: () => navigate(`/diario-digital/avaliacoes?turmaId=${selectedTurmaId}&componente=${encodeURIComponent(selectedComponente)}`),
+      action: () => navigate(`/diario-digital/avaliacoes/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente)}`),
     },
     {
       title: 'Notas Parciais',

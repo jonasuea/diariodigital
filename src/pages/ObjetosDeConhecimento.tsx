@@ -1,44 +1,46 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useAuth } from "@/contexts/AuthContext";
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft } from 'lucide-react';
+import { Loader2, ArrowLeft, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Calendar } from "@/components/ui/calendar";
+import { ptBR } from 'date-fns/locale';
+import { format, isSameDay, parseISO } from 'date-fns';
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Turma {
   id: string;
   nome: string;
 }
 
-const bimestres = [1, 2, 3, 4];
+interface Evento {
+  id: string;
+  titulo: string;
+  data: Timestamp;
+}
 
 export default function ObjetosDeConhecimento() {
   const navigate = useNavigate();
   const { turmaId } = useParams<{ turmaId?: string }>();
   const [searchParams] = useSearchParams();
   const componente = searchParams.get('componente');
+  const { escolaAtivaId } = useUserRole();
 
   const [turma, setTurma] = useState<Turma | null>(null);
-  const [conteudos, setConteudos] = useState<Record<number, { id: string | null; texto: string }>>({
-    1: { id: null, texto: "" },
-    2: { id: null, texto: "" },
-    3: { id: null, texto: "" },
-    4: { id: null, texto: "" },
-  });
-
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
+  const [diasMinistrados, setDiasMinistrados] = useState<Set<string>>(new Set());
+  const [diasNaoMinistrados, setDiasNaoMinistrados] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
-  const [savingBimestre, setSavingBimestre] = useState<number | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   useEffect(() => {
-    async function fetchTurmaEConteudos() {
-      if (!turmaId || !componente) {
+    async function fetchData() {
+      if (!turmaId || !componente || !escolaAtivaId) {
         setLoading(false);
         return;
       }
@@ -50,131 +52,154 @@ export default function ObjetosDeConhecimento() {
         const turmaDoc = await getDoc(turmaDocRef);
         if (turmaDoc.exists()) {
           setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
-        } else {
-          toast.error("Turma não encontrada.");
         }
 
-        // Fetch Conteudos
-        const q = query(
-          collection(db, 'objetos_conhecimento'),
+        // Fetch Eventos
+        const qEventos = query(
+          collection(db, 'eventos'),
+          where('escola_id', '==', escolaAtivaId),
+          orderBy('data', 'asc')
+        );
+        const queryEvents = await getDocs(qEventos);
+        const eventosData = queryEvents.docs.map(doc => {
+          const data = doc.data();
+          if (data.data && typeof data.data === 'string') {
+            data.data = Timestamp.fromDate(parseISO(data.data));
+          }
+          return { id: doc.id, ...data } as Evento;
+        });
+        setEventos(eventosData);
+
+        // Fetch Dias Letivos
+        const qDias = query(
+          collection(db, 'dias_letivos'),
+          where('escola_id', '==', escolaAtivaId)
+        );
+        const queryDias = await getDocs(qDias);
+        const dias = new Set<string>();
+        queryDias.forEach(doc => {
+          dias.add(doc.data().data);
+        });
+        setDiasLetivos(dias);
+
+        // Fetch Dias Planejados (registros de aulas)
+        const qPlanejados = query(
+          collection(db, 'registros_aulas'),
           where('turma_id', '==', turmaId),
           where('componente', '==', componente)
         );
-        const querySnapshot = await getDocs(q);
-
-        const novosConteudos: Record<number, { id: string | null; texto: string }> = {
-          1: { id: null, texto: "" }, 2: { id: null, texto: "" }, 3: { id: null, texto: "" }, 4: { id: null, texto: "" }
-        };
-
-        querySnapshot.forEach(doc => {
+        const queryPlanejados = await getDocs(qPlanejados);
+        const ministrados = new Set<string>();
+        const naoMinistrados = new Set<string>();
+        
+        queryPlanejados.forEach(doc => {
           const data = doc.data();
-          if (data.bimestre >= 1 && data.bimestre <= 4) {
-            novosConteudos[data.bimestre] = { id: doc.id, texto: data.conteudo };
+          if (data.status === 'Ministrado') {
+            ministrados.add(data.data);
+          } else {
+            naoMinistrados.add(data.data);
           }
         });
-        setConteudos(novosConteudos);
+        setDiasMinistrados(ministrados);
+        setDiasNaoMinistrados(naoMinistrados);
 
       } catch (error) {
         console.error("Error fetching data: ", error);
-        toast.error("Sem permissão para carregar os dados.");
+        toast.error("Erro ao carregar os dados do calendário.");
       } finally {
         setLoading(false);
       }
     }
 
-    fetchTurmaEConteudos();
-  }, [turmaId, componente]);
+    fetchData();
+  }, [turmaId, componente, escolaAtivaId]);
 
-  const handleSave = async (bimestre: number) => {
-    if (!turmaId || !componente) {
-      toast.warning("Turma ou componente não identificados.");
-      return;
-    }
-
-    setSavingBimestre(bimestre);
-    const conteudoParaSalvar = conteudos[bimestre];
-
-    try {
-      if (conteudoParaSalvar.id) {
-        const docRef = doc(db, 'objetos_conhecimento', conteudoParaSalvar.id);
-        await updateDoc(docRef, { conteudo: conteudoParaSalvar.texto });
-        toast.success(`Conteúdo do ${bimestre}º Bimestre atualizado!`);
-      } else {
-        const docRef = await addDoc(collection(db, 'objetos_conhecimento'), {
-          turma_id: turmaId,
-          componente: componente,
-          bimestre: bimestre,
-          conteudo: conteudoParaSalvar.texto,
-          created_at: new Date(),
-        });
-        setConteudos(prev => ({ ...prev, [bimestre]: { ...prev[bimestre], id: docRef.id } }));
-        toast.success(`Conteúdo do ${bimestre}º Bimestre salvo!`);
-      }
-    } catch (error) {
-      console.error(`Error saving bimestre ${bimestre}: `, error);
-      toast.error(`Sem permissão para salvar o conteúdo do ${bimestre}º Bimestre.`);
-    } finally {
-      setSavingBimestre(null);
-    }
-  };
-
-  const handleConteudoChange = (bimestre: number, texto: string) => {
-    setConteudos(prev => ({ ...prev, [bimestre]: { ...prev[bimestre], texto: texto } }));
-  };
+  const eventDates = eventos.map(e => e.data.toDate());
+  const diasLetivosDates = Array.from(diasLetivos).map(d => parseISO(d));
+  const diasMinistradosDates = Array.from(diasMinistrados).map(d => parseISO(d));
+  const diasNaoMinistradosDates = Array.from(diasNaoMinistrados).map(d => parseISO(d));
 
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Objetos de Conhecimento</h1>
-            <p className="text-muted-foreground">
-              Planeje e registre os objetos de conhecimento para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Objetos de Conhecimento</h1>
+            <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
+              Visualize os dias letivos e eventos para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/diario-digital')} className="shrink-0">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para o Diário
+          <Button variant="outline" size="sm" onClick={() => navigate('/diario-digital')} className="shrink-0">
+            <ArrowLeft className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden xs:inline">Voltar para o Diário</span>
+            <span className="xs:hidden">Voltar</span>
           </Button>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Conteúdos Bimestrais</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="flex h-40 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
-            ) : turmaId && componente ? (
-              <Accordion type="single" collapsible className="w-full" defaultValue="bimestre-1">
-                {bimestres.map((bimestre) => (
-                  <AccordionItem key={bimestre} value={`bimestre-${bimestre}`}>
-                    <AccordionTrigger>{bimestre}º Bimestre</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4">
-                        <Textarea
-                          placeholder={`Digite os objetos de conhecimento e habilidades para o ${bimestre}º bimestre...`}
-                          className="min-h-[200px]"
-                          value={conteudos[bimestre].texto}
-                          onChange={(e) => handleConteudoChange(bimestre, e.target.value)}
-                          disabled={savingBimestre !== null}
-                        />
-                        <Button onClick={() => handleSave(bimestre)} disabled={savingBimestre !== null}>
-                          {savingBimestre === bimestre ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                          {savingBimestre === bimestre ? 'Salvando...' : `Salvar ${bimestre}º Bimestre`}
-                        </Button>
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                ))}
-              </Accordion>
-            ) : (
-              <div className="flex h-40 items-center justify-center rounded-md border-2 border-dashed">
-                <p className="text-muted-foreground">Não foi possível carregar os dados. Verifique se a turma e o componente foram selecionados corretamente.</p>
+        <div className="flex justify-center">
+          <Card className="w-full max-w-2xl">
+            <CardHeader className="pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <CardTitle className="text-lg">Calendário de Dias Letivos</CardTitle>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-100 rounded-full border border-green-300"></div>
+                  <span>Dia Letivo</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-blue-100 rounded-full border border-blue-300"></div>
+                  <span>Ministrado</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-red-100 rounded-full border border-red-300"></div>
+                  <span>Não Ministrado</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-primary/10 rounded-full"></div>
+                  <span>Evento</span>
+                </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+              ) : (
+                <div className="flex justify-center py-4">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSelectedDate(date);
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        navigate(`/diario-digital/objetos-de-conhecimento/${turmaId}/registro?componente=${componente}&data=${dateStr}`);
+                      }
+                    }}
+                    locale={ptBR}
+                    className="rounded-md border shadow-sm mx-auto"
+                    modifiers={{
+                      hasEvent: eventDates,
+                      isLetivo: diasLetivosDates,
+                      isMinistrado: diasMinistradosDates,
+                      isNaoMinistrado: diasNaoMinistradosDates
+                    }}
+                    modifiersClassNames={{
+                      isLetivo: 'day-letivo',
+                      isMinistrado: 'day-planejado',
+                      isNaoMinistrado: 'day-nao-ministrado'
+                    }}
+                    modifiersStyles={{
+                      hasEvent: {
+                        fontWeight: 'bold',
+                        textDecoration: 'underline',
+                        textDecorationColor: 'hsl(var(--primary))',
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </AppLayout>
   );

@@ -32,7 +32,9 @@ import NotFound from "./pages/NotFound";
 import Logs from "./pages/Logs";
 import Manutencao from "./pages/Manutencao";
 import ObjetosDeConhecimento from "./pages/ObjetosDeConhecimento";
+import RegistroObjetoConhecimento from "./pages/RegistroObjetoConhecimento";
 import Avaliacoes from "./pages/Avaliacoes";
+import RegistroAvaliacao from "./pages/RegistroAvaliacao";
 import PerfilEstudante from "./pages/PerfilEstudante";
 import PerfilProfessor from "./pages/PerfilProfessor";
 
@@ -42,6 +44,8 @@ import ManualUso from "./pages/ManualUso";
 import PreMatriculas from "./pages/PreMatriculas";
 import ErrorPage from "./components/ErrorPage";
 import EscolhaPerfil from "./pages/EscolhaPerfil";
+import BaseCurricular from "./pages/BaseCurricular";
+import { MessagePopup } from "./components/MessagePopup";
 
 import { useAutoUpdate } from "@/hooks/useAutoUpdate";
 import { UserRoleProvider } from "@/hooks/useUserRole";
@@ -91,12 +95,15 @@ const router = createBrowserRouter([
       { path: "/calendario", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Calendario /></ProtectedRoute> },
       { path: "/diario-digital", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><DiarioDigital /></ProtectedRoute> },
       { path: "/diario-digital/objetos-de-conhecimento/:turmaId", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
+      { path: "/diario-digital/objetos-de-conhecimento/:turmaId/registro", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><RegistroObjetoConhecimento /></ProtectedRoute> },
       { path: "/diario-digital/objetos-de-conhecimento", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
-      { path: "/diario-digital/avaliacoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Avaliacoes /></ProtectedRoute> },
+      { path: "/diario-digital/avaliacoes/:turmaId", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Avaliacoes /></ProtectedRoute> },
+      { path: "/diario-digital/avaliacoes/:turmaId/registro", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><RegistroAvaliacao /></ProtectedRoute> },
       { path: "/relatorios", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Relatorios /></ProtectedRoute> },
       { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><Configuracoes /></ProtectedRoute> },
       { path: "/usuarios", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Usuarios /></ProtectedRoute> },
       { path: "/responsaveis", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><Responsaveis /></ProtectedRoute> },
+      { path: "/configuracoes/base-curricular", element: <ProtectedRoute allowedRoles={['admin', 'gestor']}><BaseCurricular /></ProtectedRoute> },
       { path: "/mensagens", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor']}><Mensagens /></ProtectedRoute> },
       { path: "/logs", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario']}><Logs /></ProtectedRoute> },
       { path: "/manual-uso", element: <ProtectedRoute allowedRoles={['admin', 'gestor', 'pedagogo', 'secretario', 'professor', 'estudante']}><ManualUso /></ProtectedRoute> },
@@ -116,6 +123,7 @@ const App = () => {
         <AuthProvider>
           <UserRoleProvider>
             <RouterProvider router={router} />
+            <MessagePopup />
           </UserRoleProvider>
         </AuthProvider>
       </TooltipProvider>

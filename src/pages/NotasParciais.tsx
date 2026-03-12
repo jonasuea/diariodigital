@@ -7,7 +7,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Save, Send, Search, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Save, Send, Search, ClipboardList, Link as LinkIcon, Unlink, Info, Check, Calendar } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from "@/components/ui/dialog";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { db } from '@/lib/firebase';
 import {
     collection, query, where, getDocs, doc, updateDoc,
@@ -17,6 +34,7 @@ import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { cn } from "@/lib/utils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -45,6 +63,16 @@ type NotasPorEstudante = Record<string, NotaParcial>;
 
 // All bimesters: 1-4 → NotasPorEstudante
 type NotasState = Record<number, NotasPorEstudante>;
+
+interface AvaliacaoVinculo {
+    id: string;
+    titulo: string;
+    data: string;
+    valor?: string;
+}
+
+// Map: bimestre -> (avSlot -> AvaliacaoVinculo)
+type AvaliacoesLinks = Record<number, Record<string, AvaliacaoVinculo | null>>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -128,6 +156,13 @@ export default function NotasParciais() {
     const [syncing, setSyncing] = useState<number | null>(null);
     const [unlocking, setUnlocking] = useState<number | null>(null);
     const [bimestresLocked, setBimestresLocked] = useState<Set<number>>(new Set());
+    const [avaliacoesLinks, setAvaliacoesLinks] = useState<AvaliacoesLinks>({ 1: {}, 2: {}, 3: {}, 4: {} });
+
+    const [showLinkDialog, setShowLinkDialog] = useState(false);
+    const [currentLinkBimestre, setCurrentLinkBimestre] = useState<number | null>(null);
+    const [currentLinkSlot, setCurrentLinkSlot] = useState<string | null>(null);
+    const [avaliacoesList, setAvaliacoesList] = useState<AvaliacaoVinculo[]>([]);
+    const [loadingAvaliacoes, setLoadingAvaliacoes] = useState(false);
 
     const { role, escolaAtivaId } = useUserRole();
     const ROLES_GESTAO = ['admin', 'gestor', 'pedagogo', 'secretario'];
@@ -151,27 +186,45 @@ export default function NotasParciais() {
         try {
             const snap = await getDoc(doc(db, 'notas_parciais_config', configId));
             if (snap.exists()) {
-                const locked: number[] = snap.data()?.bimestres_bloqueados || [];
+                const data = snap.data();
+                const locked: number[] = data?.bimestres_bloqueados || [];
                 setBimestresLocked(new Set(locked));
+
+                // Carrega os vínculos de avaliações
+                const links = data?.links || {};
+                const parsedLinks: AvaliacoesLinks = { 1: {}, 2: {}, 3: {}, 4: {} };
+                [1, 2, 3, 4].forEach(b => {
+                    parsedLinks[b] = links[b] || {};
+                });
+                setAvaliacoesLinks(parsedLinks);
             } else {
-                // Sem config salva: todos os bimestres começam bloqueados
-                setBimestresLocked(new Set([1, 2, 3, 4]));
+                // Sem config salva: todos os bimestres começam DESBLOQUEADOS
+                setBimestresLocked(new Set());
+                setAvaliacoesLinks({ 1: {}, 2: {}, 3: {}, 4: {} });
             }
         } catch (err) {
-            console.warn('Sem permissão para carregar config de bloqueio:', err);
+            console.warn('Erro ao carregar config de bloqueio:', err);
         }
     }
 
-    async function saveConfig(locked: Set<number>) {
+    async function saveConfig(locked: Set<number>, links?: AvaliacoesLinks) {
         if (!configId) return;
         try {
-            await setDoc(doc(db, 'notas_parciais_config', configId), {
+            const payload: any = {
                 turma_id: turmaId,
                 escola_id: escolaAtivaId,
                 componente,
                 ano,
                 bimestres_bloqueados: Array.from(locked),
-            }, { merge: true });
+            };
+
+            if (links) {
+                payload.links = links;
+            } else {
+                payload.links = avaliacoesLinks;
+            }
+
+            await setDoc(doc(db, 'notas_parciais_config', configId), payload, { merge: true });
         } catch (err) {
             console.warn('Sem permissão para salvar config de bloqueio:', err);
         }
@@ -412,6 +465,49 @@ export default function NotasParciais() {
         }
     }
 
+    const openLinkDialog = async (bim: number, slot: string) => {
+        if (bimestresLocked.has(bim)) return;
+        setCurrentLinkBimestre(bim);
+        setCurrentLinkSlot(slot);
+        setShowLinkDialog(true);
+        setLoadingAvaliacoes(true);
+        try {
+            const q = query(
+                collection(db, 'avaliacoes'),
+                where('turma_id', '==', turmaId),
+                where('componente', '==', componente)
+            );
+            const snap = await getDocs(q);
+            const list = snap.docs.map(d => ({
+                id: d.id,
+                titulo: d.data().titulo,
+                data: d.data().data,
+                valor: d.data().valor,
+            } as AvaliacaoVinculo));
+            setAvaliacoesList(list);
+        } catch (err) {
+            console.error(err);
+            toast.error("Erro ao carregar avaliações.");
+        } finally {
+            setLoadingAvaliacoes(false);
+        }
+    };
+
+    const handleLinkAvaliacao = async (avaliacao: AvaliacaoVinculo | null) => {
+        if (!currentLinkBimestre || !currentLinkSlot) return;
+
+        const newLinks = { ...avaliacoesLinks };
+        newLinks[currentLinkBimestre] = {
+            ...newLinks[currentLinkBimestre],
+            [currentLinkSlot]: avaliacao
+        };
+
+        setAvaliacoesLinks(newLinks);
+        await saveConfig(bimestresLocked, newLinks);
+        setShowLinkDialog(false);
+        toast.success(avaliacao ? "Avaliação vinculada!" : "Vínculo removido.");
+    };
+
     // ── Filtered list ─────────────────────────────────────────────────────────
 
     const estudantesFiltrados = estudantes.filter(e =>
@@ -432,22 +528,24 @@ export default function NotasParciais() {
     }
 
     return (
-        <AppLayout title="Notas Parciais">
+        <>
+            <AppLayout title="Notas Parciais">
             <div className="space-y-6 animate-fade-in">
 
                 {/* Header */}
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" onClick={() => navigate('/diario-digital')} className="gap-2">
-                        <ArrowLeft className="h-5 w-5" />
-                        Voltar para o Diário Digital
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold">Notas Parciais</h1>
-                        <p className="text-muted-foreground text-sm">
-                            {turma?.nome} {turma?.serie ? `· ${turma.serie}` : ''} · Ano {ano}
-                        </p>
-                    </div>
-                </div>
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Notas Parciais</h1>
+            <p className="text-xs md:text-sm text-muted-foreground truncate">
+              {turma?.nome} {turma?.serie ? `· ${turma.serie}` : ''} · Ano {ano}
+            </p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => navigate('/diario-digital')} className="shrink-0 gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden xs:inline">Voltar para o Diário Digital</span>
+            <span className="xs:hidden">Voltar</span>
+          </Button>
+        </div>
 
                 {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-3">
@@ -558,10 +656,51 @@ export default function NotasParciais() {
                                             <TableHeader>
                                                 <TableRow className="bg-white/60">
                                                     <TableHead className="text-xs font-semibold h-9 pl-4">Estudante</TableHead>
-                                                    <TableHead className="text-center text-xs font-semibold h-9 w-16">AV1</TableHead>
-                                                    <TableHead className="text-center text-xs font-semibold h-9 w-16">AV2</TableHead>
-                                                    <TableHead className="text-center text-xs font-semibold h-9 w-16">AV3</TableHead>
-                                                    <TableHead className="text-center text-xs font-semibold h-9 w-16">AV4</TableHead>
+                                                    {(['av1', 'av2', 'av3', 'av4'] as const).map(slot => {
+                                                        const vinculado = avaliacoesLinks[bim]?.[slot];
+                                                        return (
+                                                            <TableHead key={slot} className="text-center text-xs font-semibold h-9 w-16 p-0 border-x">
+                                                                <TooltipProvider>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <button
+                                                                                onClick={() => openLinkDialog(bim, slot)}
+                                                                                className={cn(
+                                                                                    "w-full h-full flex flex-col items-center justify-center hover:bg-black/5 transition-colors uppercase leading-none",
+                                                                                    vinculado && "text-primary font-bold bg-primary/5"
+                                                                                )}
+                                                                                disabled={bimestresLocked.has(bim)}
+                                                                            >
+                                                                                <span className="text-[10px] opacity-70 mb-0.5">{slot}</span>
+                                                                                {vinculado ? (
+                                                                                    <LinkIcon className="h-3 w-3" />
+                                                                                ) : (
+                                                                                    <div className="h-3 w-3 rounded-full border border-dashed border-muted-foreground/50" />
+                                                                                )}
+                                                                            </button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent side="top" className="max-w-xs">
+                                                                            {vinculado ? (
+                                                                                <div className="space-y-1">
+                                                                                    <p className="font-bold text-sm">{vinculado.titulo}</p>
+                                                                                    <p className="text-xs opacity-80">{format(parseISO(vinculado.data), "dd/MM/yyyy")}</p>
+                                                                                    {vinculado.valor && <p className="text-xs font-medium">Valor: {vinculado.valor}</p>}
+                                                                                    <div className="pt-1 mt-1 border-t border-white/20">
+                                                                                        <p className="text-[10px] font-medium text-primary-foreground italic">Clique para alterar ou remover</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ) : (
+                                                                                <div className="text-center py-1">
+                                                                                    <p className="text-sm font-medium">Vincular avaliação</p>
+                                                                                    <p className="text-xs opacity-70">Clique para selecionar uma avaliação para esta coluna</p>
+                                                                                </div>
+                                                                            )}
+                                                                        </TooltipContent>
+                                                                    </Tooltip>
+                                                                </TooltipProvider>
+                                                            </TableHead>
+                                                        );
+                                                    })}
                                                     <TableHead className="text-center text-xs font-semibold h-9 w-20">Média</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -575,8 +714,11 @@ export default function NotasParciais() {
                                                             className={`border-b hover:bg-white/40 ${idx % 2 === 0 ? 'bg-white/20' : ''}`}
                                                         >
                                                             <TableCell className="pl-4 py-2">
-                                                                <div className="text-sm font-medium leading-tight">{est.nome}</div>
-                                                                <div className="text-xs text-muted-foreground">{est.matricula}</div>
+                                                                <div className="flex items-baseline gap-1.5 leading-tight">
+                                                                    <span className="text-[10px] text-muted-foreground shrink-0">{est.matricula}</span>
+                                                                    <span className="text-[10px] text-muted-foreground shrink-0">-</span>
+                                                                    <span className="text-sm font-medium">{est.nome}</span>
+                                                                </div>
                                                             </TableCell>
                                                             {(['av1', 'av2', 'av3', 'av4'] as const).map(av => (
                                                                 <TableCell key={av} className="text-center py-1.5 px-1">
@@ -624,5 +766,124 @@ export default function NotasParciais() {
                 )}
             </div>
         </AppLayout>
+
+            {/* Diálogo de Vínculo de Avaliação */}
+            <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <LinkIcon className="h-5 w-5 text-primary" />
+                            Vincular Avaliação ao {currentLinkSlot?.toUpperCase()}
+                        </DialogTitle>
+                        <DialogDescription>
+                            Selecione uma avaliação registrada para preencher automaticamente esta coluna.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="flex items-center justify-between">
+                            <h4 className="text-sm font-semibold">Avaliações Disponíveis</h4>
+                            <Badge variant="outline" className="text-[10px]">
+                                {componente}
+                            </Badge>
+                        </div>
+
+                        <ScrollArea className="h-[300px] pr-4">
+                            {loadingAvaliacoes ? (
+                                <div className="flex items-center justify-center h-full">
+                                    <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                                </div>
+                            ) : avaliacoesList.length === 0 ? (
+                                <div className="text-center py-10 text-muted-foreground">
+                                    <ClipboardList className="h-10 w-10 mx-auto opacity-20 mb-2" />
+                                    <p className="text-sm">Nenhuma avaliação encontrada para este componente.</p>
+                                    <Button 
+                                        variant="link" 
+                                        size="sm" 
+                                        className="mt-2"
+                                        onClick={() => navigate(`/diario-digital/avaliacoes/${turmaId}?componente=${encodeURIComponent(componente)}`)}
+                                    >
+                                        Ir para Calendário de Avaliações
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {avaliacoesList.map((av) => {
+                                        // Verifica se já está vinculada a outro slot no mesmo bimestre
+                                        const isLinkedHere = avaliacoesLinks[currentLinkBimestre!]?.[currentLinkSlot!]?.id === av.id;
+                                        const isLinkedElseWhere = Object.entries(avaliacoesLinks[currentLinkBimestre!] || {})
+                                            .some(([s, v]) => s !== currentLinkSlot && v?.id === av.id);
+
+                                        return (
+                                            <div
+                                                key={av.id}
+                                                className={cn(
+                                                    "flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer hover:border-primary group",
+                                                    isLinkedHere ? "border-primary bg-primary/5" : "border-border",
+                                                    isLinkedElseWhere && "opacity-50 cursor-not-allowed grayscale"
+                                                )}
+                                                onClick={() => !isLinkedElseWhere && handleLinkAvaliacao(isLinkedHere ? null : av)}
+                                            >
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="font-medium text-sm truncate">{av.titulo}</p>
+                                                        {isLinkedHere && <Badge className="h-4 px-1 text-[8px] bg-primary">VINCULADO</Badge>}
+                                                    </div>
+                                                    <div className="flex items-center gap-3 mt-1">
+                                                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                            <Calendar className="h-3 w-3" />
+                                                            {format(parseISO(av.data), "dd/MM/yyyy")}
+                                                        </div>
+                                                        {av.valor && (
+                                                            <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                                                <Info className="h-3 w-3" />
+                                                                Valor: {av.valor}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {isLinkedHere ? (
+                                                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-red-50 group-hover:text-red-500">
+                                                        <Check className="h-3 w-3 group-hover:hidden" />
+                                                        <Unlink className="h-3 w-3 hidden group-hover:block" />
+                                                    </div>
+                                                ) : (
+                                                    !isLinkedElseWhere && (
+                                                        <div className="h-6 w-6 rounded-full border border-border flex items-center justify-center text-muted-foreground group-hover:border-primary group-hover:text-primary">
+                                                            <LinkIcon className="h-3 w-3" />
+                                                        </div>
+                                                    )
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </ScrollArea>
+                    </div>
+
+                    <DialogFooter className="sm:justify-between border-t pt-4">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setShowLinkDialog(false)}
+                        >
+                            Fechar
+                        </Button>
+                        {avaliacoesLinks[currentLinkBimestre!]?.[currentLinkSlot!] && (
+                            <Button
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => handleLinkAvaliacao(null)}
+                                className="gap-2"
+                            >
+                                <Unlink className="h-3 w-3" />
+                                Remover Vínculo
+                            </Button>
+                        )}
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </>
     );
 }

@@ -185,6 +185,36 @@
     background-color: #bbf7d0 !important;
   }
 
+  .day-planejado {
+    background-color: #dbeafe !important;
+    color: #1e40af !important;
+    font-weight: 600 !important;
+  }
+
+  .day-planejado:hover {
+    background-color: #bfdbfe !important;
+  }
+
+  .day-nao-ministrado {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+    font-weight: 600 !important;
+  }
+
+  .day-nao-ministrado:hover {
+    background-color: #fecaca !important;
+  }
+  
+  .day-avaliacao {
+    background-color: #f3e8ff !important;
+    color: #6b21a8 !important;
+    font-weight: 600 !important;
+  }
+
+  .day-avaliacao:hover {
+    background-color: #e9d5ff !important;
+  }
+
   .day-falta {
     background-color: #fee2e2 !important;
     color: #991b1b !important;

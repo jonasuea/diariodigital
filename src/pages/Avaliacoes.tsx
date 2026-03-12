@@ -1,44 +1,195 @@
-import { AppLayout } from '@/components/layout/AppLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { FileWarning, ArrowLeft } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { useState, useEffect } from "react";
+import { useParams, useSearchParams, useNavigate } from "react-router-dom";
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { toast } from 'sonner';
+import { Loader2, ArrowLeft, Calendar as CalendarIcon, ClipboardList } from 'lucide-react';
+import { Calendar } from "@/components/ui/calendar";
+import { ptBR } from 'date-fns/locale';
+import { format, parseISO } from 'date-fns';
+import { useUserRole } from "@/hooks/useUserRole";
+
+interface Turma {
+  id: string;
+  nome: string;
+}
+
+interface Evento {
+  id: string;
+  titulo: string;
+  data: Timestamp;
+}
+
+interface Avaliacao {
+  id: string;
+  titulo: string;
+  data: string;
+}
 
 export default function Avaliacoes() {
   const navigate = useNavigate();
+  const { turmaId } = useParams<{ turmaId?: string }>();
+  const [searchParams] = useSearchParams();
+  const componente = searchParams.get('componente');
+  const { escolaAtivaId } = useUserRole();
+
+  const [turma, setTurma] = useState<Turma | null>(null);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
+  const [avaliacoesDates, setAvaliacoesDates] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!turmaId || !componente || !escolaAtivaId) {
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+
+      try {
+        // Fetch Turma
+        const turmaDocRef = doc(db, 'turmas', turmaId);
+        const turmaDoc = await getDoc(turmaDocRef);
+        if (turmaDoc.exists()) {
+          setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
+        }
+
+        // Fetch Eventos
+        const qEventos = query(
+          collection(db, 'eventos'),
+          where('escola_id', '==', escolaAtivaId),
+          orderBy('data', 'asc')
+        );
+        const queryEvents = await getDocs(qEventos);
+        const eventosData = queryEvents.docs.map(doc => {
+          const data = doc.data();
+          if (data.data && typeof data.data === 'string') {
+            data.data = Timestamp.fromDate(parseISO(data.data));
+          }
+          return { id: doc.id, ...data } as Evento;
+        });
+        setEventos(eventosData);
+
+        // Fetch Dias Letivos
+        const qDias = query(
+          collection(db, 'dias_letivos'),
+          where('escola_id', '==', escolaAtivaId)
+        );
+        const queryDias = await getDocs(qDias);
+        const dias = new Set<string>();
+        queryDias.forEach(doc => {
+          dias.add(doc.data().data);
+        });
+        setDiasLetivos(dias);
+
+        // Fetch Avaliacoes
+        const qAvaliacoes = query(
+          collection(db, 'avaliacoes'),
+          where('turma_id', '==', turmaId),
+          where('componente', '==', componente)
+        );
+        const queryAvaliacoes = await getDocs(qAvaliacoes);
+        const avalDates = new Set<string>();
+        queryAvaliacoes.forEach(doc => {
+          avalDates.add(doc.data().data);
+        });
+        setAvaliacoesDates(avalDates);
+
+      } catch (error) {
+        console.error("Error fetching data: ", error);
+        toast.error("Erro ao carregar os dados das avaliações.");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchData();
+  }, [turmaId, componente, escolaAtivaId]);
+
+  const eventDates = eventos.map(e => e.data.toDate());
+  const diasLetivosDates = Array.from(diasLetivos).map(d => parseISO(d));
+  const hasAvaliacaoDates = Array.from(avaliacoesDates).map(d => parseISO(d));
 
   return (
     <AppLayout>
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Avaliações</h1>
-            <p className="text-muted-foreground">
-              Crie e gerencie as avaliações para suas turmas.
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Avaliações</h1>
+            <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
+              Visualize e agende avaliações para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
             </p>
           </div>
-          <Button variant="outline" onClick={() => navigate('/diario-digital')} className="shrink-0">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar para o Diário
+          <Button variant="outline" size="sm" onClick={() => navigate('/diario-digital')} className="shrink-0">
+            <ArrowLeft className="h-4 w-4 mr-1 md:mr-2" />
+            <span className="hidden xs:inline">Voltar para o Diário</span>
+            <span className="xs:hidden">Voltar</span>
           </Button>
         </div>
 
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Em Breve</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed rounded-md">
-              <FileWarning className="h-16 w-16 text-muted-foreground mb-4" />
-              <p className="text-lg font-semibold text-muted-foreground">
-                Módulo de Avaliações em Desenvolvimento
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
-                Esta funcionalidade será implementada em breve.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex justify-center">
+          <Card className="w-full max-w-2xl">
+            <CardHeader className="pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <CardTitle className="text-lg">Calendário de Avaliações</CardTitle>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-green-100 rounded-full border border-green-300"></div>
+                  <span>Dia Letivo</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-purple-100 rounded-full border border-purple-300"></div>
+                  <span>Avaliação</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 bg-primary/10 rounded-full"></div>
+                  <span>Evento</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>
+              ) : (
+                <div className="flex justify-center py-4">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSelectedDate(date);
+                        const dateStr = format(date, 'yyyy-MM-dd');
+                        navigate(`/diario-digital/avaliacoes/${turmaId}/registro?componente=${componente}&data=${dateStr}`);
+                      }
+                    }}
+                    locale={ptBR}
+                    className="rounded-md border shadow-sm mx-auto"
+                    modifiers={{
+                      hasEvent: eventDates,
+                      isLetivo: diasLetivosDates,
+                      hasAvaliacao: hasAvaliacaoDates,
+                    }}
+                    modifiersClassNames={{
+                      isLetivo: 'day-letivo',
+                      hasAvaliacao: 'day-avaliacao'
+                    }}
+                    modifiersStyles={{
+                      hasEvent: {
+                        fontWeight: 'bold',
+                        textDecoration: 'underline',
+                        textDecorationColor: 'hsl(var(--primary))',
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </AppLayout>
   );
