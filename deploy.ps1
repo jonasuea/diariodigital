@@ -1,13 +1,20 @@
 # Este script automatiza o processo de deploy da aplicação.
 # Uso: .\deploy.ps1 -m "v1.0.0" [-notes "Descrição das mudanças"]
 
-param(
-    [Parameter(Mandatory = $true)]
-    [string]$m,  # Versão da release (ex: v0.0.3)
+$releaseConfigFile = "release_config.json"
+if (-Not (Test-Path $releaseConfigFile)) {
+    Write-Host "Arquivo release_config.json não encontrado na raiz do projeto!" -ForegroundColor Red
+    exit 1
+}
 
-    [Parameter(Mandatory = $false)]
-    [string]$notes = ""  # Notas opcionais da release
-)
+$releaseInfo = Get-Content -Raw $releaseConfigFile | ConvertFrom-Json
+$m = $releaseInfo.version
+$notes = $releaseInfo.notes
+
+if ([string]::IsNullOrWhiteSpace($m)) {
+    Write-Host "A propriedade 'version' não foi encontrada no release_config.json" -ForegroundColor Red
+    exit 1
+}
 
 # --- NOVO: ATUALIZAR ARQUIVOS DE VERSÃO AUTOMATICAMENTE ---
 
@@ -19,7 +26,7 @@ $defaultNotes = if ($notes -ne "") { $notes } else { "Atualização do sistema."
 Write-Host "Atualizando arquivos de versão para v$versionNumber..." -ForegroundColor Cyan
 
 # 1. Atualizar public/version.json
-$versionJsonPath = "e:\Projetos_App\educafacil\public\version.json"
+$versionJsonPath = "e:\Projetos_App\diariodigital\public\version.json"
 $newJson = @{
     version     = $versionNumber
     releaseDate = $currentDate
@@ -29,7 +36,7 @@ $UTF8NoBOM = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($versionJsonPath, $newJson, $UTF8NoBOM)
 
 # 2. Atualizar src/constants/version.ts
-$versionTsPath = "e:\Projetos_App\educafacil\src\constants\version.ts"
+$versionTsPath = "e:\Projetos_App\diariodigital\src\constants\version.ts"
 $versionTsContent = "export const APP_VERSION = `"$versionNumber`";"
 [System.IO.File]::WriteAllText($versionTsPath, $versionTsContent, $UTF8NoBOM)
 

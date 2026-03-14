@@ -1,0 +1,82 @@
+{
+    "login": {
+        "title": "Inicia sesión en tu cuenta",
+        "titleCreate": "Crea tu cuenta",
+        "name": "Nombre completo",
+        "namePlaceholder": "Tu nombre",
+        "email": "Correo electrónico",
+        "emailPlaceholder": "tu@email.com",
+        "password": "Contraseña",
+        "passwordPlaceholder": "••••••••",
+        "forgotPassword": "¿Olvidaste tu contraseña?",
+        "submitLogin": "Entrar",
+        "submitCreate": "Crear cuenta",
+        "noAccount": "¿No tienes una cuenta?",
+        "hasAccount": "¿Ya tienes una cuenta?",
+        "devMessage1": "Aplicación en desarrollo",
+        "devMessage2": "Para acceder, hable con el Profesor Jonas",
+        "devMessage3": "Escuela Dom Paulo"
+    },
+    "branding": {
+        "title": "Sistema de Gestión Escolar",
+        "subtitle": "Gestiona estudiantes, profesores, clases y mucho más de forma sencilla y eficiente."
+    },
+    "common": {
+        "logout": "Salir",
+        "search": "Buscar...",
+        "noResults": "No se han encontrado resultados.",
+        "typeToSearch": "Escribe para buscar..."
+    },
+    "header": {
+        "prefeitura": "Ciudad de Itacoatiara – SEMED",
+        "selectSchool": "Seleccione una Escuela",
+        "changeSchool": "Cambiar Escuela",
+        "changeSchoolTitle": "Cambiar Escuela",
+        "changeSchoolDesc": "Seleccione la unidad escolar a la que desea acceder."
+    },
+    "menu": {
+        "Painel": "Panel",
+        "Escolas": "Escuelas",
+        "Estudantes": "Estudiantes",
+        "Responsáveis": "Responsables",
+        "Pré-Matrículas": "Pre-Matrículas",
+        "Professores": "Profesores",
+        "Equipe Gestora": "Equipo Directivo",
+        "Turmas": "Clases",
+        "Mensagens": "Mensajes",
+        "Diário Digital": "Diario Digital",
+        "Horário": "Horario",
+        "Relatórios": "Informes",
+        "Calendário": "Calendario",
+        "Usuários": "Usuarios",
+        "Configurações": "Configuraciones",
+        "Base Curricular": "Base Curricular",
+        "Manual de Uso": "Manual de Uso",
+        "Meu Perfil": "Mi Perfil"
+    },
+    "dashboard": {
+        "title": "Panel",
+        "loadingPanel": "Cargando panel...",
+        "totalStudents": "Total de Estudiantes",
+        "totalTeachers": "Total de Profesores",
+        "totalClasses": "Total de Clases",
+        "averageGrades": "Promedio General de Notas",
+        "generalAttendance": "Asistencia General",
+        "bimonthlyGrades": "Notas Bimestrales",
+        "thisWeek": "Esta Semana",
+        "thisMonth": "Este Mes",
+        "lastYear": "Último Año",
+        "absenceRate": "Tasa de Ausencia",
+        "upcomingEvents": "Próximos Eventos",
+        "upcomingEventsDesc": "Los próximos 5 eventos en el calendario escolar.",
+        "loadingEvents": "Cargando eventos...",
+        "noUpcomingEvents": "No se encontraron eventos futuros.",
+        "recentActivities": "Actividades Recientes",
+        "recentActivitiesDesc": "Registro de las últimas interacciones del sistema.",
+        "viewAll": "Ver Todo",
+        "loadingActivities": "Cargando actividades...",
+        "systemUser": "Usuario del Sistema",
+        "justNow": "justo ahora",
+        "noActivitiesYet": "Aún no hay actividades registradas."
+    }
+}

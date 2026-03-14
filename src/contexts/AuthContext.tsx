@@ -20,8 +20,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
+      if (authUser) {
+        try {
+          const roleDocRef = doc(db, 'user_roles', authUser.uid);
+          const roleDoc = await getDoc(roleDocRef);
+          const roleData = roleDoc.data();
+          
+          const DIARIO_ALLOWED_ROLES = ['admin', 'professor'];
+          const extraRoles: string[] = (roleData?.roles || []).map((r: any) => r.role);
+          const primaryRole: string | null = roleData?.role || null;
+          const allRoles = [...new Set([primaryRole, ...extraRoles])].filter(Boolean) as string[];
+          
+          const hasAccess = allRoles.some(r => DIARIO_ALLOWED_ROLES.includes(r));
+          
+          if (!hasAccess || roleData?.status === 'inativo') {
+            await firebaseSignOut(auth);
+            setUser(null);
+          } else {
+            setUser(authUser);
+          }
+        } catch (error) {
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
       setLoading(false);
     });
 
@@ -45,18 +69,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const roleData = roleDoc.data();
 
       const isInMaintenance = maintenanceData?.preferencias?.modoManutencao || false;
-      const userRole = roleData?.role || null;
+      const primaryRole: string | null = roleData?.role || null;
 
-      if (isInMaintenance && userRole !== 'admin') {
+      // Collect all roles this user holds (primary + any from the roles[] array)
+      const DIARIO_ALLOWED_ROLES = ['admin', 'professor'];
+      const extraRoles: string[] = (roleData?.roles || []).map((r: any) => r.role);
+      const allRoles = [...new Set([primaryRole, ...extraRoles])].filter(Boolean) as string[];
+      const hasDiarioAccess = allRoles.some(r => DIARIO_ALLOWED_ROLES.includes(r));
+
+      if (isInMaintenance && primaryRole !== 'admin') {
         await firebaseSignOut(auth);
         const maintenanceError = new Error("O sistema está em modo de manutenção. Apenas administradores podem fazer login.");
         maintenanceError.name = 'MaintenanceMode';
         return { error: maintenanceError };
       }
 
-      if (userRole === 'responsavel') {
+      if (!hasDiarioAccess) {
         await firebaseSignOut(auth);
-        const roleError = new Error("Responsáveis devem acessar pelo portal de matriculas: matricula.manaus.am.gov.br");
+        const roleError = new Error("Acesso restrito. Apenas professores podem acessar o Diário Digital.");
         roleError.name = 'RoleRestriction';
         return { error: roleError };
       }

@@ -1,0 +1,82 @@
+{
+    "login": {
+        "title": "Entre na sua conta",
+        "titleCreate": "Crie sua conta",
+        "name": "Nome completo",
+        "namePlaceholder": "Seu nome",
+        "email": "E-mail",
+        "emailPlaceholder": "seu@email.com",
+        "password": "Senha",
+        "passwordPlaceholder": "••••••••",
+        "forgotPassword": "Esqueceu a senha?",
+        "submitLogin": "Entrar",
+        "submitCreate": "Criar conta",
+        "noAccount": "Não tem uma conta?",
+        "hasAccount": "Já tem uma conta?",
+        "devMessage1": "Aplicação em desenvolvimento",
+        "devMessage2": "Para acessar, fale com o Professor Jonas",
+        "devMessage3": "Escola Dom Paulo"
+    },
+    "branding": {
+        "title": "Sistema de Gestão Escolar",
+        "subtitle": "Gerencie estudantes, professores, turmas e muito mais de forma simples e eficiente."
+    },
+    "common": {
+        "logout": "Sair",
+        "search": "Busca...",
+        "noResults": "Nenhum resultado encontrado.",
+        "typeToSearch": "Digite para buscar..."
+    },
+    "header": {
+        "prefeitura": "Itacoatiara",
+        "selectSchool": "Selecione uma Escola",
+        "changeSchool": "Trocar Escola",
+        "changeSchoolTitle": "Trocar de Escola",
+        "changeSchoolDesc": "Selecione a unidade escolar que deseja acessar."
+    },
+    "menu": {
+        "Painel": "Painel",
+        "Escolas": "Escolas",
+        "Estudantes": "Estudantes",
+        "Responsáveis": "Responsáveis",
+        "Pré-Matrículas": "Pré-Matrículas",
+        "Professores": "Professores",
+        "Equipe Gestora": "Equipe Gestora",
+        "Turmas": "Turmas",
+        "Mensagens": "Mensagens",
+        "Diário Digital": "Diário Digital",
+        "Horário": "Horário",
+        "Relatórios": "Relatórios",
+        "Calendário": "Calendário",
+        "Usuários": "Usuários",
+        "Configurações": "Configurações",
+        "Base Curricular": "Base Curricular",
+        "Manual de Uso": "Manual de Uso",
+        "Meu Perfil": "Meu Perfil"
+    },
+    "dashboard": {
+        "title": "Painel",
+        "loadingPanel": "Carregando painel...",
+        "totalStudents": "Total de Estudantes",
+        "totalTeachers": "Total de Professores",
+        "totalClasses": "Total de Turmas",
+        "averageGrades": "Média Geral de Notas",
+        "generalAttendance": "Frequência Geral",
+        "bimonthlyGrades": "Notas Bimestrais",
+        "thisWeek": "Esta Semana",
+        "thisMonth": "Este Mês",
+        "lastYear": "Último Ano",
+        "absenceRate": "Taxa de Faltas",
+        "upcomingEvents": "Próximos Eventos",
+        "upcomingEventsDesc": "Os próximos 5 eventos no calendário escolar.",
+        "loadingEvents": "Carregando eventos...",
+        "noUpcomingEvents": "Nenhum evento futuro encontrado.",
+        "recentActivities": "Atividades Recentes",
+        "recentActivitiesDesc": "Log das últimas interações no sistema.",
+        "viewAll": "Visualizar Todos",
+        "loadingActivities": "Carregando atividades...",
+        "systemUser": "Usuário do Sistema",
+        "justNow": "agora mesmo",
+        "noActivitiesYet": "Nenhuma atividade registrada ainda."
+    }
+}

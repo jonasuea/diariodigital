@@ -32,6 +32,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTranslation } from 'react-i18next';
 
 
 interface ActivityLog {
@@ -83,6 +84,7 @@ function StatCard({ title, value, icon: Icon, onClick }: { title: string, value:
 }
 
 export default function Painel() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { escolaAtivaId, role, isAdmin, isProfessor, isEstudante, loading: roleLoading } = useUserRole();
@@ -349,7 +351,7 @@ export default function Painel() {
     <AppLayout title="Painel">
       {roleLoading ? (
         <div className="flex h-[50vh] items-center justify-center">
-          <p className="text-muted-foreground animate-pulse">Carregando painel...</p>
+          <p className="text-muted-foreground animate-pulse">{t('dashboard.loadingPanel')}</p>
         </div>
       ) : (
         <div className="space-y-6 animate-fade-in">
@@ -357,10 +359,10 @@ export default function Painel() {
 
           {!isEstudante && (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard title="Total de Estudantes" value={loading ? '...' : stats.totalEstudantes} icon={Users} onClick={() => navigate('/estudantes')} />
-              <StatCard title="Total de Professores" value={loading ? '...' : stats.totalProfessores} icon={Users} onClick={() => navigate('/professores')} />
-              <StatCard title="Total de Turmas" value={loading ? '...' : stats.totalTurmas} icon={BookOpen} onClick={() => navigate('/turmas')} />
-              <StatCard title="Média Geral de Notas" value={loading ? '...' : stats.mediaNotas?.toFixed(1) || 'N/A'} icon={Trophy} />
+              <StatCard title={t('dashboard.totalStudents')} value={loading ? '...' : stats.totalEstudantes} icon={Users} onClick={() => navigate('/estudantes')} />
+              <StatCard title={t('dashboard.totalTeachers')} value={loading ? '...' : stats.totalProfessores} icon={Users} onClick={() => navigate('/professores')} />
+              <StatCard title={t('dashboard.totalClasses')} value={loading ? '...' : stats.totalTurmas} icon={BookOpen} onClick={() => navigate('/turmas')} />
+              <StatCard title={t('dashboard.averageGrades')} value={loading ? '...' : stats.mediaNotas?.toFixed(1) || 'N/A'} icon={Trophy} />
             </div>
           )}
 
@@ -370,8 +372,8 @@ export default function Painel() {
                 <Tabs defaultValue="frequencia" onValueChange={setActiveChartTab}>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 pt-6 pb-4 gap-4">
                     <TabsList className="w-full sm:w-auto">
-                      <TabsTrigger value="frequencia" className="flex-1 sm:flex-none">Frequência Geral</TabsTrigger>
-                      <TabsTrigger value="notas" className="flex-1 sm:flex-none">Notas Bimestrais</TabsTrigger>
+                      <TabsTrigger value="frequencia" className="flex-1 sm:flex-none">{t('dashboard.generalAttendance')}</TabsTrigger>
+                      <TabsTrigger value="notas" className="flex-1 sm:flex-none">{t('dashboard.bimonthlyGrades')}</TabsTrigger>
                     </TabsList>
                     {activeChartTab === 'frequencia' && (
                       <Select value={periodoFrequencia} onValueChange={setPeriodoFrequencia}>
@@ -379,9 +381,9 @@ export default function Painel() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="semana">Esta Semana</SelectItem>
-                          <SelectItem value="mes">Este Mês</SelectItem>
-                          <SelectItem value="ano">Último Ano</SelectItem>
+                          <SelectItem value="semana">{t('dashboard.thisWeek')}</SelectItem>
+                          <SelectItem value="mes">{t('dashboard.thisMonth')}</SelectItem>
+                          <SelectItem value="ano">{t('dashboard.lastYear')}</SelectItem>
                         </SelectContent>
                       </Select>
                     )}
@@ -393,7 +395,7 @@ export default function Painel() {
                           <XAxis dataKey="dia" stroke="#888888" fontSize={12} tickLine={false} axisLine={false} />
                           <YAxis stroke="#888888" fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={(value) => `${value}%`} />
                           <RechartsTooltip
-                            formatter={(value: number) => [`${value}%`, 'Taxa de Faltas']}
+                            formatter={(value: number) => [`${value}%`, t('dashboard.absenceRate')]}
                             contentStyle={{
                               backgroundColor: 'hsl(var(--card))',
                               borderColor: 'hsl(var(--border))',
@@ -431,15 +433,15 @@ export default function Painel() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Calendar className="h-5 w-5" />
-                  Próximos Eventos
+                  {t('dashboard.upcomingEvents')}
                 </CardTitle>
                 <CardDescription>
-                  Os próximos 5 eventos no calendário escolar.
+                  {t('dashboard.upcomingEventsDesc')}
                 </CardDescription>
               </CardHeader>
               <CardContent className="h-[300px] overflow-y-auto pr-2">
                 {loading ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Carregando eventos...</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.loadingEvents')}</p>
                 ) : (
                   <div className="space-y-3">
                     {proximosEventos.length > 0 ? (
@@ -458,7 +460,7 @@ export default function Painel() {
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum evento futuro encontrado.</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.noUpcomingEvents')}</p>
                     )}
                   </div>
                 )}
@@ -472,19 +474,19 @@ export default function Painel() {
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <List className="h-5 w-5" />
-                    Atividades Recentes
+                    {t('dashboard.recentActivities')}
                   </CardTitle>
                   <CardDescription>
-                    Log das últimas interações no sistema.
+                    {t('dashboard.recentActivitiesDesc')}
                   </CardDescription>
                 </div>
                 <Button variant="outline" size="sm" onClick={() => navigate('/logs')}>
-                  Visualizar Todos
+                  {t('dashboard.viewAll')}
                 </Button>
               </CardHeader>
               <CardContent>
                 {loading ? (
-                  <p className="text-sm text-muted-foreground text-center py-4">Carregando atividades...</p>
+                  <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.loadingActivities')}</p>
                 ) : (
                   <div className="space-y-4">
                     {atividadesRecentes.length > 0 ? (
@@ -497,18 +499,18 @@ export default function Painel() {
                           </div>
                           <div className="flex-1">
                             <p className="text-sm">
-                              <span className="font-semibold">{activity.user_name || 'Usuário do Sistema'}</span> {activity.action}
+                              <span className="font-semibold">{activity.user_name || t('dashboard.systemUser')}</span> {activity.action}
                             </p>
                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                               <Clock className="h-3 w-3" />
-                              {activity.created_at ? formatDistanceToNow(activity.created_at.toDate(), { addSuffix: true, locale: ptBR }) : 'agora mesmo'}
+                              {activity.created_at ? formatDistanceToNow(activity.created_at.toDate(), { addSuffix: true, locale: ptBR }) : t('dashboard.justNow')}
                             </p>
                           </div>
                         </div>
                       ))
                     ) : (
                       <p className="text-sm text-muted-foreground text-center py-4">
-                        Nenhuma atividade registrada ainda.
+                        {t('dashboard.noActivitiesYet')}
                       </p>
                     )}
                   </div>

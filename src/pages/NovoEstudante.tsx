@@ -21,6 +21,7 @@ import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 import { generateMatricula } from '@/lib/matriculaUtils';
+import { formatCPF } from '@/lib/utils';
 
 const ESTADOS_BR = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
@@ -974,7 +975,7 @@ export default function NovoEstudante() {
                   </div>
                   <div className="space-y-2">
                     <Label>CPF</Label>
-                    <Input placeholder="CPF do estudante" value={formData.cpf} onChange={(e) => handleChange('cpf', e.target.value)} />
+                    <Input placeholder="CPF do estudante" value={formData.cpf} onChange={(e) => handleChange('cpf', formatCPF(e.target.value))} />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1159,7 +1160,7 @@ export default function NovoEstudante() {
                 </div>
                 <div className="space-y-2 md:w-1/2">
                   <Label>CPF</Label>
-                  <Input placeholder="CPF da mãe" value={formData.mae_cpf} onChange={(e) => handleChange('mae_cpf', e.target.value)} />
+                  <Input placeholder="CPF da mãe" value={formData.mae_cpf} onChange={(e) => handleChange('mae_cpf', formatCPF(e.target.value))} />
                 </div>
               </div>
 
@@ -1188,7 +1189,7 @@ export default function NovoEstudante() {
                 </div>
                 <div className="space-y-2 md:w-1/2">
                   <Label>CPF</Label>
-                  <Input placeholder="CPF do pai" value={formData.pai_cpf} onChange={(e) => handleChange('pai_cpf', e.target.value)} />
+                  <Input placeholder="CPF do pai" value={formData.pai_cpf} onChange={(e) => handleChange('pai_cpf', formatCPF(e.target.value))} />
                 </div>
               </div>
 
@@ -1228,7 +1229,7 @@ export default function NovoEstudante() {
                 </div>
                 <div className="space-y-2 md:w-1/2">
                   <Label>CPF</Label>
-                  <Input placeholder="CPF do responsável" value={formData.responsavel_cpf} onChange={(e) => handleChange('responsavel_cpf', e.target.value)} />
+                  <Input placeholder="CPF do responsável" value={formData.responsavel_cpf} onChange={(e) => handleChange('responsavel_cpf', formatCPF(e.target.value))} />
                 </div>
               </div>
 

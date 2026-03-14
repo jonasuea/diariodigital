@@ -14,6 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useNavigate } from 'react-router-dom';
 import { useAutoUpdate } from '@/hooks/useAutoUpdate';
+import { useTranslation } from 'react-i18next';
+import { LanguageSelector } from '@/components/LanguageSelector';
 
 interface AppHeaderProps {
   title?: string;
@@ -34,6 +36,7 @@ interface UserProfile {
 }
 
 export function AppHeader({ title }: AppHeaderProps) {
+  const { t } = useTranslation();
   const { user, signOut } = useAuth();
   const { role, escolaAtivaId, setEscolaAtivaId, isAdmin, permittedEscolas } = useUserRole();
   const { toggleSidebar, isMobile } = useSidebar();
@@ -219,7 +222,7 @@ export function AppHeader({ title }: AppHeaderProps) {
   };
 
   return (
-    <header className="bg-secondary/50 backdrop-blur-sm border-b border-yellow-200/50 sticky top-0 z-50">
+    <header className="bg-secondary/50 backdrop-blur-sm border-b border-green-200/50 sticky top-0 z-50">
       <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 w-full">
         <div className="flex items-center gap-4">
           {isMobile && (
@@ -232,11 +235,6 @@ export function AppHeader({ title }: AppHeaderProps) {
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          <div className="flex flex-col">
-            <span className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-[#8B6508]/60 uppercase tracking-tight sm:tracking-widest leading-tight line-clamp-1 max-w-[120px] xs:max-w-none">
-              Prefeitura de Itacoatiara – SEMED
-            </span>
-          </div>
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4 flex-1 justify-end">
@@ -245,7 +243,7 @@ export function AppHeader({ title }: AppHeaderProps) {
               {/* Desktop School Select */}
               <div className="w-[300px] lg:w-[400px] hidden lg:block mr-2">
                 <Select
-                  value={escolaAtivaId || undefined}
+                  value={escolaAtivaId || ""}
                   onValueChange={(val) => {
                     setEscolaAtivaId(val);
                     sessionStorage.setItem('escolaAtivaId', val);
@@ -256,7 +254,7 @@ export function AppHeader({ title }: AppHeaderProps) {
                     <div className="flex items-center gap-2 truncate">
                       <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       <span className="truncate">
-                        {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || 'Selecione uma Escola'}
+                        {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || t('header.selectSchool')}
                       </span>
                     </div>
                   </SelectTrigger>
@@ -271,15 +269,15 @@ export function AppHeader({ title }: AppHeaderProps) {
               <div className="lg:hidden mr-2">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9" title="Trocar Escola">
+                    <Button variant="outline" size="icon" className="h-9 w-9" title={t('header.changeSchool')}>
                       <School className="h-4 w-4 text-primary" />
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="max-w-[90vw] rounded-lg">
                     <DialogHeader>
-                      <DialogTitle>Trocar de Escola</DialogTitle>
+                      <DialogTitle>{t('header.changeSchoolTitle')}</DialogTitle>
                       <DialogDescription>
-                        Selecione a unidade escolar que deseja acessar.
+                        {t('header.changeSchoolDesc')}
                       </DialogDescription>
                     </DialogHeader>
                     <div className="grid gap-2 py-4">
@@ -312,8 +310,8 @@ export function AppHeader({ title }: AppHeaderProps) {
                   <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     type="search"
-                    placeholder="Busca..."
-                    className="w-full pl-8 bg-white/60 border-yellow-100 focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
+                    placeholder={t('common.search')}
+                    className="w-full pl-8 bg-white/60 border-green-100 focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
                     value={searchQuery}
                     onChange={handleSearchChange}
                     onFocus={() => {
@@ -351,7 +349,7 @@ export function AppHeader({ title }: AppHeaderProps) {
                   </div>
                 ) : (
                   <p className="p-4 text-sm text-center text-muted-foreground">
-                    {debouncedSearchQuery.length > 1 ? 'Nenhum resultado encontrado.' : 'Digite para buscar...'}
+                    {debouncedSearchQuery.length > 1 ? t('common.noResults') : t('common.typeToSearch')}
                   </p>
                 )}
               </PopoverContent>
@@ -370,33 +368,32 @@ export function AppHeader({ title }: AppHeaderProps) {
             )}
           </Button>
 
-          {/* Language Indicator GovBR */}
-          <div className="hidden sm:flex items-center gap-1.5 px-3 border-l border-yellow-200/30">
-            <Globe className="w-4 h-4 text-[#8B6508]/40" />
-            <span className="text-xs font-bold text-[#8B6508]/60">PT-BR</span>
+          {/* Language Selector */}
+          <div className="hidden sm:flex items-center px-2">
+            <LanguageSelector />
           </div>
 
-          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-yellow-200/30">
-            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-yellow-200/50 shadow-sm shrink-0">
+          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-green-200/30">
+            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-green-200/50 shadow-sm shrink-0">
               <AvatarImage src={userProfile?.foto_url} />
               <AvatarFallback className="bg-primary/10 text-primary text-[10px] sm:text-sm font-bold">
                 {getInitials(userProfile?.nome || user?.email)}
               </AvatarFallback>
             </Avatar>
             <div className="hidden lg:block mr-2">
-              <p className="text-sm font-bold text-[#8B6508] truncate max-w-[120px]">
+              <p className="text-sm font-bold text-primary truncate max-w-[120px]">
                 {userProfile?.nome || user?.email}
               </p>
-              <p className="text-[10px] font-semibold text-[#8B6508]/60 uppercase tracking-wider">{capitalize(role)}</p>
+              <p className="text-[10px] font-semibold text-primary/60 uppercase tracking-wider">{capitalize(role)}</p>
             </div>
 
             <button
               onClick={handleLogout}
-              className="font-body font-semibold text-[#8B6508]/70 hover:text-primary hover:bg-yellow-50 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
+              className="font-body font-semibold text-primary/70 hover:text-primary hover:bg-green-50 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
             >
-              Sair
+              {t('common.logout')}
             </button>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-[#8B6508]/60 hover:text-primary">
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-primary/60 hover:text-primary">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

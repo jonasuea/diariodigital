@@ -18,6 +18,7 @@ import { logActivity } from '@/lib/logger';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { toast } from 'sonner';
 import { generateMatricula } from '@/lib/matriculaUtils';
+import { formatCPF } from '@/lib/utils';
 
 interface Formacao {
   id: string;
@@ -401,7 +402,7 @@ export default function NovoMembro() {
                       id="cpf"
                       placeholder="Número do CPF"
                       value={formData.cpf}
-                      onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                      onChange={(e) => setFormData({ ...formData, cpf: formatCPF(e.target.value) })}
                     />
                   </div>
                 </div>

@@ -9,8 +9,10 @@ import { NavLink } from '@/components/NavLink';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 
 export function AppSidebar() {
+  const { t } = useTranslation();
   const { signOut } = useAuth();
   const { open, setOpen, isMobile, toggleSidebar, openMobile } = useSidebar();
   const { menuItems } = useUserRole();
@@ -43,8 +45,11 @@ export function AppSidebar() {
               <GraduationCap className="h-5 w-5 text-sidebar-primary-foreground" />
             </div>
             {isExpanded && (
-              <span className="text-lg font-bold text-sidebar-foreground whitespace-nowrap">
+              <span className="text-lg font-bold text-sidebar-primary whitespace-nowrap">
                 Diário Digital
+                <div className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-tight sm:tracking-widest leading-tight line-clamp-1 max-w-[120px] xs:max-w-none">
+                  {t('header.prefeitura')}
+                </div>
               </span>
             )}
           </div>
@@ -79,7 +84,7 @@ export function AppSidebar() {
                 activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-bold shadow-md hover:bg-sidebar-primary hover:text-sidebar-primary-foreground scale-[1.02]"
               >
                 <item.icon className="h-5 w-5 flex-shrink-0" />
-                {isExpanded && <span className="whitespace-nowrap">{item.title}</span>}
+                {isExpanded && <span className="whitespace-nowrap">{t(`menu.${item.title}`, item.title)}</span>}
               </NavLink>
             ))}
           </div>
@@ -91,7 +96,7 @@ export function AppSidebar() {
             className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sidebar-foreground transition-all hover:bg-destructive hover:text-destructive-foreground"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
-            {isExpanded && <span className="whitespace-nowrap">Sair</span>}
+            {isExpanded && <span className="whitespace-nowrap">{t('common.logout')}</span>}
           </button>
         </div>
       </div>

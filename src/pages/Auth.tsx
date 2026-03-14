@@ -9,8 +9,10 @@ import { GraduationCap, Loader2, Eye, EyeOff, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { useTranslation } from 'react-i18next';
 
 export default function Auth() {
+  const { t } = useTranslation();
   const { user, loading, signIn, signUp, resetPassword } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -100,18 +102,18 @@ export default function Auth() {
             toast.error('Sem permissão para fazer login: ' + error.message);
           }
         } else {
-          toast.success('Login realizado com sucesso!');
+          toast.success(t('login.successLogin', 'Login realizado com sucesso!'));
         }
       } else {
         const { error } = await signUp(email, password, nome);
         if (error) {
           if (error.message.includes('User already registered')) {
-            toast.error('Este email já está cadastrado');
+            toast.error(t('login.emailExists', 'Este email já está cadastrado'));
           } else {
-            toast.error('Sem permissão para criar conta: ' + error.message);
+            toast.error(t('login.errorCreateAccount', 'Sem permissão para criar conta: ') + error.message);
           }
         } else {
-          toast.success('Conta criada! Aguarde a aprovação do administrador para acessar o sistema.');
+          toast.success(t('login.successCreateAccount', 'Conta criada! Aguarde a aprovação do administrador para acessar o sistema.'));
           setIsLogin(true);
           setEmail('');
           setPassword('');
@@ -199,17 +201,17 @@ export default function Auth() {
           <div className="auth-card-premium pt-12">
             <div className="text-center mb-10">
               <h1 className="text-3xl font-bold text-[#8B6508]">Diário Digital</h1>
-              <p className="text-[#8B6508]/60 font-medium">{isLogin ? 'Entre na sua conta' : 'Crie sua conta'}</p>
+              <p className="text-[#8B6508]/60 font-medium">{isLogin ? t('login.title') : t('login.titleCreate')}</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="nome" className="text-[#8B6508] font-bold ml-1">Nome completo</Label>
+                  <Label htmlFor="nome" className="text-[#8B6508] font-bold ml-1">{t('login.name')}</Label>
                   <Input
                     id="nome"
                     type="text"
-                    placeholder="Seu nome"
+                    placeholder={t('login.namePlaceholder')}
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
                     required={!isLogin}
@@ -219,11 +221,11 @@ export default function Auth() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-[#8B6508] font-bold ml-1">E-mail</Label>
+                <Label htmlFor="email" className="text-[#8B6508] font-bold ml-1">{t('login.email')}</Label>
                 <Input
                   id="email"
                   type="email"
-                  placeholder="seu@email.com"
+                  placeholder={t('login.emailPlaceholder')}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -233,13 +235,13 @@ export default function Auth() {
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center ml-1">
-                  <Label htmlFor="password" className="text-[#8B6508] font-bold">Senha</Label>
+                  <Label htmlFor="password" className="text-[#8B6508] font-bold">{t('login.password')}</Label>
                 </div>
                 <div className="relative">
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    placeholder="••••••••"
+                    placeholder={t('login.passwordPlaceholder')}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -261,7 +263,7 @@ export default function Auth() {
                       onClick={handleResetPassword}
                       className="text-xs font-bold text-[#D4A017] hover:dd-text-gold transition-colors"
                     >
-                      Esqueceu a senha?
+                      {t('login.forgotPassword')}
                     </button>
                   </div>
                 )}
@@ -275,9 +277,9 @@ export default function Auth() {
                 {isSubmitting ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : isLogin ? (
-                  'Entrar'
+                  t('login.submitLogin')
                 ) : (
-                  'Criar conta'
+                  t('login.submitCreate')
                 )}
               </Button>
             </form>
@@ -285,8 +287,8 @@ export default function Auth() {
             <div className="mt-8 text-center space-y-4">
 
               <div className="pt-6 border-t border-[#8B6508]/10 text-xs text-[#8B6508]/50 flex flex-col items-center gap-1">
-                <p className="font-bold uppercase tracking-wider">Aplicação em desenvolvimento</p>
-                <p>Para acessar, entre em contato com o Professor Jonas da Escola Dom Paulo.</p>
+                <p className="font-bold uppercase tracking-wider">{t('login.devMessage1')}</p>
+                <p>{t('login.devMessage2')} - {t('login.devMessage3')}</p>
               </div>
             </div>
           </div>

@@ -91,7 +91,7 @@ export default function ObjetosDeConhecimento() {
         const queryPlanejados = await getDocs(qPlanejados);
         const ministrados = new Set<string>();
         const naoMinistrados = new Set<string>();
-        
+
         queryPlanejados.forEach(doc => {
           const data = doc.data();
           if (data.status === 'Ministrado') {
@@ -139,7 +139,7 @@ export default function ObjetosDeConhecimento() {
         <div className="flex justify-center">
           <Card className="w-full max-w-2xl">
             <CardHeader className="pb-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <CardTitle className="text-lg">Calendário de Dias Letivos</CardTitle>
+              <CardTitle className="text-lg">Calendário Planos de Aula</CardTitle>
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 bg-green-100 rounded-full border border-green-300"></div>

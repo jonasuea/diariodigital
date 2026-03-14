@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "diariodigital",
+    "site": "meudiario",
     "public": "dist",
     "ignore": [
       "firebase.json",

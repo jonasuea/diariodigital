@@ -1,0 +1,82 @@
+{
+    "login": {
+        "title": "Sign in to your account",
+        "titleCreate": "Create your account",
+        "name": "Full Name",
+        "namePlaceholder": "Your name",
+        "email": "E-mail",
+        "emailPlaceholder": "your@email.com",
+        "password": "Password",
+        "passwordPlaceholder": "••••••••",
+        "forgotPassword": "Forgot password?",
+        "submitLogin": "Sign In",
+        "submitCreate": "Create Account",
+        "noAccount": "Don't have an account?",
+        "hasAccount": "Already have an account?",
+        "devMessage1": "Application under development",
+        "devMessage2": "To access, speak to Professor Jonas",
+        "devMessage3": "Dom Paulo School"
+    },
+    "branding": {
+        "title": "School Management System",
+        "subtitle": "Manage students, teachers, classes and much more simply and efficiently."
+    },
+    "common": {
+        "logout": "Sign Out",
+        "search": "Search...",
+        "noResults": "No results found.",
+        "typeToSearch": "Type to search..."
+    },
+    "header": {
+        "prefeitura": "City of Itacoatiara – SEMED",
+        "selectSchool": "Select a School",
+        "changeSchool": "Change School",
+        "changeSchoolTitle": "Change School",
+        "changeSchoolDesc": "Select the school unit you wish to access."
+    },
+    "menu": {
+        "Painel": "Dashboard",
+        "Escolas": "Schools",
+        "Estudantes": "Students",
+        "Responsáveis": "Guardians",
+        "Pré-Matrículas": "Pre-Enrollments",
+        "Professores": "Teachers",
+        "Equipe Gestora": "Management Team",
+        "Turmas": "Classes",
+        "Mensagens": "Messages",
+        "Diário Digital": "Digital Diary",
+        "Horário": "Timetable",
+        "Relatórios": "Reports",
+        "Calendário": "Calendar",
+        "Usuários": "Users",
+        "Configurações": "Settings",
+        "Base Curricular": "Curriculum Base",
+        "Manual de Uso": "User Manual",
+        "Meu Perfil": "My Profile"
+    },
+    "dashboard": {
+        "title": "Dashboard",
+        "loadingPanel": "Loading dashboard...",
+        "totalStudents": "Total Students",
+        "totalTeachers": "Total Teachers",
+        "totalClasses": "Total Classes",
+        "averageGrades": "Overall Average Grades",
+        "generalAttendance": "General Attendance",
+        "bimonthlyGrades": "Bimonthly Grades",
+        "thisWeek": "This Week",
+        "thisMonth": "This Month",
+        "lastYear": "Last Year",
+        "absenceRate": "Absence Rate",
+        "upcomingEvents": "Upcoming Events",
+        "upcomingEventsDesc": "The next 5 events in the school calendar.",
+        "loadingEvents": "Loading events...",
+        "noUpcomingEvents": "No upcoming events found.",
+        "recentActivities": "Recent Activities",
+        "recentActivitiesDesc": "Log of the latest system interactions.",
+        "viewAll": "View All",
+        "loadingActivities": "Loading activities...",
+        "systemUser": "System User",
+        "justNow": "just now",
+        "noActivitiesYet": "No activities registered yet."
+    }
+}
