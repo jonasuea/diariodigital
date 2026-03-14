@@ -27,12 +27,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const roleDoc = await getDoc(roleDocRef);
           const roleData = roleDoc.data();
           
-          const DIARIO_ALLOWED_ROLES = ['admin', 'professor'];
+          // Aceita qualquer role reconhecido em qualquer sistema.
+          // O redirecionamento para o sistema correto é feito na EscolhaPerfil.
+          const ALL_KNOWN_ROLES = ['admin', 'professor', 'gestor', 'pedagogo', 'secretario', 'responsavel', 'estudante'];
           const extraRoles: string[] = (roleData?.roles || []).map((r: any) => r.role);
           const primaryRole: string | null = roleData?.role || null;
           const allRoles = [...new Set([primaryRole, ...extraRoles])].filter(Boolean) as string[];
           
-          const hasAccess = allRoles.some(r => DIARIO_ALLOWED_ROLES.includes(r));
+          const hasAccess = allRoles.some(r => ALL_KNOWN_ROLES.includes(r));
           
           if (!hasAccess || roleData?.status === 'inativo') {
             await firebaseSignOut(auth);
@@ -71,11 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const isInMaintenance = maintenanceData?.preferencias?.modoManutencao || false;
       const primaryRole: string | null = roleData?.role || null;
 
-      // Collect all roles this user holds (primary + any from the roles[] array)
-      const DIARIO_ALLOWED_ROLES = ['admin', 'professor'];
+      // Coleta todos os perfis do usuário (primário + array roles[])
+      const ALL_KNOWN_ROLES = ['admin', 'professor', 'gestor', 'pedagogo', 'secretario', 'responsavel', 'estudante'];
       const extraRoles: string[] = (roleData?.roles || []).map((r: any) => r.role);
       const allRoles = [...new Set([primaryRole, ...extraRoles])].filter(Boolean) as string[];
-      const hasDiarioAccess = allRoles.some(r => DIARIO_ALLOWED_ROLES.includes(r));
+
+      // Usuário é aceito se tiver qualquer perfil reconhecido em qualquer sistema.
+      // O redirecionamento para o sistema correto acontece na tela EscolhaPerfil.
+      const hasAnyAccess = allRoles.some(r => ALL_KNOWN_ROLES.includes(r));
 
       if (isInMaintenance && primaryRole !== 'admin') {
         await firebaseSignOut(auth);
@@ -84,9 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { error: maintenanceError };
       }
 
-      if (!hasDiarioAccess) {
+      if (!hasAnyAccess) {
         await firebaseSignOut(auth);
-        const roleError = new Error("Acesso restrito. Apenas professores podem acessar o Diário Digital.");
+        const roleError = new Error("Acesso negado. Seu usuário não possui nenhum perfil ativo nos sistemas.");
         roleError.name = 'RoleRestriction';
         return { error: roleError };
       }

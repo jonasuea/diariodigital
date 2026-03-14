@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
@@ -7,8 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GraduationCap, Loader2, Eye, EyeOff, HelpCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
 
 export default function Auth() {
@@ -19,30 +17,9 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [nome, setNome] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [estudanteId, setEstudanteId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const { role, loading: loadingRole, needsProfileSelection } = useUserRole();
-
-  useEffect(() => {
-    if (user && role === 'estudante') {
-      const fetchEstudanteId = async () => {
-        try {
-          const q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid), limit(1));
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            setEstudanteId(snap.docs[0].id);
-          } else {
-            setEstudanteId('fallback');
-          }
-        } catch (e) {
-          console.error(e);
-          setEstudanteId('fallback');
-        }
-      };
-      fetchEstudanteId();
-    }
-  }, [user, role]);
 
   if (loading || loadingRole) {
     return (
@@ -52,24 +29,35 @@ export default function Auth() {
     );
   }
 
+  // Mapa de redirecionamento externo por perfil (igual ao EscolhaPerfil.tsx)
+  const ROLE_EXTERNAL_URL: Record<string, string | null> = {
+    professor: null,
+    admin: null,
+    estudante: 'https://souestudante.web.app',
+    responsavel: 'https://matriculaonline.web.app',
+    gestor: 'https://educafacil1.web.app',
+    pedagogo: 'https://educafacil1.web.app',
+    secretario: 'https://educafacil1.web.app',
+  };
+
   if (user) {
     if (needsProfileSelection) {
       return <Navigate to="/escolha-perfil" replace />;
     }
 
-    if (role === 'estudante') {
-      if (!estudanteId) {
+    if (role) {
+      const externalUrl = ROLE_EXTERNAL_URL[role];
+      if (externalUrl) {
+        // Redireciona para o sistema externo correto
+        window.location.href = externalUrl;
         return (
           <div className="min-h-screen flex items-center justify-center bg-[#F8F1D1]">
             <Loader2 className="h-8 w-8 animate-spin text-[#D4A017]" />
-            <span className="ml-2 text-[#8B6508]">Localizando perfil do estudante...</span>
+            <span className="ml-2 text-[#8B6508]">Redirecionando para o sistema correto...</span>
           </div>
         );
       }
-      return <Navigate to="/painel" replace />;
-    }
-
-    if (role) {
+      // Professor ou admin: fica no Diário Digital
       return <Navigate to="/painel" replace />;
     }
 
