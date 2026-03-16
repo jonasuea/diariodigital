@@ -47,6 +47,10 @@ service cloud.firestore {
     match /profiles/{uid} {
       allow read: if isSignedIn();
       allow write: if isAdmin() || isGestor() || isSecretario() || request.auth.uid == uid;
+      
+      match /mensagens_vistas/{messageId} {
+        allow read, write: if request.auth.uid == uid;
+      }
     }
 
     match /escolas/{id} {
