@@ -1,0 +1,312 @@
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { AppLayout } from "@/components/layout/AppLayout";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Loader2, ArrowLeft, Plus, Trash2, Printer, Image as ImageIcon, Save } from "lucide-react";
+import { db, storage } from "@/lib/firebase";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { toast } from "sonner";
+import { ProvaPDFDialog, Questao } from "@/components/relatorios/ProvaPDFDialog";
+import { useUserRole } from "@/hooks/useUserRole";
+
+export default function CriarAvaliacao() {
+  const { turmaId, avaliacaoId } = useParams<{ turmaId: string, avaliacaoId: string }>();
+  const navigate = useNavigate();
+  const { escolaAtivaId } = useUserRole();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const [avaliacao, setAvaliacao] = useState<any>(null);
+  const [turma, setTurma] = useState<any>(null);
+  const [escolaInfo, setEscolaInfo] = useState({ nome: '', inep: '', decreto: '' });
+  
+  const [questoes, setQuestoes] = useState<Questao[]>([]);
+
+  useEffect(() => {
+    async function fetchData() {
+      if (!turmaId || !avaliacaoId || !escolaAtivaId) return;
+      try {
+        const [avSnap, turmaSnap, escolaSnap] = await Promise.all([
+          getDoc(doc(db, "avaliacoes", avaliacaoId)),
+          getDoc(doc(db, "turmas", turmaId)),
+          getDoc(doc(db, "escolas", escolaAtivaId))
+        ]);
+
+        if (avSnap.exists()) {
+          const avData = avSnap.data();
+          setAvaliacao(avData);
+          if (avData.questoes) {
+            setQuestoes(avData.questoes);
+          }
+        }
+        if (turmaSnap.exists()) setTurma(turmaSnap.data());
+        if (escolaSnap.exists()) {
+          const eUrl = escolaSnap.data();
+          setEscolaInfo({ nome: eUrl.nome, inep: eUrl.inep, decreto: eUrl.decreto_criacao });
+        }
+      } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+        toast.error("Erro ao carregar avaliação.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchData();
+  }, [turmaId, avaliacaoId, escolaAtivaId]);
+
+  const handleAddQuestao = () => {
+    setQuestoes([...questoes, {
+      id: Math.random().toString(36).substr(2, 9),
+      tipo: 'objetiva',
+      enunciado: '',
+      alternativas: ['', '', '', ''],
+      valor: 1
+    }]);
+  };
+
+  const handleRemoveQuestao = (id: string) => {
+    setQuestoes(questoes.filter(q => q.id !== id));
+  };
+
+  const handleChangeQuestao = (id: string, field: keyof Questao, value: any) => {
+    setQuestoes(questoes.map(q => {
+      if (q.id === id) {
+        const updated = { ...q, [field]: value };
+        if (field === 'tipo') {
+          if (value === 'objetiva' && (!q.alternativas || q.alternativas.length === 0)) {
+            updated.alternativas = ['', '', '', ''];
+          }
+        }
+        return updated;
+      }
+      return q;
+    }));
+  };
+
+  const handleChangeAlternativa = (qId: string, index: number, value: string) => {
+    setQuestoes(questoes.map(q => {
+      if (q.id === qId && q.alternativas) {
+        const novasAlt = [...q.alternativas];
+        novasAlt[index] = value;
+        return { ...q, alternativas: novasAlt };
+      }
+      return q;
+    }));
+  };
+
+  const handleImageUpload = async (qId: string, file: File) => {
+    try {
+      toast.info("Fazendo upload da imagem...");
+      const storageRef = ref(storage, `avaliacoes_imagens/${avaliacaoId}/${qId}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      handleChangeQuestao(qId, 'imagemUrl', url);
+      toast.success("Upload concluído!");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro no upload da imagem.");
+    }
+  };
+
+  const handleSave = async () => {
+    if (!avaliacaoId) return;
+    setSaving(true);
+    try {
+      // Sanitiza o array para remover campos undefined (Firestore não aceita undefined)
+      const questoesSanitizadas = questoes.map(q => ({
+        id: q.id,
+        tipo: q.tipo,
+        enunciado: q.enunciado ?? '',
+        alternativas: q.alternativas ?? null,
+        valor: q.valor ?? 1,
+        imagemUrl: q.imagemUrl ?? null,
+      }));
+      await updateDoc(doc(db, "avaliacoes", avaliacaoId), {
+        questoes: questoesSanitizadas
+      });
+      toast.success("Avaliação salva com sucesso!");
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      toast.error("Erro ao salvar. Tente novamente.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <div className="flex h-64 items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  return (
+    <AppLayout>
+      <div className="space-y-4 max-w-5xl mx-auto pb-20">
+        <div className="flex flex-row items-center justify-between gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight truncate">Montar Avaliação</h1>
+            <p className="text-sm text-muted-foreground line-clamp-2">
+              Adicione questões para <span className="font-semibold text-primary">{avaliacao?.titulo}</span> - Turma <span className="font-semibold text-primary">{turma?.nome}</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="shrink-0">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)} className="shrink-0">
+              <Printer className="h-4 w-4 mr-2" /> PDF / Imprimir
+            </Button>
+            <Button size="sm" onClick={handleSave} disabled={saving} className="bg-primary hover:bg-primary/90 shrink-0">
+              {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+              Salvar
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {questoes.map((questao, index) => (
+            <Card key={questao.id} className="relative shadow-sm border-blue-100">
+              <div className="absolute top-4 left-4 bg-blue-100 text-blue-800 font-bold w-8 h-8 rounded-full flex items-center justify-center">
+                {index + 1}
+              </div>
+              <CardHeader className="pl-16 pb-2 flex flex-row justify-between items-start">
+                <div className="flex-1 space-y-2">
+                  <div className="flex flex-wrap gap-4 items-center">
+                    <div className="w-48">
+                      <Select
+                        value={questao.tipo}
+                        onValueChange={(v) => handleChangeQuestao(questao.id, 'tipo', v)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Tipo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="objetiva">Objetiva (Múltipla Escolha)</SelectItem>
+                          <SelectItem value="descritiva">Descritiva (Aberta)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <label className="text-sm text-gray-500 font-medium whitespace-nowrap">Valor:</label>
+                      <Input 
+                        type="number" 
+                        className="w-20" 
+                        value={questao.valor} 
+                        onChange={(e) => handleChangeQuestao(questao.id, 'valor', Number(e.target.value))}
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <Button variant="ghost" size="icon" className="text-red-500 hover:text-red-700 hover:bg-red-50 -mt-2 -mr-2" onClick={() => handleRemoveQuestao(questao.id)}>
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent className="pl-16 space-y-4">
+                
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium flex items-center justify-between">
+                    <span>Imagem (Opcional)</span>
+                    {questao.imagemUrl && (
+                      <Button variant="ghost" size="sm" className="h-6 text-red-500" onClick={() => handleChangeQuestao(questao.id, 'imagemUrl', '')}>
+                        Remover Imagem
+                      </Button>
+                    )}
+                  </label>
+                  {questao.imagemUrl ? (
+                    <div className="border rounded-md p-2 bg-gray-50 inline-block w-fit max-w-full">
+                      <img src={questao.imagemUrl} alt="Questão" className="max-h-48 object-contain" />
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleImageUpload(questao.id, file);
+                        }}
+                        className="w-full max-w-sm"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Enunciado da Questão</label>
+                  <Textarea 
+                    placeholder="Digite o enunciado da questão..."
+                    className="min-h-[100px]"
+                    value={questao.enunciado}
+                    onChange={(e) => handleChangeQuestao(questao.id, 'enunciado', e.target.value)}
+                  />
+                </div>
+
+                {questao.tipo === 'objetiva' && (
+                  <div className="space-y-3 pt-4 border-t">
+                    <label className="text-sm font-medium">Alternativas</label>
+                    {questao.alternativas?.map((alt, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="font-medium text-gray-500 w-6">{String.fromCharCode(97 + i)})</span>
+                        <Input 
+                          placeholder={`Alternativa ${String.fromCharCode(97 + i)}`}
+                          value={alt}
+                          onChange={(e) => handleChangeAlternativa(questao.id, i, e.target.value)}
+                          className="flex-1"
+                        />
+                      </div>
+                    ))}
+                    <div className="pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        type="button"
+                        onClick={() => {
+                          const alts = questao.alternativas || [];
+                          handleChangeQuestao(questao.id, 'alternativas', [...alts, '']);
+                        }}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Adicionar Alternativa
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+
+          <Button 
+            variant="outline" 
+            className="w-full py-8 text-blue-600 border-blue-200 border-dashed hover:bg-blue-50"
+            onClick={handleAddQuestao}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Adicionar Questão
+          </Button>
+
+        </div>
+      </div>
+
+      <ProvaPDFDialog 
+        open={previewOpen}
+        onOpenChange={setPreviewOpen}
+        avaliacao={avaliacao}
+        turma={turma}
+        escolaInfo={escolaInfo}
+        questoes={questoes}
+      />
+    </AppLayout>
+  );
+}

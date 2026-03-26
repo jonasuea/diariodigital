@@ -3,12 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Save, X, Search, Check, ClipboardList } from 'lucide-react';
+import { Loader2, ArrowLeft, Save, X, Search, Check, ClipboardList, Bot, FileEdit, PlusCircle, Pencil } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +33,24 @@ interface Turma {
   nome: string;
 }
 
+interface AvaliacaoSalva {
+  id: string;
+  titulo: string;
+  tipo: string;
+  valor: string;
+  objetosConhecimento: string[];
+  observacao: string;
+  created_at?: Timestamp;
+}
+
+const FORM_VAZIO = {
+  titulo: "",
+  tipo: "PROVA",
+  valor: "",
+  objetosConhecimento: [] as string[],
+  observacao: ""
+};
+
 export default function RegistroAvaliacao() {
   const navigate = useNavigate();
   const { turmaId } = useParams<{ turmaId: string }>();
@@ -48,13 +66,37 @@ export default function RegistroAvaliacao() {
   const [objetosMinistrados, setObjetosMinistrados] = useState<string[]>([]);
   const [loadingObjetos, setLoadingObjetos] = useState(false);
 
-  const [formData, setFormData] = useState({
-    titulo: "",
-    tipo: "PROVA",
-    valor: "",
-    objetosConhecimento: [] as string[],
-    observacao: ""
-  });
+  // Lista de avaliações já salvas para esse dia
+  const [avaliacoesDoDia, setAvaliacoesDoDia] = useState<AvaliacaoSalva[]>([]);
+
+  const [formData, setFormData] = useState({ ...FORM_VAZIO });
+
+  // Busca todas as avaliações do dia para listagem
+  const fetchAvaliacoesDoDia = useCallback(async () => {
+    if (!turmaId || !componente || !dataParams) return;
+    try {
+      const q = query(
+        collection(db, 'avaliacoes'),
+        where('turma_id', '==', turmaId),
+        where('componente', '==', componente),
+        where('data', '==', dataParams),
+        orderBy('created_at', 'asc')
+      );
+      const snap = await getDocs(q);
+      const lista: AvaliacaoSalva[] = snap.docs.map(d => ({
+        id: d.id,
+        titulo: d.data().titulo || "",
+        tipo: d.data().tipo || "",
+        valor: d.data().valor || "",
+        objetosConhecimento: d.data().objetosConhecimento || [],
+        observacao: d.data().observacao || "",
+        created_at: d.data().created_at,
+      }));
+      setAvaliacoesDoDia(lista);
+    } catch (error) {
+      console.error("Erro ao buscar avaliações do dia:", error);
+    }
+  }, [turmaId, componente, dataParams]);
 
   useEffect(() => {
     async function fetchInitialData() {
@@ -87,28 +129,9 @@ export default function RegistroAvaliacao() {
           setLoadingObjetos(false);
         }
 
-        // Buscar registro existente para esta data/turma/componente
-        if (componente && dataParams) {
-          const q = query(
-            collection(db, 'avaliacoes'),
-            where('turma_id', '==', turmaId),
-            where('componente', '==', componente),
-            where('data', '==', dataParams)
-          );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            const existingDoc = snap.docs[0];
-            const data = existingDoc.data();
-            setEditingId(existingDoc.id);
-            setFormData({
-              titulo: data.titulo || "",
-              tipo: data.tipo || "PROVA",
-              valor: data.valor || "",
-              objetosConhecimento: data.objetosConhecimento || [],
-              observacao: data.observacao || ""
-            });
-          }
-        }
+        // Buscar todas as avaliações do dia
+        await fetchAvaliacoesDoDia();
+
       } catch (error) {
         console.error("Erro ao buscar dados:", error);
       } finally {
@@ -116,9 +139,28 @@ export default function RegistroAvaliacao() {
       }
     }
     fetchInitialData();
-  }, [turmaId, componente, dataParams]);
+  }, [turmaId, componente, dataParams, fetchAvaliacoesDoDia]);
 
-  const handleSave = async () => {
+  // Carrega uma avaliação existente no formulário para edição
+  const handleEditarAvaliacao = (av: AvaliacaoSalva) => {
+    setEditingId(av.id);
+    setFormData({
+      titulo: av.titulo,
+      tipo: av.tipo,
+      valor: av.valor,
+      objetosConhecimento: av.objetosConhecimento,
+      observacao: av.observacao,
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Reseta o formulário para criar uma nova avaliação
+  const handleNovaAvaliacao = () => {
+    setEditingId(null);
+    setFormData({ ...FORM_VAZIO });
+  };
+
+  const handleSave = async (redirectType?: 'manual' | 'ia') => {
     if (!turmaId || !componente || !dataParams) return;
 
     if (!formData.titulo || formData.objetosConhecimento.length === 0) {
@@ -127,6 +169,7 @@ export default function RegistroAvaliacao() {
     }
 
     setSaving(true);
+    let savedId = editingId;
     try {
       const payload = {
         turma_id: turmaId,
@@ -138,15 +181,26 @@ export default function RegistroAvaliacao() {
 
       if (editingId) {
         await updateDoc(doc(db, "avaliacoes", editingId), payload);
+        toast.success("Avaliação atualizada!");
       } else {
-        await addDoc(collection(db, "avaliacoes"), {
+        const docRef = await addDoc(collection(db, "avaliacoes"), {
           ...payload,
           created_at: Timestamp.now()
         });
+        savedId = docRef.id;
+        toast.success("Avaliação salva com sucesso!");
       }
 
-      toast.success(editingId ? "Avaliação atualizada!" : "Avaliação salva com sucesso!");
-      navigate(-1);
+      if (redirectType === 'manual') {
+        navigate(`/diario-digital/avaliacoes/${turmaId}/criar/${savedId}`);
+      } else if (redirectType === 'ia') {
+        navigate(`/diario-digital/avaliacoes/${turmaId}/criar-ia/${savedId}`);
+      } else {
+        // Apenas Salvar: atualiza a lista e limpa o formulário para nova entrada
+        await fetchAvaliacoesDoDia();
+        setEditingId(null);
+        setFormData({ ...FORM_VAZIO });
+      }
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast.error("Erro ao salvar a avaliação.");
@@ -344,22 +398,128 @@ export default function RegistroAvaliacao() {
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-6 border-t">
+            {/* Lista de avaliações salvas para esse dia */}
+            {avaliacoesDoDia.length > 0 && (
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Avaliações criadas para este dia</p>
+                    <p className="text-xs text-muted-foreground">Clique em uma avaliação para editá-la ou crie uma nova versão.</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleNovaAvaliacao}
+                    className="shrink-0"
+                  >
+                    <PlusCircle className="h-4 w-4 mr-1" />
+                    Nova Avaliação
+                  </Button>
+                </div>
+                <div className="grid gap-2">
+                  {avaliacoesDoDia.map((av, idx) => (
+                    <div
+                      key={av.id}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors",
+                        editingId === av.id
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border bg-slate-50/40 hover:bg-slate-100/60"
+                      )}
+                      onClick={() => handleEditarAvaliacao(av)}
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={cn(
+                          "flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0",
+                          editingId === av.id ? "bg-primary text-primary-foreground" : "bg-slate-200 text-slate-600"
+                        )}>
+                          {idx + 1}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{av.titulo || "Sem título"}</p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground">{av.tipo}</span>
+                            {av.valor && (
+                              <Badge variant="outline" className="text-xs h-5 px-1.5">Nota: {av.valor}</Badge>
+                            )}
+                            {av.objetosConhecimento.length > 0 && (
+                              <Badge variant="secondary" className="text-xs h-5 px-1.5">
+                                {av.objetosConhecimento.length} objeto{av.objetosConhecimento.length > 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        {editingId === av.id && (
+                          <Badge className="text-xs bg-primary/10 text-primary border-primary/20">Editando</Badge>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => { e.stopPropagation(); handleEditarAvaliacao(av); }}
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/diario-digital/avaliacoes/${turmaId}/criar-ia/${av.id}`);
+                          }}
+                          title="Criar com IA"
+                        >
+                          <Bot className="h-3.5 w-3.5 text-purple-600" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/diario-digital/avaliacoes/${turmaId}/criar/${av.id}`);
+                          }}
+                          title="Criar manualmente"
+                        >
+                          <FileEdit className="h-3.5 w-3.5 text-blue-600" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-6 border-t flex-wrap">
               <Button variant="outline" onClick={() => navigate(-1)} disabled={saving} className="px-6">
                 Cancelar
               </Button>
-              <Button onClick={handleSave} disabled={saving} className="px-8 bg-primary hover:bg-primary/90">
+              <Button onClick={() => handleSave()} disabled={saving} className="px-6 bg-slate-600 hover:bg-slate-700">
                 {saving ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Salvando...
-                  </>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (
-                  <>
-                    <Save className="mr-2 h-4 w-4" />
-                    Salvar Avaliação
-                  </>
+                  <Save className="mr-2 h-4 w-4" />
                 )}
+                Apenas Salvar
+              </Button>
+              <Button onClick={() => handleSave('manual')} disabled={saving} className="px-6 bg-blue-600 hover:bg-blue-700">
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <FileEdit className="mr-2 h-4 w-4" />
+                )}
+                Criar Avaliação
+              </Button>
+              <Button onClick={() => handleSave('ia')} disabled={saving} className="px-6 bg-purple-600 hover:bg-purple-700">
+                {saving ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Bot className="mr-2 h-4 w-4" />
+                )}
+                Criar com IA
               </Button>
             </div>
           </CardContent>
