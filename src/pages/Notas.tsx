@@ -71,7 +71,8 @@ export default function Notas() {
   const navigate = useNavigate();
   const { turmaId } = useParams();
   const [searchParams] = useSearchParams();
-  const { escolaAtivaId } = useUserRole();
+  const { escolaAtivaId, role } = useUserRole();
+  const podeEditar = role === 'admin' || role === 'professor';
 
   const [turma, setTurma] = useState<Turma | null>(null);
   const [estudantes, setEstudantes] = useState<Estudante[]>([]);
@@ -370,7 +371,7 @@ export default function Notas() {
     a.nome.toLowerCase().includes(search.toLowerCase())
   );
 
-  const isInputDisabled = componente === 'todos';
+  const isInputDisabled = componente === 'todos' || !podeEditar;
 
   return (
     <AppLayout>
@@ -422,39 +423,45 @@ export default function Notas() {
             Gerar Boletins
           </Button>
 
-          <Button onClick={handleSave} disabled={saving || isInputDisabled} className="gap-2">
-            <Save className="h-4 w-4" />
-            {saving ? 'Salvando...' : 'Salvar'}
-          </Button>
+          {podeEditar && (
+            <Button onClick={handleSave} disabled={saving || isInputDisabled} className="gap-2">
+              <Save className="h-4 w-4" />
+              {saving ? 'Salvando...' : 'Salvar'}
+            </Button>
+          )}
 
           {/* botão temporário para apagar todas as notas do banco */}
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={clearing}
-            onClick={async () => {
-              if (!window.confirm('Tem certeza de que deseja apagar **todas** as notas? Esta ação não pode ser desfeita.')) return;
-              setClearing(true);
-              try {
-                const snapshot = await getDocs(collection(db, 'notas'));
-                await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, 'notas', d.id))));
-                toast.success('Todas as notas foram excluídas.');
-                loadData();
-              } catch (err) {
-                console.error(err);
-                toast.error('Sem permissão para apagar notas');
-              } finally {
-                setClearing(false);
-              }
-            }}
-          >
-            Limpar todas
-          </Button>
+          {role === 'admin' && (
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={clearing}
+              onClick={async () => {
+                if (!window.confirm('Tem certeza de que deseja apagar **todas** as notas? Esta ação não pode ser desfeita.')) return;
+                setClearing(true);
+                try {
+                  const snapshot = await getDocs(collection(db, 'notas'));
+                  await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, 'notas', d.id))));
+                  toast.success('Todas as notas foram excluídas.');
+                  loadData();
+                } catch (err) {
+                  console.error(err);
+                  toast.error('Sem permissão para apagar notas');
+                } finally {
+                  setClearing(false);
+                }
+              }}
+            >
+              Limpar todas
+            </Button>
+          )}
         </div>
 
         {isInputDisabled && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800 text-sm">
-            Selecione uma componente específica para lançar notas. Com "Todos os componentes" selecionado, as notas são exibidas apenas para visualização.
+            {!podeEditar 
+              ? `Modo de visualização ativo (${role || 'sem perfil'}). Apenas professores e administradores podem editar as notas finais.`
+              : 'Selecione um componente específico para lançar notas. Com "Todos os componentes" selecionado, as notas são exibidas apenas para visualização.'}
           </div>
         )}
 

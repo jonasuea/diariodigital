@@ -165,8 +165,10 @@ export default function NotasParciais() {
     const [loadingAvaliacoes, setLoadingAvaliacoes] = useState(false);
 
     const { role, escolaAtivaId } = useUserRole();
-    const ROLES_GESTAO = ['admin', 'gestor', 'pedagogo', 'secretario'];
-    const podeDesbloquear = role ? ROLES_GESTAO.includes(role) : false;
+    const ROLES_GESTAO_DESBLOQUEIO = ['admin', 'gestor', 'secretario'];
+    const ROLES_EDICAO = ['admin', 'professor'];
+    const podeDesbloquear = role ? ROLES_GESTAO_DESBLOQUEIO.includes(role) : false;
+    const podeEditar = role ? ROLES_EDICAO.includes(role) : false;
     const isProfessor = role === 'professor';
 
     // notas[bimestre][estudanteId] = NotaParcial
@@ -437,7 +439,7 @@ export default function NotasParciais() {
             const novoLocked = new Set(bimestresLocked).add(bim);
             setBimestresLocked(novoLocked);
             await saveConfig(novoLocked);
-            toast.info(`${bim}º bimestre bloqueado para edição. Apenas gestores podem reabrir.`);
+            toast.info(`${bim}º bimestre bloqueado para edição. Secretário, Gestor ou Admin podem reabilitar.`);
 
         } catch (err) {
             toast.error('Sem permissão para enviar médias para Notas.');
@@ -586,8 +588,18 @@ export default function NotasParciais() {
                         <p>Nenhum estudante encontrado nesta turma.</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        {BIMESTRES.map(bim => (
+                    <div className="space-y-6">
+                        {!podeEditar && (
+                            <div className="bg-blue-50 border border-blue-200 text-blue-800 rounded-md p-3 flex items-start gap-3">
+                                <Info className="h-5 w-5 shrink-0 mt-0.5 text-blue-600" />
+                                <div className="text-sm">
+                                    <p className="font-semibold">Modo de visualização</p>
+                                    <p>Seu perfil ({role}) tem permissão apenas para visualizar as notas parciais. Apenas professores e admins podem editá-las.</p>
+                                </div>
+                            </div>
+                        )}
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                            {BIMESTRES.map(bim => (
                             <Card
                                 key={bim}
                                 className={`border-2 ${BIMESTRE_COLORS[bim]} shadow-sm`}
@@ -616,10 +628,10 @@ export default function NotasParciais() {
                                                     >
                                                         🔓 {unlocking === bim ? 'Desbloqueando...' : 'Habilitar Edição'}
                                                     </Button>
-                                                ) : (
-                                                    <span className="text-xs text-red-600 italic self-center">Somente gestores podem editar</span>
-                                                )
-                                            ) : (
+                                                ) : podeEditar ? (
+                                                    <span className="text-xs text-red-600 italic self-center">Bloqueado. Solicite a reabertura.</span>
+                                                ) : null
+                                            ) : podeEditar ? (
                                                 <>
                                                     <Button
                                                         size="sm"
@@ -642,7 +654,7 @@ export default function NotasParciais() {
                                                         {syncing === bim ? 'Enviando...' : 'Enviar para Notas'}
                                                     </Button>
                                                 </>
-                                            )}
+                                            ) : null}
                                         </div>
                                     </div>
                                     <p className="text-xs opacity-70 mt-0.5">
@@ -669,7 +681,7 @@ export default function NotasParciais() {
                                                                                     "w-full h-full flex flex-col items-center justify-center hover:bg-black/5 transition-colors uppercase leading-none",
                                                                                     vinculado && "text-primary font-bold bg-primary/5"
                                                                                 )}
-                                                                                disabled={bimestresLocked.has(bim)}
+                                                                                disabled={bimestresLocked.has(bim) || !podeEditar}
                                                                             >
                                                                                 <span className="text-[10px] opacity-70 mb-0.5">{slot}</span>
                                                                                 {vinculado ? (
@@ -729,7 +741,7 @@ export default function NotasParciais() {
                                                                         inputMode="decimal"
                                                                         className="h-7 text-center text-sm px-1 bg-white/80 focus:bg-white border-muted disabled:opacity-50 disabled:cursor-not-allowed"
                                                                         placeholder="—"
-                                                                        disabled={bimestresLocked.has(bim)}
+                                                                        disabled={bimestresLocked.has(bim) || !podeEditar}
                                                                     />
                                                                 </TableCell>
                                                             ))}
@@ -761,7 +773,8 @@ export default function NotasParciais() {
                                     </div>
                                 </CardContent>
                             </Card>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>

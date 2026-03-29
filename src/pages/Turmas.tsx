@@ -567,7 +567,7 @@ export default function Turmas() {
                       <SelectValue placeholder="Selecionar ano/série" />
                     </SelectTrigger>
                     <SelectContent>
-                      {['1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano', '6º Ano', '7º Ano', '8º Ano', '9º Ano'].map((s) => (
+                      {['Crianças Bem Pequenas I', 'Crianças Bem Pequenas II', 'Crianças Pequenas I', 'Crianças Pequenas II', '1º Ano', '2º Ano', '3º Ano', '4º Ano', '5º Ano', '6º Ano', '7º Ano', '8º Ano', '9º Ano'].map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -957,7 +957,7 @@ export default function Turmas() {
                 <Label>Componente Curricular</Label>
                 <Select value={novaAlocacao.nome} onValueChange={(value) => setNovaAlocacao(prev => ({ ...prev, nome: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione the componente" />
+                    <SelectValue placeholder="Selecione o componente" />
                   </SelectTrigger>
                   <SelectContent>
                     {COMPONENTES_CURRICULARES.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
@@ -968,7 +968,7 @@ export default function Turmas() {
                 <Label>Professor</Label>
                 <Select value={novaAlocacao.professorId} onValueChange={(value) => setNovaAlocacao(prev => ({ ...prev, professorId: value }))}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione the professor" />
+                    <SelectValue placeholder="Selecione o professor" />
                   </SelectTrigger>
                   <SelectContent>
                     {professores.map(p => <SelectItem key={p.id} value={p.id}>{p.nome}</SelectItem>)}

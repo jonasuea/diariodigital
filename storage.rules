@@ -22,9 +22,14 @@ service firebase.storage {
       allow write: if isSignedIn();
     }
     
-    // Regra Global Restrita
+    match /avaliacoes_imagens/{allFiles=**} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Regra Global Restrita (Removida a permissão global para evitar exposição de arquivos sensíveis)
     match /{allPaths=**} {
-      allow read, write: if isSignedIn();
+      allow read, write: if false;
     }
   }
 }

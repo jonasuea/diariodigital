@@ -199,6 +199,9 @@ export default function DiarioDigital() {
     }
   }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, loggedProfessorId, selectedComponente, isRestoring]);
 
+  const selectedTurma = turmas.find(t => t.id === selectedTurmaId);
+  const isInfantil = selectedTurma ? ["Crianças Bem Pequenas I", "Crianças Bem Pequenas II", "Crianças Pequenas I", "Crianças Pequenas II"].some(nome => selectedTurma.nome.includes(nome)) : false;
+
   const cards = [
     {
       title: 'Frequência',
@@ -206,7 +209,7 @@ export default function DiarioDigital() {
       icon: Users,
       color: 'text-blue-500',
       bgColor: 'bg-blue-50',
-      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/frequencia?componente=${encodeURIComponent(selectedComponente)}&origem=diario`),
+      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/frequencia?componente=${encodeURIComponent(selectedComponente || '')}&origem=diario`),
     },
     {
       title: 'Objetos de Conhecimento',
@@ -214,7 +217,7 @@ export default function DiarioDigital() {
       icon: BookOpen,
       color: 'text-green-500',
       bgColor: 'bg-green-50',
-      action: () => navigate(selectedTurmaId ? `/diario-digital/objetos-de-conhecimento/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente)}` : '/diario-digital/objetos-de-conhecimento'),
+      action: () => navigate(selectedTurmaId ? `/diario-digital/objetos-de-conhecimento/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente || '')}` : '/diario-digital/objetos-de-conhecimento'),
     },
     {
       title: 'Avaliações',
@@ -222,7 +225,13 @@ export default function DiarioDigital() {
       icon: ClipboardList,
       color: 'text-purple-500',
       bgColor: 'bg-purple-50',
-      action: () => navigate(`/diario-digital/avaliacoes/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente)}`),
+      action: () => {
+        if (isInfantil) {
+          navigate(`/diario-digital/avaliacao-infantil/${selectedTurmaId}`);
+        } else {
+          navigate(`/diario-digital/avaliacoes/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente || '')}`);
+        }
+      },
     },
     {
       title: 'Notas Parciais',
@@ -230,9 +239,10 @@ export default function DiarioDigital() {
       icon: GraduationCap,
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-50',
-      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/notas-parciais?componente=${encodeURIComponent(selectedComponente)}&origem=diario`),
+      action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/notas-parciais?componente=${encodeURIComponent(selectedComponente || '')}&origem=diario`),
+      hide: isInfantil,
     },
-  ];
+  ].filter(card => !card.hide);
 
   if (roleLoading) {
     return (
@@ -293,7 +303,7 @@ export default function DiarioDigital() {
 
               <div className="form-group-compact">
                 <Label className="form-label-compact">Componente Curricular</Label>
-                <Select value={selectedComponente} onValueChange={setSelectedComponente} disabled={!selectedTurmaId}>
+                <Select value={selectedComponente} onValueChange={setSelectedComponente} disabled={!selectedTurmaId || isInfantil}>
                   <SelectTrigger className="h-10">
                     <SelectValue placeholder={!selectedTurmaId ? "Selecione uma turma" : "Selecione um componente"} />
                   </SelectTrigger>
@@ -312,8 +322,8 @@ export default function DiarioDigital() {
           {cards.map((card) => (
             <Card
               key={card.title}
-              className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${(!selectedTurmaId || !selectedComponente) ? 'opacity-50 cursor-not-allowed' : ''}`}
-              onClick={() => (selectedTurmaId && selectedComponente) && card.action()}
+              className={`cursor-pointer transition-all hover:shadow-md hover:scale-[1.02] ${(!selectedTurmaId || (!selectedComponente && !isInfantil)) ? 'opacity-50 cursor-not-allowed' : ''}`}
+              onClick={() => (selectedTurmaId && (selectedComponente || isInfantil)) && card.action()}
             >
               <CardContent className="pt-6 text-center">
                 <div className={`w-16 h-16 rounded-full ${card.bgColor} flex items-center justify-center mx-auto mb-4`}>

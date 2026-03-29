@@ -39,6 +39,7 @@ import CriarAvaliacao from "./pages/CriarAvaliacao";
 import CriarAvaliacaoIA from "./pages/CriarAvaliacaoIA";
 import PerfilEstudante from "./pages/PerfilEstudante";
 import PerfilProfessor from "./pages/PerfilProfessor";
+import AvaliacaoInfantil from "./pages/AvaliacaoInfantil";
 
 import PerfilMembro from "./pages/PerfilMembro";
 import NotasParciais from "./pages/NotasParciais";
@@ -86,6 +87,7 @@ const router = createBrowserRouter([
       { path: "/diario-digital/objetos-de-conhecimento/:turmaId/registro", element: <ProtectedRoute allowedRoles={['admin', , , , 'professor']}><RegistroObjetoConhecimento /></ProtectedRoute> },
       { path: "/diario-digital/objetos-de-conhecimento", element: <ProtectedRoute allowedRoles={['admin', , , , 'professor']}><ObjetosDeConhecimento /></ProtectedRoute> },
       { path: "/diario-digital/avaliacoes/:turmaId", element: <ProtectedRoute allowedRoles={['admin', , , , 'professor']}><Avaliacoes /></ProtectedRoute> },
+      { path: "/diario-digital/avaliacao-infantil/:turmaId", element: <ProtectedRoute allowedRoles={['admin', , , , 'professor']}><AvaliacaoInfantil /></ProtectedRoute> },
       { path: "/diario-digital/avaliacoes/:turmaId/registro", element: <ProtectedRoute allowedRoles={['admin', , , , 'professor']}><RegistroAvaliacao /></ProtectedRoute> },
       { path: "/diario-digital/avaliacoes/:turmaId/criar/:avaliacaoId", element: <ProtectedRoute allowedRoles={['admin', , , , 'professor']}><CriarAvaliacao /></ProtectedRoute> },
       { path: "/diario-digital/avaliacoes/:turmaId/criar-ia/:avaliacaoId", element: <ProtectedRoute allowedRoles={['admin', , , , 'professor']}><CriarAvaliacaoIA /></ProtectedRoute> },

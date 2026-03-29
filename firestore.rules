@@ -1,4 +1,7 @@
 rules_version = '2';
+// ATENÇÃO: Este arquivo é uma cópia do master (educafacil/firestore.rules).
+// Todos os projetos compartilham o mesmo projeto Firebase e portanto as mesmas regras.
+// Sempre sincronize com o master ao fazer alterações.
 service cloud.firestore {
   match /databases/{database}/documents {
     
@@ -38,10 +41,11 @@ service cloud.firestore {
     // (Atualmente liberando Leitura e Escrita para todos os logados)
     // =========================================================================
 
+    // ✅ SEGURANÇA: leitura restrita ao próprio usuário ou admin/gestor
     match /user_roles/{uid} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && request.auth.uid == uid && request.resource.data.get('role', 'pending') == 'pending';
-      allow update, delete: if isAdmin();
+      allow read: if isAdmin() || isGestor() || request.auth.uid == uid;
+      allow create: if (isSignedIn() && request.auth.uid == uid && request.resource.data.get('role', 'pending') == 'pending') || isAdmin() || isGestor();
+      allow update, delete: if isAdmin() || isGestor();
     }
 
     match /profiles/{uid} {
@@ -60,9 +64,7 @@ service cloud.firestore {
 
     match /estudantes/{id} {
       allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn();
-      allow delete: if isAdmin();
+      allow write: if isAdmin() || isGestor() || isSecretario();
     }
 
     match /professores/{id} {
@@ -70,9 +72,10 @@ service cloud.firestore {
       allow write: if isAdmin() || isGestor() || isSecretario(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
     }
 
-    match /equipe-gestora/{id} {
-      allow read: if isAdmin() || isGestor(); // Admin, Gestor e Professor podem ver as turmas
-      allow write: if isAdmin() || isGestor(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+    // ✅ EQUIPE GESTORA (nome correto da coleção: equipe_gestora)
+    match /equipe_gestora/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario();
     }
 
     match /turmas/{id} {
@@ -148,10 +151,8 @@ service cloud.firestore {
     }
 
     match /horarios/{id} { 
-      allow read, write: if hasAnyRole(); // Todos podem ver o horário
-      
-      // Mas só Admin, Gestor e Secretário podem salvar dados nelas
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
     }
 
     match /registros_aulas/{id} {
@@ -167,12 +168,20 @@ service cloud.firestore {
       allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
     }
 
-    match /manual-uso/{id} {
-      allow read, write: if hasAnyRole();
+    match /avaliacoes_infantil/{id} { 
+      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
     }
 
+    match /manual-uso/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor();
+    }
+
+    // ✅ SEGURANÇA: famílias criam, somente gestão lê/edita/deleta
     match /pre_matriculas/{id} {
-      allow read, write: if isSignedIn();
+      allow create: if isSignedIn();
+      allow read, update, delete: if isAdmin() || isGestor() || isSecretario();
     }
 
 
@@ -187,12 +196,23 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == resource.data.remetente_id);
     }
 
+    // ✅ SEGURANÇA: contadores só podem ser alterados pela gestão
+    match /counters/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario();
+    }
+
+    match /logs/{id} {
+      allow read: if isAdmin() || isGestor();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
     // =========================================================================
-    // 4. REGRA RESIDUAL (COLEÇÕES NÃO LISTADAS ACIMA)
+    // 4. REGRA RESIDUAL — BLINDAGEM
     // =========================================================================
     match /{document=**} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read, write: if false;
     }
   }
 }
