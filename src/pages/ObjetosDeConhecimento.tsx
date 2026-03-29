@@ -40,7 +40,7 @@ export default function ObjetosDeConhecimento() {
 
   useEffect(() => {
     async function fetchData() {
-      if (!turmaId || !componente || !escolaAtivaId) {
+      if (!turmaId || !escolaAtivaId) {
         setLoading(false);
         return;
       }
@@ -83,11 +83,17 @@ export default function ObjetosDeConhecimento() {
         setDiasLetivos(dias);
 
         // Fetch Dias Planejados (registros de aulas)
-        const qPlanejados = query(
-          collection(db, 'registros_aulas'),
-          where('turma_id', '==', turmaId),
-          where('componente', '==', componente)
-        );
+        // For Early Childhood (no componente), query only by turma_id
+        const qPlanejados = componente
+          ? query(
+              collection(db, 'registros_aulas'),
+              where('turma_id', '==', turmaId),
+              where('componente', '==', componente)
+            )
+          : query(
+              collection(db, 'registros_aulas'),
+              where('turma_id', '==', turmaId)
+            );
         const queryPlanejados = await getDocs(qPlanejados);
         const ministrados = new Set<string>();
         const naoMinistrados = new Set<string>();
@@ -126,7 +132,7 @@ export default function ObjetosDeConhecimento() {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Objetos de Conhecimento</h1>
             <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
-              Visualize os dias letivos e eventos para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
+              Visualize os dias letivos e eventos para a turma <span className="font-semibold text-primary">{turma?.nome}</span>{componente ? <> no componente <span className="font-semibold text-primary">{componente}</span></> : null}.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate('/diario-digital')} className="shrink-0">
@@ -171,7 +177,8 @@ export default function ObjetosDeConhecimento() {
                       if (date) {
                         setSelectedDate(date);
                         const dateStr = format(date, 'yyyy-MM-dd');
-                        navigate(`/diario-digital/objetos-de-conhecimento/${turmaId}/registro?componente=${componente}&data=${dateStr}`);
+                        const compParam = componente ? `&componente=${componente}` : '';
+                        navigate(`/diario-digital/objetos-de-conhecimento/${turmaId}/registro?data=${dateStr}${compParam}`);
                       }
                     }}
                     locale={ptBR}

@@ -255,8 +255,8 @@ export default function BaseCurricular() {
   const expandSeries = (serieStr: string): string[] => {
     if (!serieStr) return [];
 
-    // Detect range like "1º ao 5º ano" or "1-5"
-    const rangeMatch = serieStr.match(/(\d+)º?\s?(?:AO|à|a|-|–)\s?(\d+)º?/i);
+    // Detect range like "1º ao 5º ano" (only for numbered years, not Early Childhood)
+    const rangeMatch = serieStr.match(/(\d+)º?\s?(?:AO|à|a|–)\s?(\d+)º?/i);
     if (rangeMatch) {
       const start = parseInt(rangeMatch[1]);
       const end = parseInt(rangeMatch[2]);
@@ -267,12 +267,21 @@ export default function BaseCurricular() {
       return result;
     }
 
-    // Split by comma or semicolon
-    return serieStr.split(/[,;]/).map(s => {
-      const trimmed = s.trim().toUpperCase();
-      if (!trimmed.includes("ANO") && /^\d+/.test(trimmed)) {
-        return `${trimmed.match(/^\d+/)![0]}º ANO`;
+    // Split by pipe (|) — the new multi-series separator used in exports.
+    // Also accepts comma as fallback for legacy files.
+    return serieStr.split(/[|,]/).map(s => {
+      const trimmed = s.trim();
+      const upperTrimmed = trimmed.toUpperCase();
+
+      // Try exact case-insensitive match against any known series (including Early Childhood)
+      const exactMatch = SERIES.find(serie => serie.toUpperCase() === upperTrimmed);
+      if (exactMatch) return exactMatch;
+
+      // Fallback: numeric shorthand like "1", "1º" -> "1º ANO"
+      if (!upperTrimmed.includes("ANO") && /^\d+/.test(upperTrimmed)) {
+        return `${upperTrimmed.match(/^\d+/)![0]}º ANO`;
       }
+
       return trimmed;
     }).filter(s => SERIES.includes(s));
   };
@@ -285,20 +294,26 @@ export default function BaseCurricular() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      transformHeader: (header) => header.trim().replace(/^\uFEFF/, '').replace(/^["']|["']$/g, ''),
       complete: async (results) => {
         try {
           const rows = results.data as any[];
+          
           // Grouping logic: Group by series, component, and unit
           const grouped = rows.reduce((acc: any, row: any) => {
-            const series = expandSeries(row.classificacao);
+            const rawClassificacao = row.classificacao || row['\ufeffclassificacao'] || '';
+            const series = expandSeries(rawClassificacao);
             if (series.length === 0) return acc;
 
-            const key = `${series.sort().join(',')}-${row.componente}-${row.unidade_tematica}`;
+            const rawComponente = row.componente === "-" ? "" : (row.componente || "").trim();
+            const rawUnidade = row.unidade_tematica === "-" ? "" : (row.unidade_tematica || "").trim();
+
+            const key = `${series.sort().join(',')}-${rawComponente}-${rawUnidade}`;
             if (!acc[key]) {
               acc[key] = {
                 serie: series,
-                componente: row.componente,
-                unidadeTematica: row.unidade_tematica,
+                componente: rawComponente,
+                unidadeTematica: rawUnidade,
                 objetosMap: new Map<string, Set<{ code: string, description: string }>>() // nome -> Set of skills
               };
             }
@@ -310,13 +325,12 @@ export default function BaseCurricular() {
               }
 
               if (row.habilidade) {
-                const parts = row.habilidade.split(/[:\-]/);
-                const code = parts[0].trim();
-                const description = parts.length > 1 ? parts.slice(1).join(':').trim() : code;
+                // Split only on the FIRST colon to preserve dashes/colons in descriptions
+                const colonIdx = row.habilidade.indexOf(':');
+                const code = (colonIdx >= 0 ? row.habilidade.slice(0, colonIdx) : row.habilidade).trim();
+                const description = (colonIdx >= 0 ? row.habilidade.slice(colonIdx + 1) : row.habilidade).trim();
 
-                // Track unique skills within each object
                 const existingHabs = acc[key].objetosMap.get(objNome);
-                // Since Set handles objects by reference, we should check by code instead
                 const alreadyHasCode = Array.from(existingHabs).some((h: any) => h.code === code);
                 if (!alreadyHasCode) {
                   existingHabs.add({ code, description });
@@ -326,26 +340,37 @@ export default function BaseCurricular() {
             return acc;
           }, {});
 
-          const batch = writeBatch(db);
-          Object.values(grouped).forEach((item: any) => {
-            const docRef = doc(collection(db, "base_curricular"));
+          const items = Object.values(grouped);
+          if (items.length === 0) {
+            toast.error("Nenhum dado válido encontrado no CSV.");
+            setLoading(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+          }
 
-            const objetos = Array.from(item.objetosMap.entries()).map(([nome, habilidadesSet]) => ({
-              nome,
-              habilidades: Array.from(habilidadesSet)
-            }));
+          // Batch chunking (Firestore limit is 500)
+          for (let i = 0; i < items.length; i += 400) {
+            const batch = writeBatch(db);
+            items.slice(i, i + 400).forEach((item: any) => {
+              const docRef = doc(collection(db, "base_curricular"));
 
-            batch.set(docRef, {
-              serie: item.serie,
-              componente: item.componente,
-              unidadeTematica: item.unidadeTematica,
-              objetos,
-              createdAt: serverTimestamp()
+              const objetos = Array.from(item.objetosMap.entries()).map(([nome, habilidadesSet]) => ({
+                nome,
+                habilidades: Array.from(habilidadesSet)
+              }));
+
+              batch.set(docRef, {
+                serie: item.serie,
+                componente: item.componente,
+                unidadeTematica: item.unidadeTematica,
+                objetos,
+                createdAt: serverTimestamp()
+              });
             });
-          });
+            await batch.commit();
+          }
 
-          await batch.commit();
-          toast.success(`${Object.keys(grouped).length} registros importados e agrupados com sucesso!`);
+          toast.success(`${items.length} registros importados e agrupados com sucesso!`);
           fetchData();
         } catch (error) {
           console.error("Erro na importação:", error);
@@ -372,16 +397,16 @@ export default function BaseCurricular() {
     const exportData = data.flatMap(item => 
       item.objetos.flatMap(obj => 
         obj.habilidades.map(hab => ({
-          classificacao: item.serie.join(', '),
-          componente: item.componente,
-          unidade_tematica: item.unidadeTematica,
+          classificacao: item.serie.join(' | '),
+          componente: item.componente || "-",
+          unidade_tematica: item.unidadeTematica || "-",
           objeto_conhecimento: obj.nome,
           habilidade: `${hab.code}: ${hab.description}`
         }))
       )
     );
 
-    const csv = Papa.unparse(exportData);
+    const csv = Papa.unparse(exportData, { delimiter: ';' });
     const BOM = "\uFEFF";
     const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

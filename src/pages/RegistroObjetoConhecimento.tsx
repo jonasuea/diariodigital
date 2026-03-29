@@ -31,7 +31,32 @@ import { cn } from "@/lib/utils";
 interface Turma {
   id: string;
   nome: string;
+  serie?: string;
+  classificacao?: string;
+  ano?: string;
 }
+
+interface RegistroAulaData {
+  unidadeTematica?: string;
+  objetosConhecimento?: string[];
+  habilidades?: string[];
+  tempoAula?: string;
+  status?: string;
+  observacao?: string;
+}
+
+interface BaseCurricularData {
+  unidadeTematica?: string;
+  campoAtuacao?: string;
+  objetos?: { nome: string; habilidades?: { code: string; description: string }[] }[];
+}
+
+const SERIES_INFANTIL = [
+  "Crianças Bem Pequenas I",
+  "Crianças Bem Pequenas II",
+  "Crianças Pequenas I",
+  "Crianças Pequenas II"
+];
 
 export default function RegistroObjetoConhecimento() {
   const navigate = useNavigate();
@@ -44,7 +69,7 @@ export default function RegistroObjetoConhecimento() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [openHabilidades, setOpenHabilidades] = useState(false);
-  const [baseCurricular, setBaseCurricular] = useState<any[]>([]);
+  const [baseCurricular, setBaseCurricular] = useState<BaseCurricularData[]>([]);
   const [loadingBase, setLoadingBase] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
@@ -68,17 +93,33 @@ export default function RegistroObjetoConhecimento() {
         }
 
         // Buscar registro existente para esta data/turma/componente
-        if (componente && dataParams) {
-          const q = query(
-            collection(db, 'registros_aulas'),
-            where('turma_id', '==', turmaId),
-            where('componente', '==', componente),
-            where('data', '==', dataParams)
-          );
+        // Check infantil via serie/classificacao fields first, then fall back to nome
+        const turmaData = snapshot.data();
+        const turmaSerieFld = turmaData?.serie || turmaData?.classificacao || turmaData?.ano || "";
+        const isInfTurma = snapshot.exists() && (
+          SERIES_INFANTIL.some(s => turmaSerieFld?.toUpperCase().includes(s.toUpperCase())) ||
+          SERIES_INFANTIL.some(s => turmaData?.nome?.toUpperCase().includes(s.toUpperCase()))
+        );
+        if ((componente || isInfTurma) && dataParams) {
+          let q;
+          if (isInfTurma) {
+            q = query(
+              collection(db, 'registros_aulas'),
+              where('turma_id', '==', turmaId),
+              where('data', '==', dataParams)
+            );
+          } else {
+            q = query(
+              collection(db, 'registros_aulas'),
+              where('turma_id', '==', turmaId),
+              where('componente', '==', componente),
+              where('data', '==', dataParams)
+            );
+          }
           const snap = await getDocs(q);
           if (!snap.empty) {
             const existingDoc = snap.docs[0];
-            const data = existingDoc.data();
+            const data = existingDoc.data() as RegistroAulaData;
             setEditingId(existingDoc.id);
             setFormData({
               unidadeTematica: data.unidadeTematica || "",
@@ -100,26 +141,77 @@ export default function RegistroObjetoConhecimento() {
   }, [turmaId, componente, dataParams]);
 
   useEffect(() => {
-    if (!turma || !componente) return;
+    // Guard: turma is null on first render
+    if (!turma) return;
+
+    // Check if this is an Early Childhood class using the turma's serie field OR nome
+    const turmaSerieField = turma.serie || turma.classificacao || turma.ano || "";
+    const isInfantilFromField = SERIES_INFANTIL.some(s =>
+      turmaSerieField.toUpperCase() === s.toUpperCase() ||
+      turmaSerieField.toUpperCase().includes(s.toUpperCase())
+    );
+    const isInfantilFromNome = SERIES_INFANTIL.some(s => turma.nome.toUpperCase().includes(s.toUpperCase()));
+    const isInfantil = isInfantilFromField || isInfantilFromNome;
+    
+    if (!componente && !isInfantil) return;
 
     async function fetchBaseCurricular() {
       setLoadingBase(true);
       try {
-        const serieMatch = turma.nome.match(/^\dº\s?ANO/i);
-        const serie = serieMatch ? serieMatch[0].toUpperCase() : "";
+        // Extract the series: prefer turma.serie or turma.classificacao fields,
+        // then try matching turma.nome against SERIES_INFANTIL,
+        // finally fall back to regex for year-based grades
+        const turmaSerieField = turma.serie || turma.classificacao || turma.ano || "";
+        
+        // Check if this turma is Early Childhood via the explicit serie field
+        const infantilMatchFromField = SERIES_INFANTIL.find(s =>
+          turmaSerieField.toUpperCase() === s.toUpperCase() ||
+          turmaSerieField.toUpperCase().includes(s.toUpperCase())
+        );
+        
+        // Fallback: check via turma.nome
+        const infantilMatchFromNome = SERIES_INFANTIL.find(s => turma.nome.toUpperCase().includes(s.toUpperCase()));
+        
+        const resolvedInfantilMatch = infantilMatchFromField || infantilMatchFromNome;
+
+        let serie = "";
+        if (resolvedInfantilMatch) {
+          serie = resolvedInfantilMatch;
+        } else if (turmaSerieField) {
+          // Use the turma's serie field directly for non-infantil grades
+          const yearMatch = turmaSerieField.match(/\d+/);
+          if (yearMatch) {
+            serie = `${yearMatch[0]}º ANO`;
+          } else {
+            serie = turmaSerieField.toUpperCase();
+          }
+        } else {
+          const serieMatch = turma.nome.match(/(\d+)º?\s?ANO/i);
+          serie = serieMatch ? `${serieMatch[1]}º ANO` : "";
+        }
+
+        const effectiveInfantilMatch = resolvedInfantilMatch;
 
         if (!serie) {
           setLoadingBase(false);
           return;
         }
 
-        const q = query(
-          collection(db, "base_curricular"),
-          where("serie", "array-contains", serie),
-          where("componente", "==", componente)
-        );
+        let q;
+        if (effectiveInfantilMatch) {
+          q = query(
+            collection(db, "base_curricular"),
+            where("serie", "array-contains", serie)
+          );
+        } else {
+          q = query(
+            collection(db, "base_curricular"),
+            where("serie", "array-contains", serie),
+            where("componente", "==", componente)
+          );
+        }
         const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const data = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as BaseCurricularData) }));
         setBaseCurricular(data);
       } catch (error) {
         console.error("Erro ao buscar base curricular:", error);
@@ -131,47 +223,58 @@ export default function RegistroObjetoConhecimento() {
     fetchBaseCurricular();
   }, [turma, componente]);
 
+  const turmaSerie = turma ? (turma.serie || turma.classificacao || turma.ano || turma.nome) : "";
+  const isInfantil = SERIES_INFANTIL.some(s => turmaSerie.toUpperCase().includes(s.toUpperCase()));
+
   const unidadesDinamicas = Array.from(new Set(baseCurricular.map(b => b.unidadeTematica || b.campoAtuacao))).filter(Boolean) as string[];
   
   const objetosDinamicos = Array.from(new Set(
     baseCurricular
-      .filter(b => !formData.unidadeTematica || (b.unidadeTematica === formData.unidadeTematica || b.campoAtuacao === formData.unidadeTematica))
-      .flatMap(b => (b.objetos || []).map((o: any) => o.nome))
+      .filter(b => isInfantil || !formData.unidadeTematica || (b.unidadeTematica === formData.unidadeTematica || b.campoAtuacao === formData.unidadeTematica))
+      .flatMap(b => (b.objetos || []).map((o: { nome: string }) => o.nome))
   )).filter(Boolean) as string[];
 
   const habilidadesDinamicas = baseCurricular
     .filter(b => 
-      (!formData.unidadeTematica || (b.unidadeTematica === formData.unidadeTematica || b.campoAtuacao === formData.unidadeTematica)) &&
-      (formData.objetosConhecimento.length === 0 || (b.objetos || []).some((obj: any) => formData.objetosConhecimento.includes(obj.nome)))
+      (isInfantil || !formData.unidadeTematica || (b.unidadeTematica === formData.unidadeTematica || b.campoAtuacao === formData.unidadeTematica)) &&
+      (formData.objetosConhecimento.length === 0 || (b.objetos || []).some((obj: { nome: string }) => formData.objetosConhecimento.includes(obj.nome)))
     )
     .flatMap(b => {
       // Filtrar apenas as habilidades dos objetos selecionados
-      const relevantObjects = (b.objetos || []).filter((obj: any) => 
+      const relevantObjects = (b.objetos || []).filter((obj: { nome: string }) => 
         formData.objetosConhecimento.length === 0 || formData.objetosConhecimento.includes(obj.nome)
       );
-      return relevantObjects.flatMap((obj: any) => obj.habilidades || []);
+      return relevantObjects.flatMap((obj: { habilidades?: { code: string; description: string }[] }) => obj.habilidades || []);
     }) as { code: string, description: string }[];
 
   // Helper for unique skills by code
   const uniqueHabilidades = Array.from(new Map(habilidadesDinamicas.map(h => [h.code, h])).values());
 
   const handleSave = async () => {
-    if (!turmaId || !componente || !dataParams) return;
+    const isInfantil = turma ? SERIES_INFANTIL.some(s => turma.nome.toUpperCase().includes(s.toUpperCase())) : false;
+    if (!turmaId || (!componente && !isInfantil) || !dataParams) return;
     
-    if (!formData.unidadeTematica || formData.objetosConhecimento.length === 0) {
+    if (!isInfantil && (!formData.unidadeTematica || formData.objetosConhecimento.length === 0)) {
       toast.error("Por favor, preencha Unidade Temática e pelo menos um Objeto de Conhecimento.");
+      return;
+    }
+    if (isInfantil && formData.objetosConhecimento.length === 0) {
+      toast.error("Por favor, selecione pelo menos um Objeto de Conhecimento.");
       return;
     }
 
     setSaving(true);
     try {
-      const payload = {
+      const payload: any = {
         turma_id: turmaId,
-        componente,
         data: dataParams,
         ...formData,
         updated_at: Timestamp.now()
       };
+      
+      if (componente) {
+        payload.componente = componente;
+      }
 
       if (editingId) {
         await updateDoc(doc(db, "registros_aulas", editingId), payload);
@@ -239,7 +342,7 @@ export default function RegistroObjetoConhecimento() {
           <div className="flex-1 min-w-0">
             <h1 className="text-xl md:text-2xl font-bold tracking-tight truncate">Objetos de Conhecimento</h1>
             <p className="text-xs md:text-sm text-muted-foreground line-clamp-2">
-              Registre a aula para a turma <span className="font-semibold text-primary">{turma?.nome}</span> no componente <span className="font-semibold text-primary">{componente}</span>.
+              Registre a aula para a turma <span className="font-semibold text-primary">{turma?.nome}</span>{componente && <> no componente <span className="font-semibold text-primary">{componente}</span></>}.
             </p>
           </div>
           <Button variant="outline" size="sm" onClick={() => navigate(-1)} className="shrink-0">
@@ -255,6 +358,7 @@ export default function RegistroObjetoConhecimento() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {!isInfantil && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Unidade Temática</label>
                 <Select
@@ -285,8 +389,9 @@ export default function RegistroObjetoConhecimento() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
 
-              <div className="space-y-3">
+              <div className={isInfantil ? "col-span-full space-y-3" : "space-y-3"}>
                 <label className="text-sm font-medium">Objetos de Conhecimento</label>
                 <div className="flex flex-wrap gap-2 min-h-[2.5rem] p-2 border rounded-md bg-slate-50/30">
                   {formData.objetosConhecimento.length === 0 ? (
@@ -383,7 +488,7 @@ export default function RegistroObjetoConhecimento() {
                     <CommandList>
                       <CommandEmpty>Nenhuma habilidade encontrada.</CommandEmpty>
                       <CommandGroup>
-                        {uniqueHabilidades.map((hab: any) => (
+                        {uniqueHabilidades.map((hab: { code: string; description: string; id?: string }) => (
                           <CommandItem
                             key={hab.id || hab.code}
                             value={`${hab.code} ${hab.description}`}
