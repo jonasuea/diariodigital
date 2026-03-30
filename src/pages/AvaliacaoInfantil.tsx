@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { format, parseISO, isValid } from 'date-fns';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -211,11 +212,17 @@ export default function AvaliacaoInfantil() {
   const [selectedEstudante, setSelectedEstudante] = useState<Estudante | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [searchParams] = useSearchParams();
+  const selectedDate = searchParams.get('data');
   const [avaliacao, setAvaliacao] = useState<AvaliacaoData>({ criterios: {}, observacoes: {} });
 
   // Carrega turma e estudantes
   useEffect(() => {
     if (!turmaId) return;
+    if (!selectedDate) {
+      navigate(`/diario-digital/avaliacao-infantil/${turmaId}/calendario`);
+      return;
+    }
     (async () => {
       setLoading(true);
       try {
@@ -232,14 +239,22 @@ export default function AvaliacaoInfantil() {
         const estudantesData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Estudante));
         setEstudantes(estudantesData);
 
-        // Busca quais estudantes já têm avaliação salva
-        const anoAtual = new Date().getFullYear();
+        // Busca quais estudantes já têm avaliação salva para ESTA DATA
         const avalIds = new Set<string>();
         await Promise.all(
           estudantesData.map(async est => {
-            const docId = `${turmaId}_${est.id}_${anoAtual}`;
-            const avalSnap = await getDoc(doc(db, 'avaliacoes_infantil', docId));
-            if (avalSnap.exists()) avalIds.add(est.id);
+            // Tenta data específica primeiro
+            const docIdDate = `${turmaId}_${est.id}_${selectedDate}`;
+            const avalSnapDate = await getDoc(doc(db, 'avaliacoes_infantil', docIdDate));
+            if (avalSnapDate.exists()) {
+              avalIds.add(est.id);
+            } else {
+              // Fallback para o ano (legado)
+              const anoAtual = new Date().getFullYear();
+              const docIdYear = `${turmaId}_${est.id}_${anoAtual}`;
+              const avalSnapYear = await getDoc(doc(db, 'avaliacoes_infantil', docIdYear));
+              if (avalSnapYear.exists()) avalIds.add(est.id);
+            }
           })
         );
         setAvaliadosIds(avalIds);
@@ -256,10 +271,19 @@ export default function AvaliacaoInfantil() {
   async function handleSelectEstudante(est: Estudante) {
     setSelectedEstudante(est);
     setAvaliacao({ criterios: {}, observacoes: {} });
-    if (!turmaId) return;
+    if (!turmaId || !selectedDate) return;
     try {
-      const docId = `${turmaId}_${est.id}_${new Date().getFullYear()}`;
-      const snap = await getDoc(doc(db, 'avaliacoes_infantil', docId));
+      // Tenta carregar da data específica
+      const docIdDate = `${turmaId}_${est.id}_${selectedDate}`;
+      let snap = await getDoc(doc(db, 'avaliacoes_infantil', docIdDate));
+      
+      // Fallback para ano (legado) se não encontrar na data
+      if (!snap.exists()) {
+        const anoAtual = new Date().getFullYear();
+        const docIdYear = `${turmaId}_${est.id}_${anoAtual}`;
+        snap = await getDoc(doc(db, 'avaliacoes_infantil', docIdYear));
+      }
+
       if (snap.exists()) {
         const data = snap.data();
         setAvaliacao({
@@ -284,12 +308,16 @@ export default function AvaliacaoInfantil() {
     if (!selectedEstudante || !turmaId || !user) return;
     setSaving(true);
     try {
-      const docId = `${turmaId}_${selectedEstudante.id}_${new Date().getFullYear()}`;
+      const docId = `${turmaId}_${selectedEstudante.id}_${selectedDate}`;
+      const dataParsed = selectedDate ? parseISO(selectedDate) : new Date();
+      const ano = isValid(dataParsed) ? dataParsed.getFullYear() : new Date().getFullYear();
+
       await setDoc(doc(db, 'avaliacoes_infantil', docId), {
         turma_id: turmaId,
         estudante_id: selectedEstudante.id,
         estudante_nome: selectedEstudante.nome,
-        ano: new Date().getFullYear(),
+        ano: ano,
+        data_avaliacao: selectedDate,
         criterios: avaliacao.criterios,
         observacoes: avaliacao.observacoes,
         atualizado_por: user.email,

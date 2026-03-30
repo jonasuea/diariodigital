@@ -127,14 +127,23 @@ export default function Frequencia() {
       });
       setDiasLetivos(diasLetivosSet);
 
-      if (componente) {
-        const freqQuery = query(
-          collection(db, 'frequencias'),
+      const isTurmaInfantil = turmaData?.nome ? ["Crianças", "Bebês", "Infantil"].some(nome => turmaData.nome.includes(nome)) : false;
+
+      if (componente || isTurmaInfantil) {
+        const freqQueryConstraints = [
           where('escola_id', '==', escolaAtivaId),
           where('turma_id', '==', turmaId),
-          where('componente', '==', componente),
           where('data', '>=', format(startDate, 'yyyy-MM-dd')),
           where('data', '<=', format(endDate, 'yyyy-MM-dd'))
+        ];
+        
+        if (!isTurmaInfantil) {
+          freqQueryConstraints.push(where('componente', '==', componente));
+        }
+
+        const freqQuery = query(
+          collection(db, 'frequencias'),
+          ...freqQueryConstraints
         );
 
         const freqSnapshot = await getDocs(freqQuery);
@@ -146,13 +155,20 @@ export default function Frequencia() {
         setFrequencias(freqData);
 
         // Buscar entradas no diário (cliques nas datas)
-        const entradasQuery = query(
-          collection(db, 'entradas_diario'),
+        const entradasQueryConstraints = [
           where('escola_id', '==', escolaAtivaId),
           where('turma_id', '==', turmaId),
-          where('componente', '==', componente),
           where('data', '>=', format(startDate, 'yyyy-MM-dd')),
           where('data', '<=', format(endDate, 'yyyy-MM-dd'))
+        ];
+        
+        if (!isTurmaInfantil) {
+          entradasQueryConstraints.push(where('componente', '==', componente));
+        }
+
+        const entradasQuery = query(
+          collection(db, 'entradas_diario'),
+          ...entradasQueryConstraints
         );
         const entradasSnapshot = await getDocs(entradasQuery);
         const entradasSet = new Set<string>();
@@ -179,6 +195,7 @@ export default function Frequencia() {
   }
 
   const anoLetivo = turma?.ano || new Date().getFullYear();
+  const isInfantil = turma?.nome ? ["Crianças", "Bebês", "Infantil"].some(nome => turma.nome.includes(nome)) : false;
 
   const schoolDays = (() => {
     try {
@@ -216,7 +233,7 @@ export default function Frequencia() {
       return;
     }
 
-    if (!componente) {
+    if (!componente && !isInfantil) {
       toast.info('Por favor, selecione um componente curricular para registrar a frequência.');
       return;
     }
@@ -238,7 +255,7 @@ export default function Frequencia() {
       turma_id: turmaId!,
       data: dateStr,
       status: newStatus,
-      componente,
+      componente: isInfantil ? 'Geral' : componente,
     };
     setFrequencias(prev => ({ ...prev, [key]: optimisticFreq }));
 
@@ -253,7 +270,7 @@ export default function Frequencia() {
           escola_id: escolaAtivaId,
           data: dateStr,
           status: newStatus,
-          componente,
+          componente: isInfantil ? 'Geral' : componente,
           ano: turma?.ano || new Date().getFullYear()
         });
         setFrequencias(prev => ({ ...prev, [key]: { ...optimisticFreq, id: docRef.id } }));
@@ -275,7 +292,7 @@ export default function Frequencia() {
   };
 
   const handleDateClick = async (date: Date) => {
-    if (!turmaId || !componente || !escolaAtivaId) return;
+    if (!turmaId || (!componente && !isInfantil) || !escolaAtivaId) return;
     
     const dateStr = format(date, 'yyyy-MM-dd');
     if (entradasDiario.has(dateStr)) return;
@@ -292,7 +309,7 @@ export default function Frequencia() {
       await addDoc(collection(db, 'entradas_diario'), {
         escola_id: escolaAtivaId,
         turma_id: turmaId,
-        componente,
+        componente: isInfantil ? 'Geral' : componente,
         data: dateStr,
         timestamp: new Date(),
       });
@@ -332,7 +349,7 @@ export default function Frequencia() {
           data: frequenciaParaJustificar.data,
           status: 'justificado',
           justificativa: justificativaText,
-          componente,
+          componente: isInfantil ? 'Geral' : componente,
           ano: turma?.ano || new Date().getFullYear()
         });
         setFrequencias(prev => ({
@@ -402,19 +419,21 @@ export default function Frequencia() {
 
         {/* Linha 2: Componente + Mês + Ano Letivo (mesma linha no desktop) */}
         <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Label htmlFor="componente-select">Componente</Label>
-            <Select value={componente} onValueChange={setComponente} disabled={isComponenteFixo || !turma?.componentes || turma.componentes.length === 0}>
-              <SelectTrigger id="componente-select" className="w-[180px] sm:w-[200px]">
-                <SelectValue placeholder="Selecione..." />
-              </SelectTrigger>
-              <SelectContent>
-                {turma?.componentes?.map(c => (
-                  <SelectItem key={c.nome} value={c.nome}>{c.nome}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isInfantil && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="componente-select">Componente</Label>
+              <Select value={componente} onValueChange={setComponente} disabled={isComponenteFixo || !turma?.componentes || turma.componentes.length === 0}>
+                <SelectTrigger id="componente-select" className="w-[180px] sm:w-[200px]">
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {turma?.componentes?.map(c => (
+                    <SelectItem key={c.nome} value={c.nome}>{c.nome}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Mês:</span>
@@ -442,7 +461,7 @@ export default function Frequencia() {
             <Calendar className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold">
               Frequência - {MESES[currentMonth]} de {turma?.ano}
-              {componente && <span className="text-primary font-bold ml-2">({componente})</span>}
+              {!isInfantil && componente && <span className="text-primary font-bold ml-2">({componente})</span>}
             </h2>
           </div>
 
@@ -465,7 +484,7 @@ export default function Frequencia() {
             <div className="flex justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
             </div>
-          ) : !componente ? (
+          ) : (!componente && !isInfantil) ? (
             <div className="text-center py-12 text-muted-foreground">
               <p>Por favor, selecione um componente curricular para visualizar ou lançar a frequência.</p>
             </div>

@@ -41,6 +41,28 @@ export default function Calendario() {
   }
 
   const isAdminOrGestor = role === 'admin' || role === 'gestor';
+
+  // Hierarquia de roles: quanto maior o valor, maior a permissão
+  const ROLE_LEVEL: Record<string, number> = {
+    'estudante': 0,
+    'responsavel': 0,
+    'professor': 1,
+    'secretario': 2,
+    'pedagogo': 2,
+    'gestor': 3,
+    'admin': 4,
+  };
+
+  // Um usuário pode editar/excluir um evento apenas se:
+  // 1. Ele próprio criou o evento, OU
+  // 2. Seu nível de role é maior que o nível do criador
+  function canEditEvento(evento: Evento): boolean {
+    if (!role) return false;
+    if (evento.criado_por_id === user?.uid) return true;
+    const myLevel = ROLE_LEVEL[role] ?? 0;
+    const creatorLevel = ROLE_LEVEL[evento.criado_por_role ?? ''] ?? 0;
+    return myLevel > creatorLevel;
+  }
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [diasLetivos, setDiasLetivos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -447,7 +469,7 @@ export default function Calendario() {
                             </div>
                           )}
                         </div>
-                        {((role !== 'estudante') || (evento.criado_por_id === user?.uid)) && (
+                        {canEditEvento(evento) && (
                           <div className="flex gap-1 ml-2">
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
                               <Pencil className="h-4 w-4" />
@@ -510,7 +532,7 @@ export default function Calendario() {
                           </div>
                         )}
                       </div>
-                      {((role !== 'estudante') || (evento.criado_por_id === user?.uid)) && (
+                      {canEditEvento(evento) && (
                         <div className="flex gap-1 ml-2 flex-shrink-0">
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditDialog(evento)}>
                             <Pencil className="h-4 w-4" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 
 export interface SystemConfig {
@@ -16,28 +16,43 @@ const DEFAULT_CONFIG: SystemConfig = {
     matriculas_fechadas_msg: 'O período de matrículas está encerrado. Aguarde a abertura.',
 };
 
+let configCache: SystemConfig | null = null;
+let cacheTimestamp = 0;
+const CACHE_TTL_MS = 5 * 60 * 1000;
+
 export function useSystemConfig() {
-    const [config, setConfig] = useState<SystemConfig>(DEFAULT_CONFIG);
-    const [loading, setLoading] = useState(true);
+    const [config, setConfig] = useState<SystemConfig>(configCache ?? DEFAULT_CONFIG);
+    const [loading, setLoading] = useState(!configCache);
 
     useEffect(() => {
-        const ref = doc(db, 'configuracoes', 'sistema');
-        const unsub = onSnapshot(
-            ref,
-            (snap) => {
-                if (snap.exists()) {
-                    setConfig({ ...DEFAULT_CONFIG, ...snap.data() } as SystemConfig);
-                } else {
-                    setConfig(DEFAULT_CONFIG);
-                }
-                setLoading(false);
-            },
-            () => {
-                setConfig(DEFAULT_CONFIG);
-                setLoading(false);
+        const now = Date.now();
+        if (configCache && now - cacheTimestamp < CACHE_TTL_MS) {
+            setConfig(configCache);
+            setLoading(false);
+            return;
+        }
+
+        let cancelled = false;
+        async function fetchConfig() {
+            try {
+                const ref = doc(db, 'configuracoes', 'sistema');
+                const snap = await getDoc(ref);
+                if (cancelled) return;
+                const data = snap.exists()
+                    ? ({ ...DEFAULT_CONFIG, ...snap.data() } as SystemConfig)
+                    : DEFAULT_CONFIG;
+                configCache = data;
+                cacheTimestamp = Date.now();
+                setConfig(data);
+            } catch {
+                if (!cancelled) setConfig(DEFAULT_CONFIG);
+            } finally {
+                if (!cancelled) setLoading(false);
             }
-        );
-        return unsub;
+        }
+
+        fetchConfig();
+        return () => { cancelled = true; };
     }, []);
 
     return { config, loading };

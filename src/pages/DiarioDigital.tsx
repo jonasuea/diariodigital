@@ -227,7 +227,7 @@ export default function DiarioDigital() {
       bgColor: 'bg-purple-50',
       action: () => {
         if (isInfantil) {
-          navigate(`/diario-digital/avaliacao-infantil/${selectedTurmaId}`);
+          navigate(`/diario-digital/avaliacao-infantil/${selectedTurmaId}/calendario`);
         } else {
           navigate(`/diario-digital/avaliacoes/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente || '')}`);
         }

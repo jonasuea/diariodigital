@@ -1,7 +1,8 @@
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { db } from '@/lib/firebase';
-import { doc, getDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, limit, updateDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase';
 import {
   LayoutDashboard,
   Users,
@@ -84,6 +85,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [activeProfile, setActiveProfileState] = useState<UserProfile | null>(null);
 
   // Persist and apply a chosen profile
+  // IMPORTANTE: Atualiza o campo 'role' no Firestore para que as Security Rules
+  // possam identificar corretamente o papel ativo do usuário.
   function setActiveProfile(profile: UserProfile) {
     setActiveProfileState(profile);
     setRole(profile.role);
@@ -94,6 +97,20 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
 
     const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes(profile.role));
     setMenuItems(accessibleItems);
+
+    // Sincroniza o campo 'role' raiz no Firestore para que as Security Rules
+    // possam verificar o papel correto nas operações de leitura/escrita.
+    const currentUser = auth.currentUser;
+    if (currentUser) {
+      const userRoleRef = doc(db, 'user_roles', currentUser.uid);
+      updateDoc(userRoleRef, {
+        role: profile.role,
+        escola_id: profile.escola_id,
+      }).catch(err => {
+        // Falha silenciosa — o app continua funcionando, mas as regras podem rejeitar escritas
+        console.warn('Não foi possível sincronizar o perfil ativo no Firestore:', err);
+      });
+    }
   }
 
   useEffect(() => {

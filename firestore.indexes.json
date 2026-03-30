@@ -9,6 +9,154 @@
         { "fieldPath": "data", "order": "ASCENDING" },
         { "fieldPath": "created_at", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "estudantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "estudantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "ano", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "estudantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "ano", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "estudantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "nome_lower", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "estudantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "turma_id", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "professores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "turmas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "ano", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "notas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "turma_id", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "frequencias",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "turma_id", "order": "ASCENDING" },
+        { "fieldPath": "data", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "frequencias",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "data", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "activity_log",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "mensagens",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "created_at", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pre_matriculas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "data_criacao", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "pre_matriculas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "data_expiracao", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "equipe_gestora",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "horarios",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "turma_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "objetos_conhecimento",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "turma_id", "order": "ASCENDING" },
+        { "fieldPath": "componente", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

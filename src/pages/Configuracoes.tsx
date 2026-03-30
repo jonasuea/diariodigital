@@ -12,12 +12,14 @@ import { School, Mail, Phone, MapPin, Clock, Bell, Shield, Wrench, User, Buildin
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
-import { db, storage, functions } from '@/lib/firebase';
+import { db, storage, functions, auth } from '@/lib/firebase';
 import { logActivity } from '@/lib/logger';
 import { doc, getDoc, setDoc, collection, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { APP_VERSION } from '@/constants/version';
 import { httpsCallable } from 'firebase/functions';
+import { multiFactor } from 'firebase/auth';
+import { TwoFactorSetupDialog } from '@/components/TwoFactorSetupDialog';
 
 export default function Configuracoes() {
   const { user } = useAuth();
@@ -29,6 +31,8 @@ export default function Configuracoes() {
   const [isMigrating, setIsMigrating] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const [is2FADialogOpen, setIs2FADialogOpen] = useState(false);
+  const [is2FAEnabled, setIs2FAEnabled] = useState(false);
 
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
   const [newVersionAvailable, setNewVersionAvailable] = useState<{ version: string, notes: string } | null>(null);
@@ -109,15 +113,22 @@ export default function Configuracoes() {
     async function loadConfig() {
       setLoading(true);
       try {
-        // Carregar configurações do sistema (preferências)
-        const configDocRef = doc(db, 'configuracoes', 'escola');
-        const configDocSnap = await getDoc(configDocRef);
-
-        if (configDocSnap.exists()) {
-          const data = configDocSnap.data();
-          if (data.preferencias) {
-            setPreferencias(data.preferencias);
-            localStorage.setItem('telaCheiaPadrao', JSON.stringify(data.preferencias.telaCheiaPadrao || false));
+        // Preferências pessoais: lidas do perfil do usuário (qualquer role pode ler o próprio)
+        if (user) {
+          const profileDocRef = doc(db, 'profiles', user.uid);
+          const profileSnap = await getDoc(profileDocRef);
+          if (profileSnap.exists() && profileSnap.data().preferencias) {
+            const prefs = profileSnap.data().preferencias;
+            setPreferencias(prefs);
+            localStorage.setItem('telaCheiaPadrao', JSON.stringify(prefs.telaCheiaPadrao || false));
+          } else if (role === 'admin') {
+            const configDocRef = doc(db, 'configuracoes', 'escola');
+            const configDocSnap = await getDoc(configDocRef);
+            if (configDocSnap.exists() && configDocSnap.data().preferencias) {
+              const prefs = configDocSnap.data().preferencias;
+              setPreferencias(prefs);
+              localStorage.setItem('telaCheiaPadrao', JSON.stringify(prefs.telaCheiaPadrao || false));
+            }
           }
         }
 
@@ -185,6 +196,10 @@ export default function Configuracoes() {
     }
 
     loadConfig();
+
+    if (auth.currentUser) {
+      setIs2FAEnabled(multiFactor(auth.currentUser).enrolledFactors.length > 0);
+    }
   }, [user, role, escolaAtivaId]);
 
   const handleSaveEscola = async () => {
@@ -235,11 +250,16 @@ export default function Configuracoes() {
 
   const handleSavePreferencias = async (newPreferencias: typeof preferencias) => {
     setPreferencias(newPreferencias);
-    // Salvar no localStorage para persistÃªncia imediata no navegador
     localStorage.setItem('telaCheiaPadrao', JSON.stringify(newPreferencias.telaCheiaPadrao));
     try {
-      const docRef = doc(db, 'configuracoes', 'escola');
-      await setDoc(docRef, { preferencias: newPreferencias }, { merge: true });
+      if (role === 'admin') {
+        const docRef = doc(db, 'configuracoes', 'escola');
+        await setDoc(docRef, { preferencias: newPreferencias }, { merge: true });
+      }
+      if (user) {
+        const profileRef = doc(db, 'profiles', user.uid);
+        await setDoc(profileRef, { preferencias: newPreferencias }, { merge: true });
+      }
       await logActivity('atualizou as preferências do sistema.');
       toast.success('Preferências salvas com sucesso!');
     } catch (error) {
@@ -761,10 +781,13 @@ export default function Configuracoes() {
                         </p>
                       </div>
                     </div>
-                    <Switch
-                      checked={preferencias.autenticacaoDoisFatores}
-                      onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
-                    />
+                    <Button
+                      variant={is2FAEnabled ? "destructive" : "outline"}
+                      size="sm"
+                      onClick={() => setIs2FADialogOpen(true)}
+                    >
+                      {is2FAEnabled ? 'Desativar 2FA' : 'Ativar 2FA'}
+                    </Button>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-start gap-3">
@@ -1046,10 +1069,13 @@ export default function Configuracoes() {
                           </p>
                         </div>
                       </div>
-                      <Switch
-                        checked={preferencias.autenticacaoDoisFatores}
-                        onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, autenticacaoDoisFatores: checked })}
-                      />
+                      <Button
+                        variant={is2FAEnabled ? "destructive" : "outline"}
+                        size="sm"
+                        onClick={() => setIs2FADialogOpen(true)}
+                      >
+                        {is2FAEnabled ? 'Desativar 2FA' : 'Ativar 2FA'}
+                      </Button>
                     </div>
                     <div className="flex items-center justify-between">
                       <div className="flex items-start gap-3">
@@ -1335,6 +1361,14 @@ export default function Configuracoes() {
             </>
           )}
         </div>
+
+        {/* Dialog 2FA */}
+        <TwoFactorSetupDialog
+          open={is2FADialogOpen}
+          onOpenChange={setIs2FADialogOpen}
+          isEnabled={is2FAEnabled}
+          onStatusChange={(enabled) => setIs2FAEnabled(enabled)}
+        />
 
         {/* Dialog Editar Perfil */}
         <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
