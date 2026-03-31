@@ -8,6 +8,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { logActivity } from '@/lib/logger';
 import { Loader2, ArrowLeft, Save, X, Search, Check } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -286,6 +287,10 @@ export default function RegistroObjetoConhecimento() {
       }
       
       toast.success(editingId ? "Registro atualizado!" : "Registro salvo com sucesso!");
+      await logActivity(editingId
+        ? `atualizou o plano de aula de "${componente || 'Educação Infantil'}" na turma "${turma?.nome}" para o dia ${dataParams}.`
+        : `registrou plano de aula de "${componente || 'Educação Infantil'}" na turma "${turma?.nome}" para o dia ${dataParams}.`
+      );
       navigate(-1);
     } catch (error) {
       console.error("Erro ao salvar:", error);

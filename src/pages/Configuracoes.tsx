@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -18,10 +19,11 @@ import { doc, getDoc, setDoc, collection, getDocs, writeBatch, query, where } fr
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { APP_VERSION } from '@/constants/version';
 import { httpsCallable } from 'firebase/functions';
-import { multiFactor } from 'firebase/auth';
 import { TwoFactorSetupDialog } from '@/components/TwoFactorSetupDialog';
+import { multiFactor } from 'firebase/auth';
 
 export default function Configuracoes() {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { role, escolaAtivaId } = useUserRole();
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false);
@@ -114,6 +116,7 @@ export default function Configuracoes() {
       setLoading(true);
       try {
         // Preferências pessoais: lidas do perfil do usuário (qualquer role pode ler o próprio)
+        // Admin também lê as preferências globais da escola como fallback
         if (user) {
           const profileDocRef = doc(db, 'profiles', user.uid);
           const profileSnap = await getDoc(profileDocRef);
@@ -122,6 +125,7 @@ export default function Configuracoes() {
             setPreferencias(prefs);
             localStorage.setItem('telaCheiaPadrao', JSON.stringify(prefs.telaCheiaPadrao || false));
           } else if (role === 'admin') {
+            // Fallback para admin: ler preferências globais da escola
             const configDocRef = doc(db, 'configuracoes', 'escola');
             const configDocSnap = await getDoc(configDocRef);
             if (configDocSnap.exists() && configDocSnap.data().preferencias) {
@@ -188,7 +192,7 @@ export default function Configuracoes() {
           }
         }
       } catch (error) {
-        toast.error('Sem permissão para carregar configurações');
+        toast.error(t('settings.errors.loadConfig'));
         console.error(error);
       } finally {
         setLoading(false);
@@ -197,8 +201,10 @@ export default function Configuracoes() {
 
     loadConfig();
 
+    // Detectar se o 2FA já está ativo para o usuário atual
     if (auth.currentUser) {
-      setIs2FAEnabled(multiFactor(auth.currentUser).enrolledFactors.length > 0);
+      const enrolled = multiFactor(auth.currentUser).enrolledFactors;
+      setIs2FAEnabled(enrolled.length > 0);
     }
   }, [user, role, escolaAtivaId]);
 
@@ -217,10 +223,10 @@ export default function Configuracoes() {
         horario_funcionamento: escolaConfig.horarioFuncionamento,
         matriculas_abertas: escolaConfig.matriculas_abertas,
       }, { merge: true });
-      await logActivity('atualizou as informações da escola.');
-      toast.success('Informações da escola salvas com sucesso!');
+      await logActivity(t('settings.logs.updateSchool'));
+      toast.success(t('settings.success.schoolSaved'));
     } catch (error) {
-      toast.error('Sem permissão para salvar informações da escola');
+      toast.error(t('settings.errors.saveSchool'));
       console.error(error);
     }
   };
@@ -239,11 +245,11 @@ export default function Configuracoes() {
         secretaria: instalacoes.secretaria.toString(),
         salaProfessores: instalacoes.salaProfessores.toString(),
       }, { merge: true });
-      await logActivity('atualizou as informações das instalaçÃµes da escola.');
-      toast.success('Instalações atualizadas com sucesso!');
+      await logActivity(t('settings.logs.updateFacilities'));
+      toast.success(t('settings.success.facilitiesSaved'));
       setIsInstalacoesOpen(false);
     } catch (error) {
-      toast.error('Sem permissão para salvar instalaçÃµes');
+      toast.error(t('settings.errors.saveFacilities'));
       console.error(error);
     }
   };
@@ -254,17 +260,21 @@ export default function Configuracoes() {
     try {
       if (role === 'admin') {
         const docRef = doc(db, 'configuracoes', 'escola');
+        console.log('[2FA-DEBUG] Tentando escrever em configuracoes/escola');
         await setDoc(docRef, { preferencias: newPreferencias }, { merge: true });
+        console.log('[2FA-DEBUG] configuracoes/escola OK');
       }
       if (user) {
         const profileRef = doc(db, 'profiles', user.uid);
+        console.log('[2FA-DEBUG] Tentando escrever em profiles/', user.uid, '| role:', role);
         await setDoc(profileRef, { preferencias: newPreferencias }, { merge: true });
+        console.log('[2FA-DEBUG] profiles OK');
       }
-      await logActivity('atualizou as preferências do sistema.');
-      toast.success('Preferências salvas com sucesso!');
+      await logActivity(t('settings.logs.updatePreferences'));
+      toast.success(t('settings.success.preferencesSaved'));
     } catch (error) {
-      toast.error('Sem permissão para salvar preferências');
-      console.error(error);
+      toast.error(t('settings.errors.savePreferences'));
+      console.error('[2FA-DEBUG] ERRO:', error);
     }
   };
 
@@ -275,10 +285,10 @@ export default function Configuracoes() {
     try {
       const ref = doc(db, 'configuracoes', 'sistema');
       await setDoc(ref, newConfig, { merge: true });
-      await logActivity('atualizou as configurações globais do sistema.');
-      toast.success('Configuração salva!');
+      await logActivity(t('settings.logs.updateSystem'));
+      toast.success(t('settings.success.systemSaved'));
     } catch (error) {
-      toast.error('Sem permissão para alterar configurações do sistema.');
+      toast.error(t('settings.errors.saveSystem'));
       console.error(error);
     } finally {
       setSavingSystem(false);
@@ -287,12 +297,12 @@ export default function Configuracoes() {
 
   const handleSaveProfile = async () => {
     if (profileData.novaSenha && profileData.novaSenha !== profileData.confirmarSenha) {
-      toast.error('As senhas não coincidem');
+      toast.error(t('settings.errors.passwordsNoMatch'));
       return;
     }
 
     if (!user) {
-      toast.error('Usuário não autenticado.');
+      toast.error(t('settings.errors.notAuthenticated'));
       return;
     }
 
@@ -307,12 +317,12 @@ export default function Configuracoes() {
       };
       await setDoc(profileDocRef, dataToUpdate, { merge: true });
 
-      await logActivity('atualizou as informações do seu perfil.');
-      toast.success('Perfil atualizado com sucesso!');
+      await logActivity(t('settings.logs.updateProfile'));
+      toast.success(t('settings.success.profileUpdated'));
       setIsEditProfileOpen(false);
       setProfileData(prev => ({ ...prev, novaSenha: '', confirmarSenha: '' }));
     } catch (error) {
-      toast.error('Sem permissão para atualizar o perfil.');
+      toast.error(t('settings.errors.updateProfile'));
       console.error(error);
     }
   };
@@ -322,7 +332,7 @@ export default function Configuracoes() {
     if (!file || !user) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('Por favor, selecione uma imagem');
+      toast.error(t('settings.errors.selectImage'));
       return;
     }
 
@@ -340,10 +350,10 @@ export default function Configuracoes() {
       const profileDocRef = doc(db, 'profiles', user.uid);
       await setDoc(profileDocRef, { foto_url: photoURL }, { merge: true });
 
-      await logActivity('atualizou sua foto de perfil.');
-      toast.success('Foto de perfil atualizada!');
+      await logActivity(t('settings.logs.updatePhoto'));
+      toast.success(t('settings.success.photoUpdated'));
     } catch (error) {
-      toast.error('Sem permissão para fazer upload da foto');
+      toast.error(t('settings.errors.uploadPhoto'));
       console.error(error);
     } finally {
       setUploadingPhoto(false);
@@ -352,7 +362,7 @@ export default function Configuracoes() {
 
   const handleSyncSearchData = async () => {
     setIsSyncing(true);
-    toast.info('Iniciando a sincronização dos dados de busca. Isso pode levar alguns minutos...');
+    toast.info(t('settings.info.syncingStart'));
 
     try {
       const collectionsToSync = ['estudantes', 'professores', 'equipe-gestora'];
@@ -384,70 +394,25 @@ export default function Configuracoes() {
       }
 
       if (updatedCount > 0) {
-        toast.success(`${updatedCount} registros foram atualizados com sucesso!`);
+        toast.success(t('settings.success.syncConcluded', { count: updatedCount }));
       } else {
-        toast.success('Todos os registros já estão sincronizados.');
+        toast.success(t('settings.success.syncNoChanges'));
       }
 
     } catch (error) {
       console.error("Sem permissão para sincronizar dados:", error);
-      toast.error('Ocorreu um erro durante a sincronização.');
+      toast.error(t('settings.errors.syncData'));
     } finally {
       setIsSyncing(false);
     }
   };
 
-  const handleMigrateData = async () => {
-    setIsMigrating(true);
-    toast.info('Iniciando a injeção do INEP "13034243" nos registros antigos. Aguarde...');
-
-    try {
-      const collections = ['estudantes', 'professores', 'turmas', 'equipe_gestora', 'user_roles', 'frequencias', 'dias_letivos'];
-      let count = 0;
-
-      for (const coll of collections) {
-        const snapshot = await getDocs(collection(db, coll));
-        let batch = writeBatch(db);
-        let opsInBatch = 0;
-
-        snapshot.forEach(docSnap => {
-          const data = docSnap.data();
-          if (!data.escola_id) {
-            batch.update(docSnap.ref, { escola_id: '13034243' });
-            opsInBatch++;
-            count++;
-          }
-
-          if (opsInBatch >= 490) {
-            batch.commit();
-            batch = writeBatch(db);
-            opsInBatch = 0;
-          }
-        });
-
-        if (opsInBatch > 0) {
-          await batch.commit();
-        }
-      }
-
-      toast.success(`${count} registros atualizados com o INEP 13034243!`);
-      await logActivity('executou o script de migração do tenant para 13034243.');
-    } catch (error) {
-      console.error("Sem permissão para migrar dados:", error);
-      toast.error('Ocorreu um erro durante a migração. Verifique o console.');
-    } finally {
-      setIsMigrating(false);
-    }
-  };
-
   const handleLimparTransferidos = async () => {
-    const confirmado = window.confirm(
-      'Isso irá limpar o escola_id de todos os estudantes com status "Transferido" que ainda possuem uma escola vinculada, tornando-os disponíveis para rematrÃ­cula em qualquer unidade. Deseja continuar?'
-    );
+    const confirmado = window.confirm(t('settings.confirm.clearTransferred'));
     if (!confirmado) return;
 
     setIsMigrating(true);
-    toast.info('Limpando escola dos estudantes Transferidos. Aguarde...');
+    toast.info(t('settings.info.clearingTransferredStart'));
 
     try {
       const snapshot = await getDocs(
@@ -478,24 +443,22 @@ export default function Configuracoes() {
         await batch.commit();
       }
 
-      toast.success(`${count} estudante(s) transferido(s) tiveram sua escola removida com sucesso!`);
-      await logActivity(`executou o script de limpeza de escola de ${count} estudante(s) transferido(s).`);
+      toast.success(t('settings.success.clearTransferredConcluded', { count: count }));
+      await logActivity(t('settings.logs.runClearTransferred', { count: count }));
     } catch (error) {
       console.error('Sem permissão para limpar transferidos:', error);
-      toast.error('Ocorreu um erro. Verifique o console.');
+      toast.error(t('settings.errors.clearTransferred'));
     } finally {
       setIsMigrating(false);
     }
   };
 
   const handleCriarUsuariosFaltantes = async () => {
-    const confirmado = window.confirm(
-      'Isso irá checar Professores, Estudantes e Equipe Gestora.\nTodos os cadastros COM e-mail que NÃO sejam um usuário terão um usuário criado no Firebase Authentication com senha "DIARIODIGITAL2026".\n\nIsso pode demorar vários minutos. Você tem certeza que quer rodar isso?'
-    );
+    const confirmado = window.confirm(t('settings.confirm.createUsers'));
     if (!confirmado) return;
 
     setIsMigrating(true);
-    toast.info('Buscando cadastros e criando acessos no Firebase... Pode demorar.');
+    toast.info(t('settings.info.creatingUsersStart'));
 
     try {
       // ImportaçÃµes dinÃ¢micas necessárias para criar Secondary App no Firebase Auth
@@ -546,11 +509,15 @@ export default function Configuracoes() {
             // Apenas tentaremos criar se não tiver um profile correspondente
             if (!existingEmails.has(emailLower)) {
               try {
-                // Usa Cloud Function para criar/recuperar conta + papel + perfil
+                // SEGURANÇA: Senha temporária gerada via Web Crypto API (criptograficamente segura)
+                // O usuário deve usar "Esqueci a senha" no primeiro acesso para definir sua própria senha.
+                const randomBytes = new Uint8Array(16);
+                crypto.getRandomValues(randomBytes);
+                const tempPassword = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('') + 'A1!';
                 const createUser = httpsCallable(functions, 'createUserAccount');
                 const result = await createUser({
                   email: emailLower,
-                  password: 'DIARIODIGITAL2026',
+                  password: tempPassword,
                   nome: nome || 'Sem nome',
                   role: colInfo.role,
                   escola_id: escola_id
@@ -579,17 +546,17 @@ export default function Configuracoes() {
 
       // Finaliza processo
       if (createdCount > 0) {
-        toast.success(`${createdCount} novos usuários e senhas foram gerados no Firebase Auth!`);
-        await logActivity(`gerou ${createdCount} usuários no Firebase Authentication em lote.`);
+        toast.success(t('settings.success.usersCreated', { count: createdCount }));
+        await logActivity(t('settings.logs.runCreateUsers', { count: createdCount }));
       } else if (errorCount === 0) {
-        toast.info("Não havia nenhum usuário novo pendente com e-mail válido para criar.");
+        toast.info(t('settings.success.usersNoPending'));
       } else {
-        toast.warning(`Terminou com ${errorCount} falhas de criação. Observe o console.`);
+        toast.warning(t('settings.errors.createUsers'));
       }
 
     } catch (error) {
       console.error('Erro na geração de usuários faltantes:', error);
-      toast.error('Falha ao rodar o script (Verifique o console).');
+      toast.error(t('settings.errors.createUsers'));
     } finally {
       setIsMigrating(false);
     }
@@ -599,32 +566,30 @@ export default function Configuracoes() {
     setIsCheckingUpdate(true);
     try {
       const response = await fetch(`/version.json?t=${Date.now()}`);
-      if (!response.ok) throw new Error('Não foi possÃ­vel buscar a versão');
+      if (!response.ok) throw new Error(t('settings.errors.checkUpdate'));
       const data = await response.json();
 
       if (data.version !== APP_VERSION) {
         setNewVersionAvailable({ version: data.version, notes: data.notes });
-        toast.info(`Nova versão ${data.version} disponível!`);
+        toast.info(t('settings.success.updateAvailable', { version: data.version }));
       } else {
-        toast.success('Seu sistema já está atualizado.');
+        toast.success(t('settings.success.systemUpdated'));
         setNewVersionAvailable(null);
       }
     } catch (error) {
       console.error('Sem permissão para verificar atualização:', error);
-      toast.error('Sem permissão para verificar atualizações.');
+      toast.error(t('settings.errors.permissionCheckUpdate'));
     } finally {
       setIsCheckingUpdate(false);
     }
   };
 
   const handleFixMissingExcluido = async () => {
-    const confirmado = window.confirm(
-      'Isso irá adicionar o campo "excluido: false" a todos os registros de usuários, equipe, professores e estudantes que não o possuem. Isso é necessário para que eles apareçam nas listagens. Deseja continuar?'
-    );
+    const confirmado = window.confirm(t('settings.confirm.fixExcluded'));
     if (!confirmado) return;
 
     setIsMigrating(true);
-    toast.info('Corrigindo campo "excluído"... Aguarde.');
+    toast.info(t('settings.info.fixingExcludedStart'));
 
     try {
       const collectionsToMigrate = ['profiles', 'user_roles', 'equipe_gestora', 'professores', 'estudantes', 'turmas'];
@@ -670,18 +635,18 @@ export default function Configuracoes() {
         }
       }
 
-      toast.success(`${totalUpdated} documentos atualizados com sucesso!`);
-      await logActivity(`corrigiu o campo "excluido" e "nome" em ${totalUpdated} registros.`);
+      toast.success(t('settings.success.docsUpdated', { count: totalUpdated }));
+      await logActivity(t('settings.logs.runFixExcluded', { count: totalUpdated }));
     } catch (error) {
       console.error('Erro na migração:', error);
-      toast.error('Ocorreu um erro durante a migração.');
+      toast.error(t('settings.errors.migrateData'));
     } finally {
       setIsMigrating(false);
     }
   };
 
   const handleApplyUpdate = async () => {
-    toast.info('Limpando cache e atualizando... Aguarde.');
+    toast.info(t('settings.info.updatingCache'));
     try {
       if ('caches' in window) {
         const cacheNames = await caches.keys();
@@ -696,7 +661,7 @@ export default function Configuracoes() {
 
   if (loading) {
     return (
-      <AppLayout title="Configurações">
+      <AppLayout title={t('settings.title')}>
         <div className="flex justify-center items-center h-64">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
         </div>
@@ -705,18 +670,17 @@ export default function Configuracoes() {
   }
 
   return (
-    <AppLayout title="Configurações">
+    <AppLayout title={t('settings.title')}>
       <div className="space-y-6 animate-fade-in">
-        <p className="text-muted-foreground -mt-2">Gerencie as configurações do sistema</p>
+        <p className="text-muted-foreground -mt-2">{t('settings.subtitle')}</p>
 
         <div className={role === 'professor' || role === 'estudante' || role === 'aluno' ? "max-w-3xl mx-auto space-y-6" : "grid gap-6 lg:grid-cols-3"}>
           {/* Se for Professor ou Estudante, mostrar layout simplificado na ordem solicitada */}
           {(role === 'professor' || role === 'estudante' || role === 'aluno') ? (
             <>
-              {/* 1. Informações da Conta */}
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">Informações da Conta</CardTitle>
+                  <CardTitle className="text-lg font-semibold">{t('settings.account.title')}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col items-center text-center">
                   <div className="relative group mb-4">
@@ -741,28 +705,27 @@ export default function Configuracoes() {
                       onChange={handlePhotoUpload}
                     />
                   </div>
-                  {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">Enviando foto...</p>}
+                  {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">{t('settings.account.uploading')}</p>}
                   <h3 className="font-semibold text-lg">{profileData.nome}</h3>
                   <p className="text-sm text-muted-foreground mb-4">{profileData.email}</p>
                   <Button variant="outline" className="w-full" onClick={() => setIsEditProfileOpen(true)}>
-                    Editar Perfil
+                    {t('settings.account.editButton')}
                   </Button>
                 </CardContent>
               </Card>
 
-              {/* 2. Preferências do Sistema */}
               <Card>
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-lg font-semibold">Preferências do Sistema</CardTitle>
+                  <CardTitle className="text-lg font-semibold">{t('settings.preferences.title')}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-start gap-3">
                       <Bell className="h-5 w-5 text-muted-foreground mt-0.5" />
                       <div>
-                        <p className="font-medium">Notificações</p>
+                        <p className="font-medium">{t('settings.preferences.notifications')}</p>
                         <p className="text-sm text-muted-foreground">
-                          Receber Notificações de eventos e atividades
+                          {t('settings.preferences.notificationsDesc')}
                         </p>
                       </div>
                     </div>
@@ -775,9 +738,9 @@ export default function Configuracoes() {
                     <div className="flex items-start gap-3">
                       <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
                       <div>
-                        <p className="font-medium">Autenticação em Dois Fatores</p>
+                        <p className="font-medium">{t('settings.preferences.twoFactor')}</p>
                         <p className="text-sm text-muted-foreground">
-                          Aumenta a segurança da sua conta
+                          {t('settings.preferences.twoFactorDesc')}
                         </p>
                       </div>
                     </div>
@@ -793,9 +756,9 @@ export default function Configuracoes() {
                     <div className="flex items-start gap-3">
                       <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
                       <div>
-                        <p className="font-medium">Navegador em Tela Cheia</p>
+                        <p className="font-medium">{t('settings.preferences.fullscreen')}</p>
                         <p className="text-sm text-muted-foreground">
-                          O sistema sempre inicia em modo de tela cheia
+                          {t('settings.preferences.fullscreenDesc')}
                         </p>
                       </div>
                     </div>
@@ -807,18 +770,17 @@ export default function Configuracoes() {
                 </CardContent>
               </Card>
 
-              {/* 3. Sistema e Versão */}
               <Card>
                 <CardHeader className="pb-4">
                   <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                    <Wrench className="h-5 w-5" /> Versão do Sistema
+                    <Wrench className="h-5 w-5" /> {t('settings.version.title')}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-4">
                     <div>
-                      <p className="font-medium">Versão do App</p>
-                      <p className="text-sm text-muted-foreground">Versão Local: v{APP_VERSION}</p>
+                      <p className="font-medium">{t('settings.version.appVersion')}</p>
+                      <p className="text-sm text-muted-foreground">{t('settings.version.localVersion', { version: APP_VERSION })}</p>
                     </div>
                     <Button
                       variant="outline"
@@ -829,9 +791,9 @@ export default function Configuracoes() {
                       {isCheckingUpdate ? (
                         <>
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Verificando...
+                          {t('settings.version.checking')}
                         </>
-                      ) : 'Verificar Atualizações'}
+                      ) : t('settings.version.checkButton')}
                     </Button>
                   </div>
 
@@ -839,14 +801,14 @@ export default function Configuracoes() {
                     <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <p className="font-bold text-primary">Nova Versão Disponível: v{newVersionAvailable.version}</p>
+                          <p className="font-bold text-primary">{t('settings.version.newAvailable', { version: newVersionAvailable.version })}</p>
                           <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
                         </div>
-                        <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
+                        <Button size="sm" onClick={handleApplyUpdate}> {t('settings.version.updateNow')}
                         </Button>
                       </div>
                       <p className="text-[10px] text-muted-foreground italic">
-                        Nota: A atualização irá limpar o cache local e recarregar a página. Seus dados no Firebase não serão afetados.
+                        {t('settings.version.updateNote')}
                       </p>
                     </div>
                   )}
@@ -857,15 +819,14 @@ export default function Configuracoes() {
             <>
               {/* Coluna principal (Admin, Gestor, Secretário) */}
               <div className="lg:col-span-2 space-y-6">
-                {/* Informações da Escola */}
                 <Card>
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-lg font-semibold">Informações da Escola</CardTitle>
+                    <CardTitle className="text-lg font-semibold">{t('settings.school.title')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">INEP</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.school.inep')}</Label>
                         <div className="flex items-center gap-2">
                           <Building className="h-4 w-4 text-muted-foreground" />
                           <Input
@@ -876,7 +837,7 @@ export default function Configuracoes() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Nome da Escola</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.school.schoolName')}</Label>
                         <div className="flex items-center gap-2">
                           <School className="h-4 w-4 text-muted-foreground" />
                           <Input
@@ -887,19 +848,19 @@ export default function Configuracoes() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Decreto de Criação</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.school.decreto')}</Label>
                         <div className="flex items-center gap-2">
                           <Loader2 className="h-4 w-4 text-muted-foreground invisible" /> {/* Placeholder for consistent alignment */}
                           <Input
                             value={escolaConfig.decretoCriacao}
                             onChange={(e) => setEscolaConfig({ ...escolaConfig, decretoCriacao: e.target.value })}
                             className="border-0 bg-transparent p-0 h-auto font-medium focus-visible:ring-0"
-                            placeholder="Informe o decreto"
+                            placeholder={t('settings.school.decretoPlaceholder')}
                           />
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">E-mail</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.school.email')}</Label>
                         <div className="flex items-center gap-2">
                           <Mail className="h-4 w-4 text-muted-foreground" />
                           <Input
@@ -910,7 +871,7 @@ export default function Configuracoes() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Contato</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.school.contact')}</Label>
                         <div className="flex items-center gap-2">
                           <Phone className="h-4 w-4 text-muted-foreground" />
                           <Input
@@ -921,23 +882,23 @@ export default function Configuracoes() {
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Zona (Urbana/Rural)</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.school.zone')}</Label>
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           <Select value={escolaConfig.zona} onValueChange={(value) => setEscolaConfig({ ...escolaConfig, zona: value })}>
                             <SelectTrigger className="border-0 bg-transparent p-0 h-auto font-medium focus:ring-0 w-full text-left">
-                              <SelectValue placeholder="Selecione a Zona" />
+                              <SelectValue placeholder={t('settings.school.zonePlaceholder')} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="Urbana">Urbana</SelectItem>
-                              <SelectItem value="Rural - Várzea">Rural - Várzea</SelectItem>
-                              <SelectItem value="Rural - Terra Firme">Rural - Terra Firme</SelectItem>
+                              <SelectItem value="Urbana">{t('settings.school.zoneOptions.urban')}</SelectItem>
+                              <SelectItem value="Rural - Várzea">{t('settings.school.zoneOptions.ruralVarzea')}</SelectItem>
+                              <SelectItem value="Rural - Terra Firme">{t('settings.school.zoneOptions.ruralTerraFirme')}</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">Endereço</Label>
+                        <Label className="text-xs text-muted-foreground">{t('settings.school.address')}</Label>
                         <div className="flex items-center gap-2">
                           <MapPin className="h-4 w-4 text-muted-foreground" />
                           <Input
@@ -950,7 +911,7 @@ export default function Configuracoes() {
                     </div>
 
                     <div className="space-y-1 mt-4">
-                      <Label className="text-xs text-muted-foreground">Horário de Funcionamento</Label>
+                      <Label className="text-xs text-muted-foreground">{t('settings.school.workingHours')}</Label>
                       <div className="flex items-center gap-2">
                         <Clock className="h-4 w-4 text-muted-foreground" />
                         <Input
@@ -965,11 +926,11 @@ export default function Configuracoes() {
                       <div className="flex items-start gap-3">
                         <ToggleLeft className={`h-5 w-5 mt-0.5 ${escolaConfig.matriculas_abertas ? 'text-green-600' : 'text-muted-foreground'}`} />
                         <div>
-                          <p className="font-semibold text-sm">Matrículas Abertas nesta Escola</p>
+                          <p className="font-semibold text-sm">{t('settings.school.enrollmentStatus')}</p>
                           <p className="text-xs text-muted-foreground">
                             {escolaConfig.matriculas_abertas
-                              ? 'Responsáveis podem matricular nesta unidade online.'
-                              : 'Matrículas online suspensas para esta escola.'}
+                              ? t('settings.school.enrollmentOpen')
+                              : t('settings.school.enrollmentClosed')}
                           </p>
                         </div>
                       </div>
@@ -980,7 +941,7 @@ export default function Configuracoes() {
                     </div>
 
                     <Button onClick={handleSaveEscola} className="mt-2">
-                      Salvar Alterações
+                      {t('settings.school.saveButton')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -989,10 +950,10 @@ export default function Configuracoes() {
                 <Card>
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg font-semibold">Instalações da Escola</CardTitle>
+                      <CardTitle className="text-lg font-semibold">{t('settings.facilities.title')}</CardTitle>
                       <Button variant="outline" size="sm" onClick={() => setIsInstalacoesOpen(true)}>
                         <Building className="h-4 w-4 mr-2" />
-                        Gerenciar Instalações
+                        {t('settings.facilities.manageButton')}
                       </Button>
                     </div>
                   </CardHeader>
@@ -1000,37 +961,37 @@ export default function Configuracoes() {
                     <div className="grid gap-4 sm:grid-cols-3">
                       <Card className="bg-muted/50">
                         <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">Salas de Aula</p>
+                          <p className="text-sm text-muted-foreground">{t('settings.facilities.classrooms')}</p>
                           <p className="text-2xl font-bold">{instalacoes.salasAula}</p>
                         </CardContent>
                       </Card>
                       <Card className="bg-muted/50">
                         <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">Laboratórios</p>
+                          <p className="text-sm text-muted-foreground">{t('settings.facilities.labs')}</p>
                           <p className="text-2xl font-bold">{instalacoes.laboratorios}</p>
                         </CardContent>
                       </Card>
                       <Card className="bg-muted/50">
                         <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">Banheiros</p>
+                          <p className="text-sm text-muted-foreground">{t('settings.facilities.bathrooms')}</p>
                           <p className="text-2xl font-bold">{instalacoes.banheiros}</p>
                         </CardContent>
                       </Card>
                       <Card className="bg-muted/50">
                         <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">Cantina</p>
+                          <p className="text-sm text-muted-foreground">{t('settings.facilities.cafeteria')}</p>
                           <p className="text-2xl font-bold">{instalacoes.cantina}</p>
                         </CardContent>
                       </Card>
                       <Card className="bg-muted/50">
                         <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">Biblioteca</p>
+                          <p className="text-sm text-muted-foreground">{t('settings.facilities.library')}</p>
                           <p className="text-2xl font-bold">{instalacoes.biblioteca}</p>
                         </CardContent>
                       </Card>
                       <Card className="bg-muted/50">
                         <CardContent className="p-4">
-                          <p className="text-sm text-muted-foreground">Quadras</p>
+                          <p className="text-sm text-muted-foreground">{t('settings.facilities.sportsCourts')}</p>
                           <p className="text-2xl font-bold">{instalacoes.quadras}</p>
                         </CardContent>
                       </Card>
@@ -1038,19 +999,18 @@ export default function Configuracoes() {
                   </CardContent>
                 </Card>
 
-                {/* Preferências do Sistema */}
                 <Card>
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-lg font-semibold">Preferências do Sistema</CardTitle>
+                    <CardTitle className="text-lg font-semibold">{t('settings.preferences.title')}</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-start gap-3">
                         <Bell className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">Notificações</p>
+                          <p className="font-medium">{t('settings.preferences.notifications')}</p>
                           <p className="text-sm text-muted-foreground">
-                            Receber Notificações de eventos e atividades
+                            {t('settings.preferences.notificationsDesc')}
                           </p>
                         </div>
                       </div>
@@ -1063,9 +1023,9 @@ export default function Configuracoes() {
                       <div className="flex items-start gap-3">
                         <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">Autenticação em Dois Fatores</p>
+                          <p className="font-medium">{t('settings.preferences.twoFactor')}</p>
                           <p className="text-sm text-muted-foreground">
-                            Aumenta a segurança da sua conta
+                            {t('settings.preferences.twoFactorDesc')}
                           </p>
                         </div>
                       </div>
@@ -1081,9 +1041,9 @@ export default function Configuracoes() {
                       <div className="flex items-start gap-3">
                         <Shield className="h-5 w-5 text-muted-foreground mt-0.5" />
                         <div>
-                          <p className="font-medium">Navegador em Tela Cheia</p>
+                          <p className="font-medium">{t('settings.preferences.fullscreen')}</p>
                           <p className="text-sm text-muted-foreground">
-                            O sistema sempre Iniciação em modo de tela cheia
+                            {t('settings.preferences.fullscreenDesc')}
                           </p>
                         </div>
                       </div>
@@ -1099,10 +1059,9 @@ export default function Configuracoes() {
               {/* Sidebar direita */}
               <div className="space-y-6">
 
-                {/* Informações da Conta */}
                 <Card>
                   <CardHeader className="pb-4">
-                    <CardTitle className="text-lg font-semibold">Informações da Conta</CardTitle>
+                    <CardTitle className="text-lg font-semibold">{t('settings.account.title')}</CardTitle>
                   </CardHeader>
                   <CardContent className="flex flex-col items-center text-center">
                     <div className="relative group mb-4">
@@ -1127,11 +1086,11 @@ export default function Configuracoes() {
                         onChange={handlePhotoUpload}
                       />
                     </div>
-                    {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">Enviando foto...</p>}
+                    {uploadingPhoto && <p className="text-xs text-muted-foreground mb-2 animate-pulse">{t('settings.account.uploading')}</p>}
                     <h3 className="font-semibold text-lg">{profileData.nome}</h3>
                     <p className="text-sm text-muted-foreground mb-4">{profileData.email}</p>
                     <Button variant="outline" className="w-full" onClick={() => setIsEditProfileOpen(true)}>
-                      Editar Perfil
+                      {t('settings.account.editButton')}
                     </Button>
                   </CardContent>
                 </Card>
@@ -1143,9 +1102,9 @@ export default function Configuracoes() {
                       <CardHeader className="pb-4">
                         <CardTitle className="text-lg font-semibold flex items-center gap-2">
                           <ToggleLeft className="h-5 w-5 text-amber-600" />
-                          Controle do Sistema
+                          {t('settings.control.title')}
                         </CardTitle>
-                        <p className="text-xs text-muted-foreground">Afeta os dois sistemas em tempo real</p>
+                        <p className="text-xs text-muted-foreground">{t('settings.control.description')}</p>
                       </CardHeader>
                       <CardContent className="space-y-5">
                         {/* Manutenção */}
@@ -1153,9 +1112,9 @@ export default function Configuracoes() {
                           <div className="flex items-start gap-3">
                             <Wrench className={`h-5 w-5 mt-0.5 ${systemConfig.manutencao ? 'text-amber-500' : 'text-muted-foreground'}`} />
                             <div>
-                              <p className="font-semibold">Modo Manutenção</p>
+                              <p className="font-semibold">{t('settings.control.maintenanceMode')}</p>
                               <p className="text-sm text-muted-foreground">
-                                Exibe tela de manutenção nos dois sistemas
+                                {t('settings.control.maintenanceModeDesc')}
                               </p>
                             </div>
                           </div>
@@ -1169,7 +1128,7 @@ export default function Configuracoes() {
                         {/* Mensagem de manutenção editável */}
                         {systemConfig.manutencao && (
                           <div className="space-y-1 pl-8">
-                            <label className="text-xs text-muted-foreground font-medium">Mensagem de manutenção</label>
+                            <label className="text-xs text-muted-foreground font-medium">{t('settings.control.maintenanceMsgLabel')}</label>
                             <input
                               className="w-full border border-border rounded-lg px-3 py-2 text-sm"
                               value={systemConfig.manutencao_mensagem}
@@ -1186,11 +1145,11 @@ export default function Configuracoes() {
                           <div className="flex items-start gap-3">
                             <School className={`h-5 w-5 mt-0.5 ${systemConfig.matriculas_abertas ? 'text-green-500' : 'text-muted-foreground'}`} />
                             <div>
-                              <p className="font-semibold">Matrículas Abertas (Rede Inteira)</p>
+                              <p className="font-semibold">{t('settings.control.enrollmentOverall')}</p>
                               <p className="text-sm text-muted-foreground">
                                 {systemConfig.matriculas_abertas
-                                  ? 'Responsáveis podem realizar matrículas online na rede'
-                                  : 'Bloqueia matrículas online em TODAS as escolas'}
+                                  ? t('settings.control.enrollmentOverallOpen')
+                                  : t('settings.control.enrollmentOverallClosed')}
                               </p>
                             </div>
                           </div>
@@ -1204,7 +1163,7 @@ export default function Configuracoes() {
                         {/* Mensagem de matrículas fechadas editável */}
                         {!systemConfig.matriculas_abertas && (
                           <div className="space-y-1 pl-8">
-                            <label className="text-xs text-muted-foreground font-medium">Mensagem para o responsável</label>
+                            <label className="text-xs text-muted-foreground font-medium">{t('settings.control.enrollmentMsgLabel')}</label>
                             <input
                               className="w-full border border-border rounded-lg px-3 py-2 text-sm"
                               value={systemConfig.matriculas_fechadas_msg}
@@ -1216,7 +1175,7 @@ export default function Configuracoes() {
 
                         {savingSystem && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" /> Salvando...
+                            <Loader2 className="h-3 w-3 animate-spin" /> {t('settings.info.saving')}
                           </p>
                         )}
                       </CardContent>
@@ -1228,14 +1187,14 @@ export default function Configuracoes() {
                 <Card>
                   <CardHeader className="pb-4">
                     <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                      <Wrench className="h-5 w-5" /> Versão do Sistema
+                      <Wrench className="h-5 w-5" /> {t('settings.version.title')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex items-center justify-between border-b pb-4">
                       <div>
-                        <p className="font-medium">Versão do App</p>
-                        <p className="text-sm text-muted-foreground">Versão Local: v{APP_VERSION}</p>
+                        <p className="font-medium">{t('settings.version.appVersion')}</p>
+                        <p className="text-sm text-muted-foreground">{t('settings.version.localVersion', { version: APP_VERSION })}</p>
                       </div>
                       <Button
                         variant="outline"
@@ -1246,9 +1205,9 @@ export default function Configuracoes() {
                         {isCheckingUpdate ? (
                           <>
                             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Verificando...
+                            {t('settings.version.checking')}
                           </>
-                        ) : 'Verificar Atualizações'}
+                        ) : t('settings.version.checkButton')}
                       </Button>
                     </div>
 
@@ -1256,14 +1215,14 @@ export default function Configuracoes() {
                       <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 animate-in fade-in slide-in-from-top-2">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <p className="font-bold text-primary">Nova Versão Disponível: v{newVersionAvailable.version}</p>
+                            <p className="font-bold text-primary">{t('settings.version.newAvailable', { version: newVersionAvailable.version })}</p>
                             <p className="text-xs text-muted-foreground mt-1">{newVersionAvailable.notes}</p>
                           </div>
-                          <Button size="sm" onClick={handleApplyUpdate}> Atualizar Agora
+                          <Button size="sm" onClick={handleApplyUpdate}> {t('settings.version.updateNow')}
                           </Button>
                         </div>
                         <p className="text-[10px] text-muted-foreground italic">
-                          Nota: A atualização irá limpar o cache local e recarregar a página. Seus dados no Firebase não serão afetados.
+                          {t('settings.version.updateNote')}
                         </p>
                       </div>
                     )}
@@ -1274,7 +1233,7 @@ export default function Configuracoes() {
                 {role === 'admin' && (
                   <Card>
                     <CardHeader className="pb-4">
-                      <CardTitle className="text-lg font-semibold">Manutenção do Sistema</CardTitle>
+                      <CardTitle className="text-lg font-semibold">{t('settings.maintenance.title')}</CardTitle>
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-4">
@@ -1282,9 +1241,9 @@ export default function Configuracoes() {
                           <div className="flex items-start gap-3">
                             <Wrench className="h-5 w-5 text-muted-foreground mt-0.5" />
                             <div>
-                              <p className="font-medium">Modo de Manutenção</p>
+                              <p className="font-medium">{t('settings.maintenance.maintenanceMode')}</p>
                               <p className="text-sm text-muted-foreground">
-                                Sistema disponível apenas para administradores
+                                {t('settings.maintenance.maintenanceModeDesc')}
                               </p>
                             </div>
                           </div>
@@ -1296,7 +1255,7 @@ export default function Configuracoes() {
 
                         <div className="space-y-2">
                           <p className="text-sm text-muted-foreground mb-2 mt-4">
-                            Ferramentas de sincronização e correção de dados legados.
+                            {t('settings.maintenance.toolsDesc')}
                           </p>
 
                           <Button
@@ -1310,7 +1269,7 @@ export default function Configuracoes() {
                             ) : (
                               <Wrench className="h-4 w-4 mr-2" />
                             )}
-                            {isSyncing ? 'Sincronizando...' : 'Sincronizar Dados de Busca'}
+                            {isSyncing ? t('settings.info.syncing') : t('settings.maintenance.syncButton')}
                           </Button>
 
                           <Button
@@ -1320,7 +1279,7 @@ export default function Configuracoes() {
                             disabled={isSyncing || isMigrating}
                           >
                             <Shield className="h-4 w-4 mr-2" />
-                            Corrigir Campo "Excluído" nos Usuários
+                            {t('settings.maintenance.fixExcludedButton')}
                           </Button>
 
                           <Button
@@ -1330,7 +1289,7 @@ export default function Configuracoes() {
                             disabled={isSyncing || isMigrating}
                           >
                             <UserCog className="h-4 w-4 mr-2" />
-                            Criar Usuários a partir de Cadastros
+                            {t('settings.maintenance.createUsersButton')}
                           </Button>
 
                           <Button
@@ -1340,17 +1299,7 @@ export default function Configuracoes() {
                             disabled={isSyncing || isMigrating}
                           >
                             <MapPin className="h-4 w-4 mr-2" />
-                            Limpar Escola dos Transferidos
-                          </Button>
-
-                          <Button
-                            className="w-full justify-start"
-                            variant="destructive"
-                            onClick={handleMigrateData}
-                            disabled={isSyncing || isMigrating}
-                          >
-                            <Wrench className="h-4 w-4 mr-2" />
-                            {isMigrating ? 'Migrando...' : 'Injetar INEP 13034243 nos dados antigos'}
+                            {t('settings.maintenance.clearTransferredButton')}
                           </Button>
                         </div>
                       </div>
@@ -1374,14 +1323,14 @@ export default function Configuracoes() {
         <Dialog open={isEditProfileOpen} onOpenChange={setIsEditProfileOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Editar Perfil</DialogTitle>
+              <DialogTitle>{t('settings.dialogs.editProfileTitle')}</DialogTitle>
               <DialogDescription>
-                Atualize suas informações pessoais abaixo.
+                {t('settings.dialogs.editProfileDesc')}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="profile-nome">Nome</Label>
+                <Label htmlFor="profile-nome">{t('settings.school.name')}</Label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1394,7 +1343,7 @@ export default function Configuracoes() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-email">E-mail</Label>
+                <Label htmlFor="profile-email">{t('settings.school.email')}</Label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1408,7 +1357,7 @@ export default function Configuracoes() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-contato">Contato</Label>
+                <Label htmlFor="profile-contato">{t('settings.school.contact')}</Label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1421,7 +1370,7 @@ export default function Configuracoes() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-cargo">Cargo</Label>
+                <Label htmlFor="profile-cargo">{t('settings.dialogs.role')}</Label>
                 <div className="relative">
                   <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
@@ -1433,31 +1382,31 @@ export default function Configuracoes() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-senha">Nova Senha</Label>
+                <Label htmlFor="profile-senha">{t('settings.dialogs.newPassword')}</Label>
                 <Input
                   id="profile-senha"
                   type="password"
-                  placeholder="Deixe em branco para não alterar"
+                  placeholder={t('settings.dialogs.passwordPlaceholder')}
                   value={profileData.novaSenha}
                   onChange={(e) => setProfileData({ ...profileData, novaSenha: e.target.value })}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="profile-confirmar-senha">Confirmar Nova Senha</Label>
+                <Label htmlFor="profile-confirmar-senha">{t('settings.dialogs.confirmPassword')}</Label>
                 <Input
                   id="profile-confirmar-senha"
                   type="password"
-                  placeholder="Confirme a nova senha"
+                  placeholder={t('settings.dialogs.confirmPasswordPlaceholder')}
                   value={profileData.confirmarSenha}
                   onChange={(e) => setProfileData({ ...profileData, confirmarSenha: e.target.value })}
                 />
               </div>
               <div className="flex justify-end gap-2 pt-4">
                 <Button variant="outline" onClick={() => setIsEditProfileOpen(false)}>
-                  Cancelar
+                  {t('settings.dialogs.cancelButton')}
                 </Button>
                 <Button onClick={handleSaveProfile}>
-                  Salvar Alterações
+                  {t('settings.dialogs.saveButton')}
                 </Button>
               </div>
             </div>
@@ -1468,11 +1417,11 @@ export default function Configuracoes() {
         <Dialog open={isInstalacoesOpen} onOpenChange={setIsInstalacoesOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>Gerenciar Instalações da Escola</DialogTitle>
+              <DialogTitle>{t('settings.dialogs.manageFacilitiesTitle')}</DialogTitle>
             </DialogHeader>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="salasAula">Salas de Aula</Label>
+                <Label htmlFor="salasAula">{t('settings.facilities.classrooms')}</Label>
                 <Input
                   id="salasAula"
                   type="number"
@@ -1481,7 +1430,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="laboratorios">Laboratórios</Label>
+                <Label htmlFor="laboratorios">{t('settings.facilities.labs')}</Label>
                 <Input
                   id="laboratorios"
                   type="number"
@@ -1490,7 +1439,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="banheiros">Banheiros</Label>
+                <Label htmlFor="banheiros">{t('settings.facilities.bathrooms')}</Label>
                 <Input
                   id="banheiros"
                   type="number"
@@ -1499,7 +1448,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="cantina">Cantina</Label>
+                <Label htmlFor="cantina">{t('settings.facilities.cafeteria')}</Label>
                 <Input
                   id="cantina"
                   type="number"
@@ -1508,7 +1457,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="biblioteca">Biblioteca</Label>
+                <Label htmlFor="biblioteca">{t('settings.facilities.library')}</Label>
                 <Input
                   id="biblioteca"
                   type="number"
@@ -1517,7 +1466,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="quadras">Quadras</Label>
+                <Label htmlFor="quadras">{t('settings.facilities.sportsCourts')}</Label>
                 <Input
                   id="quadras"
                   type="number"
@@ -1526,7 +1475,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="secretaria">Secretaria</Label>
+                <Label htmlFor="secretaria">{t('settings.facilities.office')}</Label>
                 <Input
                   id="secretaria"
                   type="number"
@@ -1535,7 +1484,7 @@ export default function Configuracoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="salaProfessores">Sala dos Professores</Label>
+                <Label htmlFor="salaProfessores">{t('settings.facilities.teachersRoom')}</Label>
                 <Input
                   id="salaProfessores"
                   type="number"
@@ -1546,10 +1495,10 @@ export default function Configuracoes() {
             </div>
             <div className="flex justify-end gap-2 pt-4">
               <Button variant="outline" onClick={() => setIsInstalacoesOpen(false)}>
-                Cancelar
+                {t('settings.dialogs.cancelButton')}
               </Button>
               <Button onClick={handleSaveInstalacoes}>
-                Salvar Alterações
+                {t('settings.dialogs.saveButton')}
               </Button>
             </div>
           </DialogContent>

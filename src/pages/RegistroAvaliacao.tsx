@@ -8,6 +8,7 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { logActivity } from '@/lib/logger';
 import { Loader2, ArrowLeft, Save, X, Search, Check, ClipboardList, Bot, FileEdit, PlusCircle, Pencil } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -182,6 +183,7 @@ export default function RegistroAvaliacao() {
       if (editingId) {
         await updateDoc(doc(db, "avaliacoes", editingId), payload);
         toast.success("Avaliação atualizada!");
+        await logActivity(`atualizou a avaliação "${formData.titulo}" de "${componente}" na turma "${turma?.nome}".`);
       } else {
         const docRef = await addDoc(collection(db, "avaliacoes"), {
           ...payload,
@@ -189,6 +191,7 @@ export default function RegistroAvaliacao() {
         });
         savedId = docRef.id;
         toast.success("Avaliação salva com sucesso!");
+        await logActivity(`criou a avaliação "${formData.titulo}" de "${componente}" na turma "${turma?.nome}" para o dia ${dataParams}.`);
       }
 
       if (redirectType === 'manual') {

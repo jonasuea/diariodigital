@@ -10,6 +10,7 @@ import { ArrowLeft, Save, User, ChevronRight, Loader2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { toast } from 'sonner';
+import { logActivity } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -324,7 +325,7 @@ export default function AvaliacaoInfantil() {
         atualizado_em: serverTimestamp(),
       }, { merge: true });
       toast.success('Avaliação salva com sucesso!');
-      // Marca o estudante como avaliado na lista
+      await logActivity(`salvou a avaliação infantil de "${selectedEstudante.nome}" na turma "${turmaNome}" para o dia ${selectedDate}.`);
       setAvaliadosIds(prev => new Set(prev).add(selectedEstudante.id));
     } catch (err) {
       console.error(err);

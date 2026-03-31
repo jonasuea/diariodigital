@@ -15,8 +15,16 @@ export async function logActivity(action: string) {
     return;
   }
 
-  // Lê o escola_id ativo da sessão (gravado pelo useUserRole)
   const escolaId = sessionStorage.getItem('escolaAtivaId') || '';
+
+  // Lê o role ativo da sessão para permitir filtragem de logs de admin
+  let userRole = '';
+  try {
+    const profileJson = sessionStorage.getItem('activeProfile');
+    if (profileJson) {
+      userRole = JSON.parse(profileJson).role || '';
+    }
+  } catch (_) { /* ignore */ }
 
   try {
     await addDoc(collection(db, 'activity_log'), {
@@ -24,6 +32,8 @@ export async function logActivity(action: string) {
       user_name: user.displayName || user.email,
       action: action,
       escola_id: escolaId,
+      role: userRole,
+      source: 'diariodigital',
       created_at: serverTimestamp(),
     });
   } catch (error) {

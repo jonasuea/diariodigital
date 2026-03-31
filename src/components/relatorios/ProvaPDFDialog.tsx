@@ -125,9 +125,9 @@ export function ProvaPDFDialog({
             ) : (
               questoes.map((questao, index) => (
                 <div key={questao.id} className="text-sm mb-6 break-inside-avoid">
-                  <div className="flex gap-2 font-medium mb-2">
+                  <div className="flex gap-2 font-medium mb-0.5">
                     <span className="whitespace-nowrap">{index + 1})</span>
-                    <div className="whitespace-pre-wrap">{questao.enunciado}</div>
+                    <span className="whitespace-pre-wrap"> {questao.enunciado}</span>
                   </div>
 
                   {questao.imagemUrl && (

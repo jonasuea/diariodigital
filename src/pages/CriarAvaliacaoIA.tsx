@@ -11,6 +11,7 @@ import { db, storage } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { toast } from "sonner";
+import { logActivity } from "@/lib/logger";
 import { ProvaPDFDialog, Questao } from "@/components/relatorios/ProvaPDFDialog";
 import { useUserRole } from "@/hooks/useUserRole";
 import { GoogleGenerativeAI } from "@google/generative-ai";
@@ -191,6 +192,7 @@ Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
         questoes: questoesSanitizadas
       });
       toast.success("Avaliação salva com sucesso!");
+      await logActivity(`salvou as questões (via IA) da avaliação "${avaliacao?.titulo}" na turma "${turma?.nome}".`);
     } catch (error) {
       console.error("Erro ao salvar:", error);
       toast.error("Erro ao salvar. Tente novamente.");

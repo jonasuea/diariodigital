@@ -7,7 +7,8 @@ import { db } from '@/lib/firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { Loader2, Calendar, Save, Wand2 } from 'lucide-react';
-import { collection, query, where, getDocs, deleteDoc, addDoc, writeBatch } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, writeBatch } from 'firebase/firestore';
+import { useTranslation } from 'react-i18next';
 
 interface ComponenteCurricular {
     nome: string;
@@ -29,27 +30,28 @@ interface TimeTableGeneratorDialogProps {
     onSuccess?: () => void;
 }
 
-const DIAS_SEMANA = [
-    { value: 'nenhum', label: 'Nenhum' },
-    { value: 'segunda', label: 'Segunda-feira' },
-    { value: 'terca', label: 'Terça-feira' },
-    { value: 'quarta', label: 'Quarta-feira' },
-    { value: 'quinta', label: 'Quinta-feira' },
-    { value: 'sexta', label: 'Sexta-feira' },
-];
-
-const TEMPOS = [
-    { inicio: '07:00', fim: '07:50', label: '1º Tempo' },
-    { inicio: '07:50', fim: '08:40', label: '2º Tempo' },
-    { inicio: '08:40', fim: '09:30', label: '3º Tempo' },
-    { inicio: '09:50', fim: '10:40', label: '4º Tempo' },
-    { inicio: '10:40', fim: '11:30', label: '5º Tempo' },
-];
-
 export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess }: TimeTableGeneratorDialogProps) {
+    const { t } = useTranslation();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [componentes, setComponentes] = useState<ComponenteCurricular[]>([]);
+
+    const DIAS_SEMANA = [
+        { value: 'nenhum', label: t('schedule.generator_dialog.none') },
+        { value: 'segunda', label: t('common.days.monday') },
+        { value: 'terca', label: t('common.days.tuesday') },
+        { value: 'quarta', label: t('common.days.wednesday') },
+        { value: 'quinta', label: t('common.days.thursday') },
+        { value: 'sexta', label: t('common.days.friday') },
+    ];
+
+    const TEMPOS = [
+        { inicio: '07:00', fim: '07:50', label: t('schedule.generator_dialog.timeLabel', { count: 1 }) },
+        { inicio: '07:50', fim: '08:40', label: t('schedule.generator_dialog.timeLabel', { count: 2 }) },
+        { inicio: '08:40', fim: '09:30', label: t('schedule.generator_dialog.timeLabel', { count: 3 }) },
+        { inicio: '09:50', fim: '10:40', label: t('schedule.generator_dialog.timeLabel', { count: 4 }) },
+        { inicio: '10:40', fim: '11:30', label: t('schedule.generator_dialog.timeLabel', { count: 5 }) },
+    ];
 
     useEffect(() => {
         if (open && turma) {
@@ -87,7 +89,7 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
             }
         } catch (error) {
             console.error("Erro ao carregar dados da turma:", error);
-            toast.error("Erro ao carregar componentes da turma");
+            toast.error(t('schedule.generator_dialog.errorLoadComps'));
         } finally {
             setLoading(false);
         }
@@ -122,12 +124,12 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
                     componentes: updatedAllComponentes
                 });
 
-                toast.success("Restrições de planejamento salvas com sucesso!");
+                toast.success(t('schedule.generator_dialog.successSaveConstraints'));
                 if (onSuccess) onSuccess();
             }
         } catch (error) {
             console.error("Erro ao salvar restrições:", error);
-            toast.error("Erro ao salvar restrições de planejamento");
+            toast.error(t('schedule.generator_dialog.errorSaveConstraints'));
         } finally {
             setSaving(false);
         }
@@ -196,12 +198,12 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
 
             await batch.commit();
 
-            toast.success("Professores distribuídos e horários gerados com sucesso!");
+            toast.success(t('schedule.generator_dialog.successGenerate'));
             if (onSuccess) onSuccess();
             onOpenChange(false);
         } catch (error) {
             console.error("Erro ao distribuir professores:", error);
-            toast.error("Erro ao gerar distribuição de professores");
+            toast.error(t('schedule.generator_dialog.errorGenerate'));
         } finally {
             setSaving(false);
         }
@@ -213,13 +215,13 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-primary" />
-                        Configurar Gerador - {turma?.nome}
+                        {t('schedule.generator_dialog.title', { name: turma?.nome })}
                     </DialogTitle>
                 </DialogHeader>
 
                 <div className="py-4 space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        Defina os dias de planejamento para cada professor. Nestes dias, o gerador não alocará aulas deste componente.
+                        {t('schedule.generator_dialog.description')}
                     </p>
 
                     {loading ? (
@@ -228,15 +230,15 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
                         </div>
                     ) : componentes.length === 0 ? (
                         <div className="text-center py-8 border rounded-lg bg-muted/50">
-                            <p className="text-sm text-muted-foreground">Nenhum componente com professor alocado nesta turma.</p>
+                            <p className="text-sm text-muted-foreground">{t('schedule.generator_dialog.noAllocatedProfessor')}</p>
                         </div>
                     ) : (
                         <div className="border rounded-lg overflow-hidden">
                             <table className="w-full text-sm">
                                 <thead className="bg-muted">
                                     <tr>
-                                        <th className="text-left p-3 font-semibold">Componente / Professor</th>
-                                        <th className="text-left p-3 font-semibold w-48">Dia de Planejamento</th>
+                                        <th className="text-left p-3 font-semibold">{t('schedule.generator_dialog.compProfHeader')}</th>
+                                        <th className="text-left p-3 font-semibold w-48">{t('schedule.generator_dialog.planningDayHeader')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y text-black">
@@ -244,7 +246,7 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
                                         <tr key={`${comp.nome}-${comp.professorId}`} className="hover:bg-muted/30">
                                             <td className="p-3">
                                                 <div className="font-medium">{comp.nome}</div>
-                                                <div className="text-xs text-muted-foreground">{comp.professorNome || 'Professor não identificado'}</div>
+                                                <div className="text-xs text-muted-foreground">{comp.professorNome || t('schedule.generator_dialog.unidentifiedProfessor')}</div>
                                             </td>
                                             <td className="p-3">
                                                 <Select
@@ -273,12 +275,12 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
 
                 <DialogFooter>
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancelar
+                        {t('schedule.cancel')}
                     </Button>
                     <div className="flex gap-2">
                         <Button variant="secondary" onClick={handleSave} disabled={saving || componentes.length === 0}>
                             {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                            Salvar Planejamento
+                            {t('schedule.generator_dialog.savePlanning')}
                         </Button>
                         <Button onClick={handleDistribute} disabled={saving || componentes.length === 0} className="bg-primary hover:bg-primary/90">
                             {saving ? (
@@ -286,7 +288,7 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
                             ) : (
                                 <Wand2 className="mr-2 h-4 w-4" />
                             )}
-                            Distribuir Professores
+                            {t('schedule.generator_dialog.distributeProfessors')}
                         </Button>
                     </div>
                 </DialogFooter>
