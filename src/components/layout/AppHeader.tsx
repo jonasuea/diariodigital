@@ -68,7 +68,6 @@ export function AppHeader({ title }: AppHeaderProps) {
           const lista = escolasSnap.docs.map(doc => ({ id: doc.id, nome: (doc.data() as any).nome }));
           setEscolasDisponiveis(lista);
 
-          // Se não houver escola selecionada ainda, autoseleciona a primeira
           if (!escolaAtivaId && lista.length > 0) {
             setEscolaAtivaId(lista[0].id);
             sessionStorage.setItem('escolaAtivaId', lista[0].id);
@@ -222,7 +221,7 @@ export function AppHeader({ title }: AppHeaderProps) {
   };
 
   return (
-    <header className="bg-secondary/50 backdrop-blur-sm border-b border-green-200/50 sticky top-0 z-50">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 w-full">
         <div className="flex items-center gap-4">
           {isMobile && (
@@ -311,7 +310,7 @@ export function AppHeader({ title }: AppHeaderProps) {
                   <Input
                     type="search"
                     placeholder={t('common.search')}
-                    className="w-full pl-8 bg-white/60 border-green-100 focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
+                    className="w-full pl-8 bg-gray-100 border-transparent focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
                     value={searchQuery}
                     onChange={handleSearchChange}
                     onFocus={() => {
@@ -373,27 +372,27 @@ export function AppHeader({ title }: AppHeaderProps) {
             <LanguageSelector />
           </div>
 
-          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-green-200/30">
-            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-green-200/50 shadow-sm shrink-0">
+          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-gray-200">
+            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-gray-200 shadow-sm shrink-0">
               <AvatarImage src={userProfile?.foto_url} />
               <AvatarFallback className="bg-primary/10 text-primary text-[10px] sm:text-sm font-bold">
                 {getInitials(userProfile?.nome || user?.email)}
               </AvatarFallback>
             </Avatar>
             <div className="hidden lg:block mr-2">
-              <p className="text-sm font-bold text-primary truncate max-w-[120px]">
+              <p className="text-sm font-bold text-gray-900 truncate max-w-[120px]">
                 {userProfile?.nome || user?.email}
               </p>
-              <p className="text-[10px] font-semibold text-primary/60 uppercase tracking-wider">{capitalize(role)}</p>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{capitalize(role)}</p>
             </div>
 
             <button
               onClick={handleLogout}
-              className="font-body font-semibold text-primary/70 hover:text-primary hover:bg-green-50 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
+              className="font-body font-semibold text-gray-600 hover:text-primary hover:bg-gray-100 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
             >
               {t('common.logout')}
             </button>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-primary/60 hover:text-primary">
+            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-gray-500 hover:text-primary">
               <LogOut className="h-4 w-4" />
             </Button>
           </div>

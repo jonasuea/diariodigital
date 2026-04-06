@@ -5,22 +5,14 @@ import { doc, getDoc, collection, query, where, getDocs, limit, updateDoc } from
 import { auth } from '@/lib/firebase';
 import {
   LayoutDashboard,
-  Users,
-  UserCog,
-  GraduationCap,
-  School,
   Clock,
-  FileText,
   Calendar,
   BookOpen,
   Settings,
   User,
-  Building2,
-  UserCheck,
   MessageSquare,
   LucideIcon
 } from 'lucide-react';
-
 
 interface MenuItem {
   title: string;
@@ -61,7 +53,6 @@ interface UserRoleContextType {
   permittedEscolas: string[];
   menuItems: MenuItem[];
   isInMaintenance: boolean;
-  // Multi-profile support
   availableProfiles: UserProfile[];
   activeProfile: UserProfile | null;
   setActiveProfile: (profile: UserProfile) => void;
@@ -84,22 +75,56 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [availableProfiles, setAvailableProfiles] = useState<UserProfile[]>([]);
   const [activeProfile, setActiveProfileState] = useState<UserProfile | null>(null);
 
-  // Persist and apply a chosen profile
-  // IMPORTANTE: Atualiza o campo 'role' no Firestore para que as Security Rules
-  // possam identificar corretamente o papel ativo do usuário.
-  function setActiveProfile(profile: UserProfile) {
+  async function setActiveProfile(profile: UserProfile) {
     setActiveProfileState(profile);
     setRole(profile.role);
-    setEscolaAtivaId(profile.escola_id);
-    setPermittedEscolas([profile.escola_id]);
     sessionStorage.setItem(SESSION_ACTIVE_PROFILE_KEY, JSON.stringify(profile));
     sessionStorage.setItem('escolaAtivaId', profile.escola_id);
 
     const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes(profile.role));
     setMenuItems(accessibleItems);
 
-    // Sincroniza o campo 'role' raiz no Firestore para que as Security Rules
-    // possam verificar o papel correto nas operações de leitura/escrita.
+    // Para professores, busca todas as escolas onde está lotado
+    if (profile.role === 'professor') {
+      try {
+        const currentUser = auth.currentUser;
+        if (currentUser) {
+          const profByUid = await getDoc(doc(db, 'professores', currentUser.uid));
+          if (profByUid.exists()) {
+            const d = profByUid.data();
+            const escolaIds: string[] = d.escola_ids?.length > 0 ? d.escola_ids : [profile.escola_id];
+            setPermittedEscolas(escolaIds);
+            const savedEscola = sessionStorage.getItem('escolaAtivaId');
+            const escolaAtiva = (savedEscola && escolaIds.includes(savedEscola)) ? savedEscola : profile.escola_id;
+            setEscolaAtivaId(escolaAtiva);
+            sessionStorage.setItem('escolaAtivaId', escolaAtiva);
+          } else {
+            const profSnap = await getDocs(
+              query(collection(db, 'professores'), where('usuario_id', '==', currentUser.uid), limit(1))
+            );
+            if (!profSnap.empty) {
+              const d = profSnap.docs[0].data();
+              const escolaIds: string[] = d.escola_ids?.length > 0 ? d.escola_ids : [profile.escola_id];
+              setPermittedEscolas(escolaIds);
+              const savedEscola = sessionStorage.getItem('escolaAtivaId');
+              const escolaAtiva = (savedEscola && escolaIds.includes(savedEscola)) ? savedEscola : profile.escola_id;
+              setEscolaAtivaId(escolaAtiva);
+              sessionStorage.setItem('escolaAtivaId', escolaAtiva);
+            } else {
+              setPermittedEscolas([profile.escola_id]);
+              setEscolaAtivaId(profile.escola_id);
+            }
+          }
+        }
+      } catch (_) {
+        setPermittedEscolas([profile.escola_id]);
+        setEscolaAtivaId(profile.escola_id);
+      }
+    } else {
+      setPermittedEscolas([profile.escola_id]);
+      setEscolaAtivaId(profile.escola_id);
+    }
+
     const currentUser = auth.currentUser;
     if (currentUser) {
       const userRoleRef = doc(db, 'user_roles', currentUser.uid);
@@ -107,7 +132,6 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         role: profile.role,
         escola_id: profile.escola_id,
       }).catch(err => {
-        // Falha silenciosa — o app continua funcionando, mas as regras podem rejeitar escritas
         console.warn('Não foi possível sincronizar o perfil ativo no Firestore:', err);
       });
     }
@@ -151,25 +175,75 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           dbRoles = data.roles || [];
         }
 
-        // ─── Multi-profile path ───────────────────────────────────────────────
+        // ─── Para professores: sempre busca escola_ids do documento professores ─
+        // Isso garante que multi-lotação funciona independente do user_roles.escolas[]
+        const isProfessorRole = userRole === 'professor' ||
+          (dbRoles.length >= 1 && dbRoles.some(r => r.role === 'professor'));
+
+        if (isProfessorRole) {
+          // Busca o documento professores: primeiro pelo uid (ID do doc), depois por usuario_id
+          let escolaIds: string[] = [];
+          try {
+            const profByUid = await getDoc(doc(db, 'professores', user.uid));
+            if (profByUid.exists()) {
+              const d = profByUid.data();
+              escolaIds = d.escola_ids?.length > 0 ? d.escola_ids : (d.escola_id ? [d.escola_id] : []);
+            } else {
+              // Fallback: busca por usuario_id
+              const profSnap = await getDocs(
+                query(collection(db, 'professores'), where('usuario_id', '==', user.uid), limit(1))
+              );
+              if (!profSnap.empty) {
+                const d = profSnap.docs[0].data();
+                escolaIds = d.escola_ids?.length > 0 ? d.escola_ids : (d.escola_id ? [d.escola_id] : []);
+              }
+            }
+          } catch (_) { /* ignore, use fallback below */ }
+
+          // Fallback para user_roles se não encontrou no professores
+          if (escolaIds.length === 0) {
+            escolaIds = dbEscolas.length > 0 ? dbEscolas : (dbEscolaId ? [dbEscolaId] : []);
+          }
+
+          const savedEscola = sessionStorage.getItem('escolaAtivaId');
+          const escolaAtiva = (savedEscola && escolaIds.includes(savedEscola)) ? savedEscola : (escolaIds[0] || '');
+
+          setRole('professor');
+          setPermittedEscolas(escolaIds);
+          setEscolaAtivaId(escolaAtiva);
+          if (escolaAtiva) sessionStorage.setItem('escolaAtivaId', escolaAtiva);
+
+          // Perfil ativo para sessão
+          const profileToUse = dbRoles.length >= 1
+            ? dbRoles.find(r => r.role === 'professor') || dbRoles[0]
+            : { role: 'professor', escola_id: escolaAtiva, escola_nome: '' };
+          setActiveProfileState(profileToUse);
+          sessionStorage.setItem(SESSION_ACTIVE_PROFILE_KEY, JSON.stringify(profileToUse));
+          setAvailableProfiles(dbRoles.length >= 1 ? dbRoles : [profileToUse]);
+
+          const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes('professor'));
+          setMenuItems(accessibleItems);
+          setLoading(false);
+          return;
+        }
+
+        // ─── Multi-profile path (não-professor) ──────────────────────────────
         if (dbRoles.length > 1) {
           setAvailableProfiles(dbRoles);
 
-          // Restore saved profile from session if still valid
           const savedJson = sessionStorage.getItem(SESSION_ACTIVE_PROFILE_KEY);
           if (savedJson) {
             try {
               const saved: UserProfile = JSON.parse(savedJson);
               const isValid = dbRoles.some(p => p.role === saved.role && p.escola_id === saved.escola_id);
               if (isValid) {
-                setActiveProfile(saved);
+                await setActiveProfile(saved);
                 setLoading(false);
                 return;
               }
             } catch (_) { /* invalid data — ignore */ }
           }
 
-          // No valid saved profile → picker needed; leave role null
           setLoading(false);
           return;
         }
@@ -177,7 +251,21 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         // ─── Single-profile shortcut: roles array with exactly 1 entry ───────
         if (dbRoles.length === 1) {
           setAvailableProfiles(dbRoles);
-          setActiveProfile(dbRoles[0]);
+          if (dbRoles[0].role === 'professor' && dbEscolas.length > 1) {
+            setRole(dbRoles[0].role);
+            setPermittedEscolas(dbEscolas);
+            const savedEscola = sessionStorage.getItem('escolaAtivaId');
+            const escolaAtiva = (savedEscola && dbEscolas.includes(savedEscola)) ? savedEscola : dbEscolas[0];
+            setEscolaAtivaId(escolaAtiva);
+            sessionStorage.setItem('escolaAtivaId', escolaAtiva);
+            setActiveProfileState(dbRoles[0]);
+            sessionStorage.setItem(SESSION_ACTIVE_PROFILE_KEY, JSON.stringify(dbRoles[0]));
+            const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes(dbRoles[0].role));
+            setMenuItems(accessibleItems);
+            setLoading(false);
+            return;
+          }
+          await setActiveProfile(dbRoles[0]);
           setLoading(false);
           return;
         }
@@ -224,19 +312,19 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
             const estId = snap.empty ? 'not-found' : snap.docs[0].id;
 
             setMenuItems([
-              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['estudante', 'responsavel'] },
-              { title: 'Meu Perfil', url: `/estudantes/${estId}`, icon: User, allowedRoles: ['estudante', 'responsavel'] },
-              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['estudante', 'responsavel'] },
-              { title: 'Manual de Uso', url: '/manual-uso', icon: BookOpen, allowedRoles: ['estudante', 'responsavel'] },
-              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['estudante', 'responsavel'] }
+              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['responsavel'] },
+              { title: 'Meu Perfil', url: `/estudantes/${estId}`, icon: User, allowedRoles: ['responsavel'] },
+              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['responsavel'] },
+              { title: 'Manual de Uso', url: '/manual-uso', icon: BookOpen, allowedRoles: ['responsavel'] },
+              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['responsavel'] }
             ]);
           } catch (e) {
-            console.error('Erro ao buscar perfil de estudante. Carregando menus genéricos...', e);
+            console.error('Erro ao buscar perfil de estudante:', e);
             setMenuItems([
-              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['estudante', 'responsavel'] },
-              { title: 'Meu Perfil', url: `/estudantes/not-found`, icon: User, allowedRoles: ['estudante', 'responsavel'] },
-              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['estudante', 'responsavel'] },
-              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['estudante', 'responsavel'] }
+              { title: 'Painel', url: '/painel', icon: LayoutDashboard, allowedRoles: ['responsavel'] },
+              { title: 'Meu Perfil', url: `/estudantes/not-found`, icon: User, allowedRoles: ['responsavel'] },
+              { title: 'Horário', url: '/horario', icon: Clock, allowedRoles: ['responsavel'] },
+              { title: 'Configurações', url: '/configuracoes', icon: Settings, allowedRoles: ['responsavel'] }
             ]);
           }
         } else if (userRole) {
@@ -265,7 +353,6 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const isEstudante = role === 'estudante';
   const isResponsavel = role === 'responsavel';
 
-  // True when user has multiple profiles but hasn't selected one yet for this session
   const needsProfileSelection = availableProfiles.length > 1 && activeProfile === null && !loading;
 
   return (

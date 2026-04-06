@@ -41,13 +41,13 @@ const DIAS = [
 
 const componentes = [
   'Língua Portuguesa',
+  'Arte',
+  'Educação Física',
+  'Língua Inglesa',
   'Matemática',
   'Ciências',
   'História',
   'Geografia',
-  'Arte',
-  'Educação Física',
-  'Inglês',
   'Ensino Religioso',
   'Física',
   'Química',
@@ -57,7 +57,7 @@ const componentes = [
 ];
 
 export default function Horario() {
-  const { role, isEstudante } = useUserRole();
+  const { role, isEstudante, escolaAtivaId } = useUserRole();
   const { user } = useAuth();
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [selectedTurma, setSelectedTurma] = useState<Turma | null>(null);
@@ -76,7 +76,7 @@ export default function Horario() {
 
   useEffect(() => {
     fetchTurmas();
-  }, []);
+  }, [role, escolaAtivaId, user]);
 
   useEffect(() => {
     if (selectedTurma) {
@@ -115,16 +115,49 @@ export default function Horario() {
               setTurmas([turmaData]);
               setSelectedTurma(turmaData);
             } else {
-              setTurmas([]); // Turma referenciada não existe
+              setTurmas([]);
             }
           } else {
-            setTurmas([]); // Estudante sem turma
+            setTurmas([]);
           }
         } else {
-          setTurmas([]); // Estudante não encontrado
+          setTurmas([]);
+        }
+      } else if (role === 'professor' && user) {
+        // Professor: busca apenas as turmas onde está alocado na escola ativa
+        let professorId: string | null = null;
+
+        // Busca o documento do professor pelo uid ou email
+        const profByUid = await getDoc(doc(db, 'professores', user.uid));
+        if (profByUid.exists()) {
+          professorId = user.uid;
+        } else if (user.email) {
+          const profSnap = await getDocs(
+            query(collection(db, 'professores'), where('email', '==', user.email), limit(1))
+          );
+          if (!profSnap.empty) professorId = profSnap.docs[0].id;
+        }
+
+        if (professorId && escolaAtivaId) {
+          const q = query(
+            collection(db, 'turmas'),
+            where('escola_id', '==', escolaAtivaId),
+            where('professoresIds', 'array-contains', professorId),
+            orderBy('nome')
+          );
+          const snap = await getDocs(q);
+          const turmasData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Turma));
+          setTurmas(turmasData);
+          if (turmasData.length > 0) setSelectedTurma(turmasData[0]);
+        } else {
+          setTurmas([]);
         }
       } else {
-        const q = query(collection(db, 'turmas'), orderBy('nome'));
+        // Gestor/admin: todas as turmas da escola ativa
+        const constraints = escolaAtivaId
+          ? [where('escola_id', '==', escolaAtivaId), orderBy('nome')]
+          : [orderBy('nome')];
+        const q = query(collection(db, 'turmas'), ...constraints);
         const querySnapshot = await getDocs(q);
         const turmasData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Turma));
         setTurmas(turmasData);

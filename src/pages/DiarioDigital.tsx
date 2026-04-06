@@ -68,12 +68,28 @@ export default function DiarioDigital() {
 
     async function fetchLoggedProfessorId() {
       try {
-        const profQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('email', '==', user.email), limit(1));
+        // Busca por email sem filtrar por escola_id — professor multi-escola tem um único documento
+        const profQuery = query(
+          collection(db, 'professores'),
+          where('email', '==', user.email),
+          limit(1)
+        );
         const profSnapshot = await getDocs(profQuery);
         if (!profSnapshot.empty) {
           setLoggedProfessorId(profSnapshot.docs[0].id);
         } else {
-          console.warn("Nenhum professor encontrado com o e-mail: ", user.email);
+          // Fallback: busca por usuario_id
+          const profByUid = query(
+            collection(db, 'professores'),
+            where('usuario_id', '==', user.uid),
+            limit(1)
+          );
+          const profByUidSnap = await getDocs(profByUid);
+          if (!profByUidSnap.empty) {
+            setLoggedProfessorId(profByUidSnap.docs[0].id);
+          } else {
+            console.warn("Nenhum professor encontrado para o usuário logado.");
+          }
         }
       } catch (error) {
         console.error("Sem permissão para buscar professor logado:", error);
@@ -81,6 +97,7 @@ export default function DiarioDigital() {
     }
 
     fetchLoggedProfessorId();
+  // Não depende de escolaAtivaId — o documento do professor é único independente da escola ativa
   }, [user, isGestor]);
 
   // Efeito para carregar professores (apenas para gestores)
@@ -110,6 +127,11 @@ export default function DiarioDigital() {
       return;
     }
 
+    // Limpa seleções ao trocar de escola
+    setSelectedTurmaId('');
+    setSelectedComponente('');
+    setComponentes([]);
+
     async function fetchTurmas() {
       setLoading(true);
       try {
@@ -128,7 +150,7 @@ export default function DiarioDigital() {
               id: doc.id,
               nome: data.nome,
               ano: data.ano,
-              componentes: data.componentes || [], // Garante que o campo exista
+              componentes: data.componentes || [],
               professoresIds: data.professoresIds || [],
             } as Turma;
           })
@@ -144,7 +166,7 @@ export default function DiarioDigital() {
     }
 
     fetchTurmas();
-  }, [selectedProfessorId, isGestor, loggedProfessorId]);
+  }, [selectedProfessorId, isGestor, loggedProfessorId, escolaAtivaId]);
 
   // useEffect para persistir os filtros no sessionStorage quando forem alterados
   useEffect(() => {
