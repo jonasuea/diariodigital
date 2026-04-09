@@ -119,8 +119,14 @@ export default function CalendarioAvaliacaoInfantil() {
   };
 
   const eventDates = eventos.map(e => e.data.toDate());
-  const diasLetivosDates = Array.from(diasLetivos).map(d => parseISO(d));
-  const hasAvaliacaoDates = Array.from(avaliacoesDates).map(d => parseISO(d));
+  const diasLetivosDates = Array.from(diasLetivos).map(d => {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  });
+  const hasAvaliacaoDates = Array.from(avaliacoesDates).map(d => {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  });
 
   return (
     <AppLayout>
@@ -184,6 +190,11 @@ export default function CalendarioAvaliacaoInfantil() {
                       hasAvaliacao: 'day-avaliacao'
                     }}
                     modifiersStyles={{
+                      isLetivo: { 
+                        backgroundColor: '#dcfce7', 
+                        color: '#166534',
+                        borderRadius: '50%'
+                      },
                       hasEvent: {
                         fontWeight: 'bold',
                         textDecoration: 'underline',

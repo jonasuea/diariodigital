@@ -3,6 +3,7 @@ import { User, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEma
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth } from '@/lib/firebase';
 import { db } from '@/lib/firebase';
+import { localDb } from '@/lib/db';
 
 interface AuthContextType {
   user: User | null;
@@ -136,7 +137,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
+    try {
+      // Tenta sincronizar uma última vez antes de sair (opcional, mas recomendado)
+      // await syncService.processQueue();
+      
+      await firebaseSignOut(auth);
+      
+      // Limpa os dados locais ao sair por segurança
+      await localDb.delete();
+      console.log("[AuthContext] IndexedDB limpo após logout.");
+      
+      // Recria a instância para o próximo uso (Dexie reabre automaticamente se necessário, 
+      // mas deletar o banco requer uma limpeza cuidadosa)
+      window.location.reload(); // Recarrega para garantir que os estados globais e o DB sejam resetados
+    } catch (error) {
+      console.error("Erro ao realizar logout e limpar DB:", error);
+      await firebaseSignOut(auth);
+    }
   };
 
   const resetPassword = async (email: string) => {

@@ -121,9 +121,18 @@ export default function ObjetosDeConhecimento() {
   }, [turmaId, componente, escolaAtivaId]);
 
   const eventDates = eventos.map(e => e.data.toDate());
-  const diasLetivosDates = Array.from(diasLetivos).map(d => parseISO(d));
-  const diasMinistradosDates = Array.from(diasMinistrados).map(d => parseISO(d));
-  const diasNaoMinistradosDates = Array.from(diasNaoMinistrados).map(d => parseISO(d));
+  const diasLetivosDates = Array.from(diasLetivos).map(d => {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  });
+  const diasMinistradosDates = Array.from(diasMinistrados).map(d => {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  });
+  const diasNaoMinistradosDates = Array.from(diasNaoMinistrados).map(d => {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  });
 
   return (
     <AppLayout>
@@ -199,6 +208,11 @@ export default function ObjetosDeConhecimento() {
                         fontWeight: 'bold',
                         textDecoration: 'underline',
                         textDecorationColor: 'hsl(var(--primary))',
+                      },
+                      isLetivo: { 
+                        backgroundColor: '#dcfce7', 
+                        color: '#166534',
+                        borderRadius: '50%'
                       }
                     }}
                   />

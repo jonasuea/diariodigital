@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useState, useEffect, useCallback } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { avaliacaoRepo } from '@/repositories/AvaliacaoRepository';
+import { planejamentoRepo } from '@/repositories/PlanejamentoRepository';
+import { turmaRepo } from '@/repositories/CadastrosRepository';
 import { toast } from 'sonner';
 import { logActivity } from '@/lib/logger';
 import { Loader2, ArrowLeft, Save, X, Search, Check, ClipboardList, Bot, FileEdit, PlusCircle, Pencil } from 'lucide-react';
@@ -28,6 +29,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { useUserRole } from "@/hooks/useUserRole";
 
 interface Turma {
   id: string;
@@ -41,7 +43,6 @@ interface AvaliacaoSalva {
   valor: string;
   objetosConhecimento: string[];
   observacao: string;
-  created_at?: Timestamp;
 }
 
 const FORM_VAZIO = {
@@ -58,6 +59,7 @@ export default function RegistroAvaliacao() {
   const [searchParams] = useSearchParams();
   const componente = searchParams.get('componente');
   const dataParams = searchParams.get('data');
+  const { escolaAtivaId } = useUserRole();
 
   const [turma, setTurma] = useState<Turma | null>(null);
   const [loading, setLoading] = useState(true);
@@ -72,27 +74,11 @@ export default function RegistroAvaliacao() {
 
   const [formData, setFormData] = useState({ ...FORM_VAZIO });
 
-  // Busca todas as avaliações do dia para listagem
+  // Busca todas as avaliações do dia para listagem (do cache local)
   const fetchAvaliacoesDoDia = useCallback(async () => {
     if (!turmaId || !componente || !dataParams) return;
     try {
-      const q = query(
-        collection(db, 'avaliacoes'),
-        where('turma_id', '==', turmaId),
-        where('componente', '==', componente),
-        where('data', '==', dataParams),
-        orderBy('created_at', 'asc')
-      );
-      const snap = await getDocs(q);
-      const lista: AvaliacaoSalva[] = snap.docs.map(d => ({
-        id: d.id,
-        titulo: d.data().titulo || "",
-        tipo: d.data().tipo || "",
-        valor: d.data().valor || "",
-        objetosConhecimento: d.data().objetosConhecimento || [],
-        observacao: d.data().observacao || "",
-        created_at: d.data().created_at,
-      }));
+      const lista = await avaliacaoRepo.getAvaliacoesByDia(turmaId, componente, dataParams);
       setAvaliacoesDoDia(lista);
     } catch (error) {
       console.error("Erro ao buscar avaliações do dia:", error);
@@ -101,36 +87,31 @@ export default function RegistroAvaliacao() {
 
   useEffect(() => {
     async function fetchInitialData() {
-      if (!turmaId) return;
+      if (!turmaId || !escolaAtivaId) return;
       try {
-        const docRef = doc(db, 'turmas', turmaId);
-        const snapshot = await getDoc(docRef);
-        if (snapshot.exists()) {
-          setTurma({ id: snapshot.id, ...snapshot.data() } as Turma);
+        // Seeding (apenas se online)
+        await avaliacaoRepo.seedAvaliacoes(turmaId, escolaAtivaId);
+        
+        const turmaData = await turmaRepo.getById(turmaId);
+        if (turmaData) {
+          setTurma({ id: turmaId, ...turmaData } as Turma);
         }
 
-        // Buscar objetos de conhecimento ministrados para esta turma/componente
+        // Buscar objetos de conhecimento ministrados do banco local
         if (componente) {
           setLoadingObjetos(true);
-          const qMinistrados = query(
-            collection(db, 'registros_aulas'),
-            where('turma_id', '==', turmaId),
-            where('componente', '==', componente),
-            where('status', '==', 'Ministrado')
-          );
-          const snapMinistrados = await getDocs(qMinistrados);
+          const registros = await planejamentoRepo.getRegistrosByTurma(turmaId, componente);
           const objetos = new Set<string>();
-          snapMinistrados.forEach(doc => {
-            const data = doc.data();
-            if (data.objetosConhecimento) {
-              data.objetosConhecimento.forEach((obj: string) => objetos.add(obj));
+          registros.forEach(reg => {
+            if (reg.status === 'Ministrado' && reg.objetosConhecimento) {
+              reg.objetosConhecimento.forEach((obj: string) => objetos.add(obj));
             }
           });
           setObjetosMinistrados(Array.from(objetos).sort());
           setLoadingObjetos(false);
         }
 
-        // Buscar todas as avaliações do dia
+        // Buscar todas as avaliações do dia do banco local
         await fetchAvaliacoesDoDia();
 
       } catch (error) {
@@ -140,7 +121,7 @@ export default function RegistroAvaliacao() {
       }
     }
     fetchInitialData();
-  }, [turmaId, componente, dataParams, fetchAvaliacoesDoDia]);
+  }, [turmaId, componente, dataParams, escolaAtivaId, fetchAvaliacoesDoDia]);
 
   // Carrega uma avaliação existente no formulário para edição
   const handleEditarAvaliacao = (av: AvaliacaoSalva) => {
@@ -170,28 +151,22 @@ export default function RegistroAvaliacao() {
     }
 
     setSaving(true);
-    let savedId = editingId;
     try {
       const payload = {
+        ...formData,
         turma_id: turmaId,
         componente,
         data: dataParams,
-        ...formData,
-        updated_at: Timestamp.now()
       };
 
+      let savedId: string;
       if (editingId) {
-        await updateDoc(doc(db, "avaliacoes", editingId), payload);
+        await avaliacaoRepo.updateAvaliacao(editingId, payload);
+        savedId = editingId;
         toast.success("Avaliação atualizada!");
-        await logActivity(`atualizou a avaliação "${formData.titulo}" de "${componente}" na turma "${turma?.nome}".`);
       } else {
-        const docRef = await addDoc(collection(db, "avaliacoes"), {
-          ...payload,
-          created_at: Timestamp.now()
-        });
-        savedId = docRef.id;
+        savedId = await avaliacaoRepo.saveAvaliacao(payload);
         toast.success("Avaliação salva com sucesso!");
-        await logActivity(`criou a avaliação "${formData.titulo}" de "${componente}" na turma "${turma?.nome}" para o dia ${dataParams}.`);
       }
 
       if (redirectType === 'manual') {
@@ -199,7 +174,6 @@ export default function RegistroAvaliacao() {
       } else if (redirectType === 'ia') {
         navigate(`/diario-digital/avaliacoes/${turmaId}/criar-ia/${savedId}`);
       } else {
-        // Apenas Salvar: atualiza a lista e limpa o formulário para nova entrada
         await fetchAvaliacoesDoDia();
         setEditingId(null);
         setFormData({ ...FORM_VAZIO });

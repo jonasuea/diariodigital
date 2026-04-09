@@ -90,21 +90,26 @@ const router = createBrowserRouter([
   },
 });
 
+import { OfflineStatusProvider } from "@/contexts/OfflineStatusContext";
+
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AuthProvider>
-          <UserRoleProvider>
-            <RouterProvider router={router} />
-            <MessagePopup />
-          </UserRoleProvider>
-        </AuthProvider>
+        <OfflineStatusProvider>
+          <Toaster />
+          <Sonner />
+          <AuthProvider>
+            <UserRoleProvider>
+              <RouterProvider router={router} />
+              <MessagePopup />
+            </UserRoleProvider>
+          </AuthProvider>
+        </OfflineStatusProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
 };
+
 
 export default App;

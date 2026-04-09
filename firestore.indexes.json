@@ -14,7 +14,7 @@
       "collectionGroup": "estudantes",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "excluido", "order": "ASCENDING" },
         { "fieldPath": "nome", "order": "ASCENDING" }
       ]
@@ -23,7 +23,7 @@
       "collectionGroup": "estudantes",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "ano", "order": "ASCENDING" },
         { "fieldPath": "excluido", "order": "ASCENDING" },
         { "fieldPath": "nome", "order": "ASCENDING" }
@@ -33,7 +33,7 @@
       "collectionGroup": "estudantes",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "ano", "order": "ASCENDING" },
         { "fieldPath": "excluido", "order": "ASCENDING" },
         { "fieldPath": "status", "order": "ASCENDING" },
@@ -44,7 +44,7 @@
       "collectionGroup": "estudantes",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "nome_lower", "order": "ASCENDING" },
         { "fieldPath": "excluido", "order": "ASCENDING" }
       ]
@@ -62,7 +62,7 @@
       "collectionGroup": "professores",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "excluido", "order": "ASCENDING" },
         { "fieldPath": "nome", "order": "ASCENDING" }
       ]
@@ -97,7 +97,7 @@
       "collectionGroup": "frequencias",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "data", "order": "ASCENDING" }
       ]
     },
@@ -105,7 +105,7 @@
       "collectionGroup": "activity_log",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
     },
@@ -113,7 +113,7 @@
       "collectionGroup": "mensagens",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "created_at", "order": "DESCENDING" }
       ]
     },
@@ -137,7 +137,7 @@
       "collectionGroup": "equipe_gestora",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "excluido", "order": "ASCENDING" },
         { "fieldPath": "nome", "order": "ASCENDING" }
       ]
@@ -146,7 +146,7 @@
       "collectionGroup": "horarios",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "turma_id", "order": "ASCENDING" }
       ]
     },

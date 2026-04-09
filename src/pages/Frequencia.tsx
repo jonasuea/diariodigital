@@ -8,8 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ArrowLeft, Calendar, CheckCircle, XCircle, FileText } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, addDoc, orderBy } from 'firebase/firestore';
+import { localDb } from '@/lib/db';
+import { turmaRepo, estudanteRepo } from '@/repositories/CadastrosRepository';
+import { frequenciaRepo } from '@/repositories/FrequenciaRepository';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isSameDay, subDays, isBefore, startOfDay, isSameWeek, isAfter } from 'date-fns';
@@ -89,100 +90,58 @@ export default function Frequencia() {
     }
     setLoading(true);
     try {
-      const turmaDocRef = doc(db, 'turmas', turmaId);
-      const turmaDoc = await getDoc(turmaDocRef);
-      const turmaData = turmaDoc.exists() ? { id: turmaDoc.id, ...turmaDoc.data() } as Turma : null;
+      const year = turma?.ano || new Date().getFullYear();
+      const startDate = format(startOfMonth(new Date(year, currentMonth)), 'yyyy-MM-dd');
+      const endDate = format(endOfMonth(new Date(year, currentMonth)), 'yyyy-MM-dd');
+
+      // 1. Tenta sincronizar se estiver online (Seeding)
+      if (navigator.onLine) {
+        try {
+          await Promise.all([
+            turmaRepo.seed(escolaAtivaId),
+            estudanteRepo.seed(turmaId, escolaAtivaId),
+            frequenciaRepo.seed(turmaId, escolaAtivaId, startDate, endDate)
+          ]);
+        } catch (syncError) {
+          console.warn("[Frequencia] Falha ao sincronizar dados remotos, usando cache local.", syncError);
+        }
+      }
+
+      // 2. Carrega do banco local (Fonte da Verdade)
+      const turmaData = await turmaRepo.getById(turmaId);
       setTurma(turmaData);
 
       if (!turmaData) {
-        toast.error("Turma não encontrada");
+        toast.error("Dados da turma não encontrados offline.");
         setLoading(false);
         return;
       }
 
-      const anoTurma = turmaData.ano;
+      const estudantesData = await estudanteRepo.getByTurma(turmaId);
+      setEstudantes(estudantesData);
 
-      const estudantesQuery = query(
-        collection(db, 'estudantes'),
-        where('escola_id', '==', escolaAtivaId),
-        where('turma_id', '==', turmaId),
-        orderBy('nome')
-      );
-      const querySnapshot = await getDocs(estudantesQuery);
-      setEstudantes(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante)));
-
-      const startDate = startOfMonth(new Date(anoTurma, currentMonth));
-      const endDate = endOfMonth(new Date(anoTurma, currentMonth));
-
-      const diasLetivosQuery = query(
-        collection(db, 'dias_letivos'),
-        where('escola_id', '==', escolaAtivaId),
-        where('data', '>=', format(startDate, 'yyyy-MM-dd')),
-        where('data', '<=', format(endDate, 'yyyy-MM-dd'))
-      );
-      const diasLetivosSnapshot = await getDocs(diasLetivosQuery);
-      const diasLetivosSet = new Set<string>();
-      diasLetivosSnapshot.forEach(doc => {
-        diasLetivosSet.add(doc.data().data);
-      });
-      setDiasLetivos(diasLetivosSet);
+      const diasLetivosData = await localDb.dias_letivos
+        .where('escola_id').equals(escolaAtivaId)
+        .filter(d => d.data >= startDate && d.data <= endDate)
+        .toArray();
+      setDiasLetivos(new Set(diasLetivosData.map(d => d.data)));
 
       const isTurmaInfantil = turmaData?.nome ? ["Crianças", "Bebês", "Infantil"].some(nome => turmaData.nome.includes(nome)) : false;
 
-      if (componente || isTurmaInfantil) {
-        const freqQueryConstraints = [
-          where('escola_id', '==', escolaAtivaId),
-          where('turma_id', '==', turmaId),
-          where('data', '>=', format(startDate, 'yyyy-MM-dd')),
-          where('data', '<=', format(endDate, 'yyyy-MM-dd'))
-        ];
-        
-        if (!isTurmaInfantil) {
-          freqQueryConstraints.push(where('componente', '==', componente));
+      const { freq, entradas } = await frequenciaRepo.getByTurmaAndRange(turmaId, startDate, endDate);
+      
+      const freqMap: Record<string, FrequenciaRecord> = {};
+      freq.forEach((f: any) => {
+        // Filtra por componente se não for infantil
+        if (isTurmaInfantil || f.componente === componente) {
+           freqMap[`${f.estudante_id}-${f.data}`] = f;
         }
-
-        const freqQuery = query(
-          collection(db, 'frequencias'),
-          ...freqQueryConstraints
-        );
-
-        const freqSnapshot = await getDocs(freqQuery);
-        const freqData: Record<string, FrequenciaRecord> = {};
-        freqSnapshot.forEach(doc => {
-          const data = doc.data() as FrequenciaRecord;
-          freqData[`${data.estudante_id}-${data.data}`] = { id: doc.id, ...data };
-        });
-        setFrequencias(freqData);
-
-        // Buscar entradas no diário (cliques nas datas)
-        const entradasQueryConstraints = [
-          where('escola_id', '==', escolaAtivaId),
-          where('turma_id', '==', turmaId),
-          where('data', '>=', format(startDate, 'yyyy-MM-dd')),
-          where('data', '<=', format(endDate, 'yyyy-MM-dd'))
-        ];
-        
-        if (!isTurmaInfantil) {
-          entradasQueryConstraints.push(where('componente', '==', componente));
-        }
-
-        const entradasQuery = query(
-          collection(db, 'entradas_diario'),
-          ...entradasQueryConstraints
-        );
-        const entradasSnapshot = await getDocs(entradasQuery);
-        const entradasSet = new Set<string>();
-        entradasSnapshot.forEach(doc => {
-          entradasSet.add(doc.data().data);
-        });
-        setEntradasDiario(entradasSet);
-      } else {
-        setFrequencias({});
-        setEntradasDiario(new Set());
-      }
+      });
+      setFrequencias(freqMap);
+      setEntradasDiario(new Set(entradas.map(e => e.data)));
 
     } catch (error) {
-      toast.error("Sem permissão para carregar dados da frequência");
+      toast.error("Erro ao carregar dados");
       console.error(error);
     } finally {
       setLoading(false);
@@ -260,24 +219,26 @@ export default function Frequencia() {
     setFrequencias(prev => ({ ...prev, [key]: optimisticFreq }));
 
     try {
-      if (existingFreq?.id) {
-        const freqRef = doc(db, 'frequencias', existingFreq.id);
-        await updateDoc(freqRef, { status: newStatus });
-      } else {
-        const docRef = await addDoc(collection(db, 'frequencias'), {
-          estudante_id: estudanteId,
-          turma_id: turmaId,
-          escola_id: escolaAtivaId,
-          data: dateStr,
-          status: newStatus,
-          componente: isInfantil ? 'Geral' : componente,
-          ano: turma?.ano || new Date().getFullYear()
-        });
-        setFrequencias(prev => ({ ...prev, [key]: { ...optimisticFreq, id: docRef.id } }));
+      // Usamos put para salvar localmente e registrar na fila de sync
+      // Se não tiver ID (ex: registro novo), o BaseResilientService deve gerar um ou deixar o Firestore gerar no sync?
+      // Melhor garantir um ID temporário ou definitivo aqui.
+      const recordToSave = {
+        ...optimisticFreq,
+        id: optimisticFreq.id || `${estudanteId}-${dateStr}-${isInfantil ? 'Geral' : componente}`,
+        escola_id: escolaAtivaId,
+        escola_ids: [escolaAtivaId],
+        ano: turma?.ano || new Date().getFullYear()
+      };
+      
+      await frequenciaRepo.save(recordToSave);
+      
+      if (!optimisticFreq.id) {
+        setFrequencias(prev => ({ ...prev, [key]: recordToSave }));
       }
+
       logActivity(`registrou a frequência para o dia ${dateStr} na turma "${turma?.nome}".`);
     } catch (error) {
-      toast.error('Sem permissão para atualizar frequência');
+      toast.error('Erro ao salvar frequência offline');
       console.error(error);
       setFrequencias(prev => {
         const reverted = { ...prev };
@@ -306,13 +267,18 @@ export default function Frequencia() {
     setEntradasDiario(prev => new Set(prev).add(dateStr));
 
     try {
-      await addDoc(collection(db, 'entradas_diario'), {
+      const entradaData = {
+        id: `${turmaId}-${dateStr}-${isInfantil ? 'Geral' : componente}`,
         escola_id: escolaAtivaId,
+        escola_ids: [escolaAtivaId],
         turma_id: turmaId,
         componente: isInfantil ? 'Geral' : componente,
         data: dateStr,
-        timestamp: new Date(),
-      });
+        timestamp: new Date().toISOString(),
+      };
+      
+      await frequenciaRepo.recordEntrada(entradaData);
+      
       toast.success(`Entrada registrada para o dia ${format(date, 'dd/MM')}`);
       logActivity(`marcou entrada no diário para o dia ${dateStr} na turma "${turma?.nome}" (${componente}).`);
     } catch (error) {
@@ -338,28 +304,27 @@ export default function Frequencia() {
     toast.success('Falta justificada com sucesso');
 
     try {
-      if (frequenciaParaJustificar.id) {
-        const freqRef = doc(db, 'frequencias', frequenciaParaJustificar.id);
-        await updateDoc(freqRef, { status: 'justificado', justificativa: justificativaText });
-      } else {
-        const docRef = await addDoc(collection(db, 'frequencias'), {
-          estudante_id: frequenciaParaJustificar.estudante_id,
-          turma_id: turmaId!,
-          escola_id: escolaAtivaId,
-          data: frequenciaParaJustificar.data,
-          status: 'justificado',
-          justificativa: justificativaText,
-          componente: isInfantil ? 'Geral' : componente,
-          ano: turma?.ano || new Date().getFullYear()
-        });
-        setFrequencias(prev => ({
-          ...prev,
-          [key]: { ...frequenciaParaJustificar, id: docRef.id, status: 'justificado', justificativa: justificativaText }
-        }));
-      }
+      const recordToSave = {
+        ...frequenciaParaJustificar,
+        id: frequenciaParaJustificar.id || `${frequenciaParaJustificar.estudante_id}-${frequenciaParaJustificar.data}-${isInfantil ? 'Geral' : componente}`,
+        status: 'justificado',
+        justificativa: justificativaText,
+        escola_id: escolaAtivaId,
+        escola_ids: [escolaAtivaId],
+        ano: turma?.ano || new Date().getFullYear(),
+        componente: isInfantil ? 'Geral' : componente
+      };
+
+      await frequenciaRepo.save(recordToSave);
+      
+      setFrequencias(prev => ({
+        ...prev,
+        [key]: recordToSave
+      }));
+
       logActivity(`justificou a falta do dia ${frequenciaParaJustificar.data} na turma "${turma?.nome}".`);
     } catch (error) {
-      toast.error('Sem permissão para salvar justificativa');
+      toast.error('Erro ao salvar justificativa offline');
       console.error(error);
       setFrequencias(prev => ({ ...prev, [key]: frequenciaParaJustificar }));
     }

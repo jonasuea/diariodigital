@@ -205,7 +205,7 @@ export default function Turmas() {
     }
 
     // O payload não precisa de ajustes, pois o formData já está sem professor_id
-    const payload = { ...formData, escola_id: escolaAtivaId };
+    const payload = { ...formData, escola_id: escolaAtivaId, escola_ids: [escolaAtivaId] };
 
     try {
       if (editingTurma) {

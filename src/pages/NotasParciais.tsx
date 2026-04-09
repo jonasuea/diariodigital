@@ -215,6 +215,7 @@ export default function NotasParciais() {
             const payload: any = {
                 turma_id: turmaId,
                 escola_id: escolaAtivaId,
+                escola_ids: [escolaAtivaId],
                 componente,
                 ano,
                 bimestres_bloqueados: Array.from(locked),
@@ -351,6 +352,7 @@ export default function NotasParciais() {
                     const payload = {
                         turma_id: turmaId,
                         escola_id: escolaAtivaId,
+                        escola_ids: [escolaAtivaId],
                         componente,
                         ano,
                         bimestre: bim,
@@ -422,6 +424,7 @@ export default function NotasParciais() {
                             estudante_id: estudanteId,
                             turma_id: turmaId,
                             escola_id: escolaAtivaId,
+                            escola_ids: [escolaAtivaId],
                             componente,
                             ano,
                             bimestre_1: bim === 1 ? media : null,
@@ -476,6 +479,7 @@ export default function NotasParciais() {
         try {
             const q = query(
                 collection(db, 'avaliacoes'),
+                where('escola_id', '==', escolaAtivaId),
                 where('turma_id', '==', turmaId),
                 where('componente', '==', componente)
             );

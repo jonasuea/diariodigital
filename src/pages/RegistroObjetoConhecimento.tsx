@@ -5,8 +5,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, addDoc, updateDoc, doc, getDoc, Timestamp } from 'firebase/firestore';
+import { localDb } from '@/lib/db';
+import { turmaRepo } from '@/repositories/CadastrosRepository';
+import { planejamentoRepo } from '@/repositories/PlanejamentoRepository';
 import { toast } from 'sonner';
 import { logActivity } from '@/lib/logger';
 import { Loader2, ArrowLeft, Save, X, Search, Check } from 'lucide-react';
@@ -18,9 +19,9 @@ import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
+  CommandInput,
 } from "@/components/ui/command";
 import {
   Popover,
@@ -42,7 +43,7 @@ interface RegistroAulaData {
   objetosConhecimento?: string[];
   habilidades?: string[];
   tempoAula?: string;
-  status?: string;
+  status?: 'Ministrado' | 'Pendente' | 'Justificado';
   observacao?: string;
 }
 
@@ -65,6 +66,7 @@ export default function RegistroObjetoConhecimento() {
   const [searchParams] = useSearchParams();
   const componente = searchParams.get('componente');
   const dataParams = searchParams.get('data');
+  const escolaAtivaId = localStorage.getItem('escolaAtivaId') || '';
 
   const [turma, setTurma] = useState<Turma | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,162 +75,88 @@ export default function RegistroObjetoConhecimento() {
   const [baseCurricular, setBaseCurricular] = useState<BaseCurricularData[]>([]);
   const [loadingBase, setLoadingBase] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [registrosIniciais, setRegistrosIniciais] = useState<any[]>([]);
+  const [unidadesTematicas, setUnidadesTematicas] = useState<string[]>([]);
 
   const [formData, setFormData] = useState({
     unidadeTematica: "",
     objetosConhecimento: [] as string[],
     habilidades: [] as string[],
     tempoAula: "1º TEMPO",
-    status: "Ministrado",
+    status: "Ministrado" as 'Ministrado' | 'Pendente' | 'Justificado',
     observacao: ""
   });
 
-  useEffect(() => {
-    async function fetchTurmaAndRegistro() {
-      if (!turmaId) return;
-      try {
-        const docRef = doc(db, 'turmas', turmaId);
-        const snapshot = await getDoc(docRef);
-        if (snapshot.exists()) {
-          setTurma({ id: snapshot.id, ...snapshot.data() } as Turma);
-        }
-
-        // Buscar registro existente para esta data/turma/componente
-        // Check infantil via serie/classificacao fields first, then fall back to nome
-        const turmaData = snapshot.data();
-        const turmaSerieFld = turmaData?.serie || turmaData?.classificacao || turmaData?.ano || "";
-        const isInfTurma = snapshot.exists() && (
-          SERIES_INFANTIL.some(s => turmaSerieFld?.toUpperCase().includes(s.toUpperCase())) ||
-          SERIES_INFANTIL.some(s => turmaData?.nome?.toUpperCase().includes(s.toUpperCase()))
-        );
-        if ((componente || isInfTurma) && dataParams) {
-          let q;
-          if (isInfTurma) {
-            q = query(
-              collection(db, 'registros_aulas'),
-              where('turma_id', '==', turmaId),
-              where('data', '==', dataParams)
-            );
-          } else {
-            q = query(
-              collection(db, 'registros_aulas'),
-              where('turma_id', '==', turmaId),
-              where('componente', '==', componente),
-              where('data', '==', dataParams)
-            );
-          }
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            const existingDoc = snap.docs[0];
-            const data = existingDoc.data() as RegistroAulaData;
-            setEditingId(existingDoc.id);
-            setFormData({
-              unidadeTematica: data.unidadeTematica || "",
-              objetosConhecimento: data.objetosConhecimento || [],
-              habilidades: data.habilidades || [],
-              tempoAula: data.tempoAula || "1º TEMPO",
-              status: data.status || "Ministrado",
-              observacao: data.observacao || ""
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Erro ao buscar dados:", error);
-      } finally {
-        setLoading(false);
-      }
+  async function loadData() {
+    if (!turmaId || !escolaAtivaId) {
+      setLoading(false);
+      return;
     }
-    fetchTurmaAndRegistro();
+    setLoading(true);
+    try {
+      if (navigator.onLine) {
+        try {
+          const tData = await turmaRepo.getById(turmaId);
+          if (tData) {
+            await Promise.all([
+              planejamentoRepo.seedBaseCurricular(tData.serie || '', componente || ''),
+              planejamentoRepo.seedRegistros(turmaId, componente || '')
+            ]);
+          }
+        } catch (e) {
+          console.warn("[BNCC] Erro ao carregar base online", e);
+        }
+      }
+
+      const turmaData = await turmaRepo.getById(turmaId);
+      setTurma(turmaData || null);
+
+      if (!turmaData) {
+        return;
+      }
+
+      const registrosData = await planejamentoRepo.getRegistrosByTurma(turmaId, componente || '');
+      setRegistrosIniciais(registrosData);
+
+      const baseCurricularData = await planejamentoRepo.getBaseCurricularLocal(turmaData.serie || '', componente || '');
+      setBaseCurricular(baseCurricularData);
+
+      const isInfantilSerie = ["Crianças", "Bebês", "Infantil"].some(nome => turmaData.nome.includes(nome));
+      if (!isInfantilSerie) {
+        const unidades = Array.from(new Set(baseCurricularData.map(item => item.unidadeTematica).filter(Boolean))) as string[];
+        setUnidadesTematicas(unidades);
+      }
+
+      if (dataParams) {
+        const existing = registrosData.find(r => r.data === dataParams);
+        if (existing) {
+          setEditingId(existing.id);
+          setFormData({
+            unidadeTematica: existing.unidadeTematica || "",
+            objetosConhecimento: existing.objetosConhecimento || [],
+            habilidades: existing.habilidades || [],
+            tempoAula: existing.tempoAula || "1º TEMPO",
+            status: existing.status || "Ministrado",
+            observacao: existing.observacao || ""
+          });
+        }
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadData();
   }, [turmaId, componente, dataParams]);
-
-  useEffect(() => {
-    // Guard: turma is null on first render
-    if (!turma) return;
-
-    // Check if this is an Early Childhood class using the turma's serie field OR nome
-    const turmaSerieField = turma.serie || turma.classificacao || turma.ano || "";
-    const isInfantilFromField = SERIES_INFANTIL.some(s =>
-      turmaSerieField.toUpperCase() === s.toUpperCase() ||
-      turmaSerieField.toUpperCase().includes(s.toUpperCase())
-    );
-    const isInfantilFromNome = SERIES_INFANTIL.some(s => turma.nome.toUpperCase().includes(s.toUpperCase()));
-    const isInfantil = isInfantilFromField || isInfantilFromNome;
-    
-    if (!componente && !isInfantil) return;
-
-    async function fetchBaseCurricular() {
-      setLoadingBase(true);
-      try {
-        // Extract the series: prefer turma.serie or turma.classificacao fields,
-        // then try matching turma.nome against SERIES_INFANTIL,
-        // finally fall back to regex for year-based grades
-        const turmaSerieField = turma.serie || turma.classificacao || turma.ano || "";
-        
-        // Check if this turma is Early Childhood via the explicit serie field
-        const infantilMatchFromField = SERIES_INFANTIL.find(s =>
-          turmaSerieField.toUpperCase() === s.toUpperCase() ||
-          turmaSerieField.toUpperCase().includes(s.toUpperCase())
-        );
-        
-        // Fallback: check via turma.nome
-        const infantilMatchFromNome = SERIES_INFANTIL.find(s => turma.nome.toUpperCase().includes(s.toUpperCase()));
-        
-        const resolvedInfantilMatch = infantilMatchFromField || infantilMatchFromNome;
-
-        let serie = "";
-        if (resolvedInfantilMatch) {
-          serie = resolvedInfantilMatch;
-        } else if (turmaSerieField) {
-          // Use the turma's serie field directly for non-infantil grades
-          const yearMatch = turmaSerieField.match(/\d+/);
-          if (yearMatch) {
-            serie = `${yearMatch[0]}º ANO`;
-          } else {
-            serie = turmaSerieField.toUpperCase();
-          }
-        } else {
-          const serieMatch = turma.nome.match(/(\d+)º?\s?ANO/i);
-          serie = serieMatch ? `${serieMatch[1]}º ANO` : "";
-        }
-
-        const effectiveInfantilMatch = resolvedInfantilMatch;
-
-        if (!serie) {
-          setLoadingBase(false);
-          return;
-        }
-
-        let q;
-        if (effectiveInfantilMatch) {
-          q = query(
-            collection(db, "base_curricular"),
-            where("serie", "array-contains", serie)
-          );
-        } else {
-          q = query(
-            collection(db, "base_curricular"),
-            where("serie", "array-contains", serie),
-            where("componente", "==", componente)
-          );
-        }
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as BaseCurricularData) }));
-        setBaseCurricular(data);
-      } catch (error) {
-        console.error("Erro ao buscar base curricular:", error);
-      } finally {
-        setLoadingBase(false);
-      }
-    }
-
-    fetchBaseCurricular();
-  }, [turma, componente]);
 
   const turmaSerie = turma ? (turma.serie || turma.classificacao || turma.ano || turma.nome) : "";
   const isInfantil = SERIES_INFANTIL.some(s => turmaSerie.toUpperCase().includes(s.toUpperCase()));
 
   const unidadesDinamicas = Array.from(new Set(baseCurricular.map(b => b.unidadeTematica || b.campoAtuacao))).filter(Boolean) as string[];
-  
+
   const objetosDinamicos = Array.from(new Set(
     baseCurricular
       .filter(b => isInfantil || !formData.unidadeTematica || (b.unidadeTematica === formData.unidadeTematica || b.campoAtuacao === formData.unidadeTematica))
@@ -241,60 +169,44 @@ export default function RegistroObjetoConhecimento() {
       (formData.objetosConhecimento.length === 0 || (b.objetos || []).some((obj: { nome: string }) => formData.objetosConhecimento.includes(obj.nome)))
     )
     .flatMap(b => {
-      // Filtrar apenas as habilidades dos objetos selecionados
       const relevantObjects = (b.objetos || []).filter((obj: { nome: string }) => 
         formData.objetosConhecimento.length === 0 || formData.objetosConhecimento.includes(obj.nome)
       );
       return relevantObjects.flatMap((obj: { habilidades?: { code: string; description: string }[] }) => obj.habilidades || []);
     }) as { code: string, description: string }[];
 
-  // Helper for unique skills by code
   const uniqueHabilidades = Array.from(new Map(habilidadesDinamicas.map(h => [h.code, h])).values());
 
   const handleSave = async () => {
-    const isInfantil = turma ? SERIES_INFANTIL.some(s => turma.nome.toUpperCase().includes(s.toUpperCase())) : false;
     if (!turmaId || (!componente && !isInfantil) || !dataParams) return;
     
     if (!isInfantil && (!formData.unidadeTematica || formData.objetosConhecimento.length === 0)) {
-      toast.error("Por favor, preencha Unidade Temática e pelo menos um Objeto de Conhecimento.");
-      return;
-    }
-    if (isInfantil && formData.objetosConhecimento.length === 0) {
-      toast.error("Por favor, selecione pelo menos um Objeto de Conhecimento.");
       return;
     }
 
-    setSaving(true);
     try {
-      const payload: any = {
-        turma_id: turmaId,
-        data: dataParams,
+      setSaving(true);
+      const dataToSave = {
         ...formData,
-        updated_at: Timestamp.now()
+        id: editingId || `${turmaId}-${dataParams}-${componente}`,
+        escola_id: escolaAtivaId,
+        turma_id: turmaId,
+        componente: componente,
+        data: dataParams,
+        timestamp: new Date().toISOString()
       };
-      
-      if (componente) {
-        payload.componente = componente;
-      }
 
-      if (editingId) {
-        await updateDoc(doc(db, "registros_aulas", editingId), payload);
-      } else {
-        await addDoc(collection(db, "registros_aulas"), {
-          ...payload,
-          created_at: Timestamp.now()
-        });
-      }
-      
-      toast.success(editingId ? "Registro atualizado!" : "Registro salvo com sucesso!");
+      await planejamentoRepo.save(dataToSave);
+
+      toast.success("Registro de aula salvo offline!");
       await logActivity(editingId
         ? `atualizou o plano de aula de "${componente || 'Educação Infantil'}" na turma "${turma?.nome}" para o dia ${dataParams}.`
         : `registrou plano de aula de "${componente || 'Educação Infantil'}" na turma "${turma?.nome}" para o dia ${dataParams}.`
       );
       navigate(-1);
     } catch (error) {
-      console.error("Erro ao salvar:", error);
-      toast.error("Erro ao salvar o registro.");
+      toast.error("Erro ao salvar offline");
+      console.error(error);
     } finally {
       setSaving(false);
     }
@@ -307,14 +219,9 @@ export default function RegistroObjetoConhecimento() {
         ? prev.objetosConhecimento.filter(o => o !== objeto)
         : [...prev.objetosConhecimento, objeto];
       
-      // If we remove an object, we might need to filter out skills that no longer belong to any selected object
-      // But for simplicity and flexibility, we usually keep them or let the user decide.
-      // However, usually it's better to clear skills if they don't apply anymore or just let them stay.
-      // Let's just update the objects for now to follow the user request style.
       return {
         ...prev,
         objetosConhecimento: newObjetos,
-        // Optional: clear skills that are no longer valid? Might be annoying.
       };
     });
   };
@@ -543,14 +450,15 @@ export default function RegistroObjetoConhecimento() {
                 <label className="text-sm font-medium">Status</label>
                 <Select
                   value={formData.status}
-                  onValueChange={(v) => setFormData(f => ({ ...f, status: v }))}
+                  onValueChange={(v) => setFormData(f => ({ ...f, status: v as 'Ministrado' | 'Pendente' | 'Justificado' }))}
                 >
                   <SelectTrigger className="bg-slate-50/50">
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Ministrado">Ministrado</SelectItem>
-                    <SelectItem value="Não Ministrado">Não Ministrado</SelectItem>
+                    <SelectItem value="Pendente">Pendente</SelectItem>
+                    <SelectItem value="Justificado">Justificado</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

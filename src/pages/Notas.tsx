@@ -136,7 +136,7 @@ export default function Notas() {
 
         // if ano is missing, persist current year
         if (data.ano == null) {
-          updateDoc(doc(db, 'notas', docSnap.id), { ano: currentYear }).catch(console.error);
+          updateDoc(doc(db, 'notas', docSnap.id), { ano: currentYear, escola_ids: [escolaAtivaId] }).catch(console.error);
           data.ano = currentYear;
         }
 
@@ -241,6 +241,7 @@ export default function Notas() {
               media_anual: media,
               situacao: situacao,
               ano: currentYear,
+              escola_ids: [escolaAtivaId],
             });
           } else if (temNotaLancada) {
             await addDoc(collection(db, 'notas'), {
@@ -248,6 +249,7 @@ export default function Notas() {
               estudante_id: estudanteId,
               turma_id: turmaId!,
               escola_id: escolaAtivaId,
+              escola_ids: [escolaAtivaId],
               componente: componente,
               media_anual: media,
               situacao: situacao,
@@ -440,7 +442,7 @@ export default function Notas() {
                 if (!window.confirm('Tem certeza de que deseja apagar **todas** as notas? Esta ação não pode ser desfeita.')) return;
                 setClearing(true);
                 try {
-                  const snapshot = await getDocs(collection(db, 'notas'));
+                  const snapshot = await getDocs(query(collection(db, 'notas'), where('escola_id', '==', escolaAtivaId)));
                   await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, 'notas', d.id))));
                   toast.success('Todas as notas foram excluídas.');
                   loadData();

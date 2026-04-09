@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Loader2, Calendar, Save, Wand2 } from 'lucide-react';
 import { collection, query, where, getDocs, addDoc, writeBatch } from 'firebase/firestore';
 import { useTranslation } from 'react-i18next';
+import { useUserRole } from '@/hooks/useUserRole';
 
 interface ComponenteCurricular {
     nome: string;
@@ -32,6 +33,7 @@ interface TimeTableGeneratorDialogProps {
 
 export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess }: TimeTableGeneratorDialogProps) {
     const { t } = useTranslation();
+    const { escolaAtivaId } = useUserRole();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [componentes, setComponentes] = useState<ComponenteCurricular[]>([]);
@@ -181,7 +183,9 @@ export function TimeTableGeneratorDialog({ open, onOpenChange, turma, onSuccess 
                             dia,
                             inicio: tempo.inicio,
                             fim: tempo.fim,
-                            componente: compNome
+                            componente: compNome,
+                            escola_id: escolaAtivaId,
+                            escola_ids: [escolaAtivaId]
                         });
                     }
                 }

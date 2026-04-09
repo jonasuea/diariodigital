@@ -199,6 +199,8 @@ export default function Horario() {
       inicio: formData.inicio,
       fim: formData.fim,
       componente: formData.componente,
+      escola_id: escolaAtivaId,
+      escola_ids: [escolaAtivaId],
     };
 
     try {

@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAutoUpdate } from '@/hooks/useAutoUpdate';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelector } from '@/components/LanguageSelector';
+import { SyncStatus } from '@/components/SyncStatus';
 
 interface AppHeaderProps {
   title?: string;
@@ -246,7 +247,7 @@ export function AppHeader({ title }: AppHeaderProps) {
                   onValueChange={(val) => {
                     setEscolaAtivaId(val);
                     sessionStorage.setItem('escolaAtivaId', val);
-                    window.location.reload(); // Força recarregamento contextual
+                    window.location.href = '/painel';
                   }}
                 >
                   <SelectTrigger className="h-9">
@@ -288,7 +289,7 @@ export function AppHeader({ title }: AppHeaderProps) {
                           onClick={() => {
                             setEscolaAtivaId(esc.id);
                             sessionStorage.setItem('escolaAtivaId', esc.id);
-                            window.location.reload();
+                            window.location.href = '/painel';
                           }}
                         >
                           <School className="mr-2 h-4 w-4" />
@@ -368,6 +369,10 @@ export function AppHeader({ title }: AppHeaderProps) {
           </Button>
 
           {/* Language Selector */}
+          <div className="hidden sm:flex items-center px-2 border-r border-gray-200 mr-2">
+            <SyncStatus />
+          </div>
+
           <div className="hidden sm:flex items-center px-2">
             <LanguageSelector />
           </div>

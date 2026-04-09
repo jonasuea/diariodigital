@@ -105,7 +105,7 @@ export default function DiarioDigital() {
     if (isGestor && escolaAtivaId) {
       async function fetchProfessores() {
         try {
-          const profQuery = query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId), where('ativo', '==', true), orderBy('nome'));
+          const profQuery = query(collection(db, 'professores'), where('escola_ids', 'array-contains', escolaAtivaId), where('ativo', '==', true), orderBy('nome'));
           const profSnapshot = await getDocs(profQuery);
           setProfessores(profSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professor)));
         } catch (error) {
@@ -126,11 +126,6 @@ export default function DiarioDigital() {
       setLoading(false);
       return;
     }
-
-    // Limpa seleções ao trocar de escola
-    setSelectedTurmaId('');
-    setSelectedComponente('');
-    setComponentes([]);
 
     async function fetchTurmas() {
       setLoading(true);
@@ -157,6 +152,13 @@ export default function DiarioDigital() {
           .sort((a, b) => a.nome.localeCompare(b.nome));
 
         setTurmas(turmasData);
+
+        // Se a turma restaurada ou selecionada não existe na lista desta escola, limpa a seleção
+        if (selectedTurmaId && !turmasData.some(t => t.id === selectedTurmaId) && !isRestoring) {
+          setSelectedTurmaId('');
+          setSelectedComponente('');
+          setComponentes([]);
+        }
       } catch (error) {
         toast.error("Sem permissão para carregar as turmas.");
         console.error(error);

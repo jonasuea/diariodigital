@@ -1,0 +1,151 @@
+﻿
+> diario-digital@0.0.0 build
+> vite build
+
+[36mvite v5.4.19 [32mbuilding for production...[36m[39m
+transforming...
+[32mÔ£ô[39m 3875 modules transformed.
+rendering chunks...
+node.exe : 
+[1m[33m[plugin:vite:reporter][39m[22m 
+[33m[plugin vite:reporter] 
+No linha:1 caractere:1
++ & "C:\Program Files\nodejs/node.exe" 
+"C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: 
+([1m    [33m[plugi...vite:reporter] :String) 
+[], Rem    oteException
+    + FullyQualifiedErrorId : 
+NativeCommandError
+ 
+(!) E:/Projetos_App/diariodigital/node_modules/
+firebase/auth/dist/esm/index.esm.js is 
+dynamically imported by E:/Projetos_App/diariod
+igital/src/pages/Configuracoes.tsx but also 
+statically imported by E:/Projetos_App/diariodi
+gital/src/components/TwoFactorSetupDialog.tsx, 
+E:/Projetos_App/diariodigital/src/contexts/Auth
+Context.tsx, E:/Projetos_App/diariodigital/src/
+lib/firebase.ts, E:/Projetos_App/diariodigital/
+src/pages/Configuracoes.tsx, dynamic import 
+will not move module into another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m 
+[33m[plugin vite:reporter] 
+(!) E:/Projetos_App/diariodigital/node_modules/
+firebase/firestore/dist/esm/index.esm.js is 
+dynamically imported by E:/Projetos_App/diariod
+igital/src/pages/Mensagens.tsx, E:/Projetos_App
+/diariodigital/src/pages/Mensagens.tsx but 
+also statically imported by E:/Projetos_App/dia
+riodigital/src/components/MessagePopup.tsx, E:/
+Projetos_App/diariodigital/src/components/horar
+ios/TimeTableGeneratorDialog.tsx, E:/Projetos_A
+pp/diariodigital/src/components/layout/AppHeade
+r.tsx, E:/Projetos_App/diariodigital/src/compon
+ents/manual/ManualScreenshot.tsx, E:/Projetos_A
+pp/diariodigital/src/contexts/AuthContext.tsx, 
+E:/Projetos_App/diariodigital/src/hooks/useSyst
+emConfig.ts, E:/Projetos_App/diariodigital/src/
+hooks/useUserRole.tsx, E:/Projetos_App/diariodi
+gital/src/lib/firebase.ts, E:/Projetos_App/diar
+iodigital/src/lib/logger.ts, E:/Projetos_App/di
+ariodigital/src/pages/AtaFinal.tsx, E:/Projetos
+_App/diariodigital/src/pages/Calendario.tsx, E:
+/Projetos_App/diariodigital/src/pages/Calendari
+oAvaliacaoInfantil.tsx, E:/Projetos_App/diariod
+igital/src/pages/Configuracoes.tsx, E:/Projetos
+_App/diariodigital/src/pages/CriarAvaliacao.tsx
+, E:/Projetos_App/diariodigital/src/pages/Criar
+AvaliacaoIA.tsx, E:/Projetos_App/diariodigital/
+src/pages/DiarioDigital.tsx, E:/Projetos_App/di
+ariodigital/src/pages/Horario.tsx, E:/Projetos_
+App/diariodigital/src/pages/Mensagens.tsx, E:/P
+rojetos_App/diariodigital/src/pages/Notas.tsx, 
+E:/Projetos_App/diariodigital/src/pages/NotasPa
+rciais.tsx, E:/Projetos_App/diariodigital/src/p
+ages/ObjetosDeConhecimento.tsx, E:/Projetos_App
+/diariodigital/src/pages/Painel.tsx, E:/Projeto
+s_App/diariodigital/src/pages/PerfilEstudante.t
+sx, E:/Projetos_App/diariodigital/src/pages/Per
+filMembro.tsx, E:/Projetos_App/diariodigital/sr
+c/pages/PerfilProfessor.tsx, E:/Projetos_App/di
+ariodigital/src/pages/Turmas.tsx, E:/Projetos_A
+pp/diariodigital/src/repositories/AvaliacaoRepo
+sitory.ts, E:/Projetos_App/diariodigital/src/re
+positories/CadastrosRepository.ts, E:/Projetos_
+App/diariodigital/src/repositories/FrequenciaRe
+pository.ts, E:/Projetos_App/diariodigital/src/
+repositories/PlanejamentoRepository.ts, E:/Proj
+etos_App/diariodigital/src/services/SyncService
+.ts, dynamic import will not move module into 
+another chunk.
+[39m
+[1m[33m[plugin:vite:reporter][39m[22m 
+[33m[plugin vite:reporter] 
+(!) E:/Projetos_App/diariodigital/node_modules/
+firebase/app/dist/esm/index.esm.js is 
+dynamically imported by E:/Projetos_App/diariod
+igital/src/pages/Configuracoes.tsx but also 
+statically imported by E:/Projetos_App/diariodi
+gital/src/lib/firebase.ts, dynamic import will 
+not move module into another chunk.
+[39m
+computing gzip size...
+[2mdist/[22m[32mregisterSW.js                       [39m[1m[2m    0.13 kB[22m[1m[22m
+[2mdist/[22m[32mmanifest.webmanifest                [39m[1m[2m    0.45 kB[22m[1m[22m
+[2mdist/[22m[32mindex.html                          [39m[1m[2m    1.28 kB[22m[1m[22m[2m Ôöé gzip:   0.50 kB[22m
+[2mdist/[22m[35massets/index-DFDyE-sO.css           [39m[1m[2m  102.99 kB[22m[1m[22m[2m Ôöé gzip:  17.87 kB[22m
+[2mdist/[22m[36massets/purify.es-sOfw8HaZ.js        [39m[1m[2m   22.67 kB[22m[1m[22m[2m Ôöé gzip:   8.79 kB[22m
+[2mdist/[22m[36massets/index.es-BqxloO17.js         [39m[1m[2m  150.55 kB[22m[1m[22m[2m Ôöé gzip:  51.51 kB[22m
+[2mdist/[22m[36massets/html2canvas.esm-CBrSDip1.js  [39m[1m[2m  201.42 kB[22m[1m[22m[2m Ôöé gzip:  48.03 kB[22m
+[2mdist/[22m[36massets/index-BQD6pRI1.js            [39m[1m[33m2,656.31 kB[39m[22m[2m Ôöé gzip: 744.52 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after 
+minification. Consider:
+- Using dynamic import() to code-split the 
+application
+- Use build.rollupOptions.output.manualChunks 
+to improve chunking: https://rollupjs.org/confi
+guration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via 
+build.chunkSizeWarningLimit.[39m
+[32mÔ£ô built in 10.34s[39m
+[31merror during build:
+Error: 
+  Configure 
+"workbox.maximumFileSizeToCacheInBytes" to 
+change the limit: the default value is 2 MiB.
+  Check https://vite-pwa-org.netlify.app/guide/
+faq.html#missing-assets-from-sw-precache-manife
+st for more information.
+  Assets exceeding the limit:
+  - assets/index-BQD6pRI1.js is 2.66 MB, and 
+won't be precached.
+
+    at logWorkboxResult (file:///E:/Projetos_Ap
+p/diariodigital/node_modules/vite-plugin-pwa/di
+st/chunk-G4TAN34B.js:44:13)
+    at generateServiceWorker (file:///E:/Projet
+os_App/diariodigital/node_modules/vite-plugin-p
+wa/dist/index.js:209:3)
+    at async _generateSW (file:///E:/Projetos_A
+pp/diariodigital/node_modules/vite-plugin-pwa/d
+ist/index.js:234:5)
+    at async Object.handler (file:///E:/Projeto
+s_App/diariodigital/node_modules/vite-plugin-pw
+a/dist/index.js:427:13)
+    at async PluginDriver.hookParallel (file://
+/E:/Projetos_App/diariodigital/node_modules/rol
+lup/dist/es/shared/node-entry.js:20652:17)
+    at async Object.close (file:///E:/Projetos_
+App/diariodigital/node_modules/rollup/dist/es/s
+hared/node-entry.js:21627:13)
+    at async build (file:///E:/Projetos_App/dia
+riodigital/node_modules/vite/dist/node/chunks/d
+ep-C6uTJdX2.js:65716:17)
+    at async CAC.<anonymous> (file:///E:/Projet
+os_App/diariodigital/node_modules/vite/dist/nod
+e/cli.js:829:5)[39m

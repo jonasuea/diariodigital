@@ -3,8 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, useNavigate } from "react-router-dom";
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { turmaRepo, eventosRepo, diasLetivosRepo } from '@/repositories/CadastrosRepository';
+import { avaliacaoRepo } from '@/repositories/AvaliacaoRepository';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Calendar as CalendarIcon, ClipboardList } from 'lucide-react';
 import { Calendar } from "@/components/ui/calendar";
@@ -20,7 +20,7 @@ interface Turma {
 interface Evento {
   id: string;
   titulo: string;
-  data: Timestamp;
+  data: string | { toDate: () => Date };
 }
 
 interface Avaliacao {
@@ -52,57 +52,41 @@ export default function Avaliacoes() {
       setLoading(true);
 
       try {
-        // Fetch Turma
-        const turmaDocRef = doc(db, 'turmas', turmaId);
-        const turmaDoc = await getDoc(turmaDocRef);
-        if (turmaDoc.exists()) {
-          setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
+        // 1. Seed online
+        if (navigator.onLine) {
+          try {
+            await Promise.all([
+              turmaRepo.seed(escolaAtivaId),
+              avaliacaoRepo.seedAvaliacoes(turmaId, escolaAtivaId),
+              eventosRepo.seed(escolaAtivaId),
+              diasLetivosRepo.seed(escolaAtivaId)
+            ]);
+          } catch (e) {
+            console.warn("[Avaliacoes] Erro ao sincronizar", e);
+          }
         }
 
-        // Fetch Eventos
-        const qEventos = query(
-          collection(db, 'eventos'),
-          where('escola_id', '==', escolaAtivaId),
-          orderBy('data', 'asc')
-        );
-        const queryEvents = await getDocs(qEventos);
-        const eventosData = queryEvents.docs.map(doc => {
-          const data = doc.data();
-          if (data.data && typeof data.data === 'string') {
-            data.data = Timestamp.fromDate(parseISO(data.data));
-          }
-          return { id: doc.id, ...data } as Evento;
-        });
-        setEventos(eventosData);
+        // Fetch local
+        const [turmaData, queryEvents, queryDias, queryAval] = await Promise.all([
+          turmaRepo.getById(turmaId),
+          eventosRepo.getByEscola(escolaAtivaId),
+          diasLetivosRepo.getByEscola(escolaAtivaId),
+          avaliacaoRepo.getAvaliacoesByTurma(turmaId, componente)
+        ]);
+        
+        setTurma(turmaData);
 
-        // Fetch Dias Letivos
-        const qDias = query(
-          collection(db, 'dias_letivos'),
-          where('escola_id', '==', escolaAtivaId)
-        );
-        const queryDias = await getDocs(qDias);
-        const dias = new Set<string>();
-        queryDias.forEach(doc => {
-          dias.add(doc.data().data);
-        });
-        setDiasLetivos(dias);
+        setEventos(queryEvents.map(e => ({
+          ...e,
+          data: typeof e.data === 'string' ? { toDate: () => parseISO(e.data) } : e.data
+        } as any)));
 
-        // Fetch Avaliacoes
-        const qAvaliacoes = query(
-          collection(db, 'avaliacoes'),
-          where('turma_id', '==', turmaId),
-          where('componente', '==', componente)
-        );
-        const queryAvaliacoes = await getDocs(qAvaliacoes);
-        const avalDates = new Set<string>();
-        queryAvaliacoes.forEach(doc => {
-          avalDates.add(doc.data().data);
-        });
-        setAvaliacoesDates(avalDates);
+        setDiasLetivos(new Set(queryDias.map(d => d.data)));
+        setAvaliacoesDates(new Set(queryAval.map(a => a.data)));
 
       } catch (error) {
         console.error("Error fetching data: ", error);
-        toast.error("Erro ao carregar os dados das avaliações.");
+        toast.error("Erro ao carregar os dados offline.");
       } finally {
         setLoading(false);
       }
@@ -111,9 +95,19 @@ export default function Avaliacoes() {
     fetchData();
   }, [turmaId, componente, escolaAtivaId]);
 
-  const eventDates = eventos.map(e => e.data.toDate());
-  const diasLetivosDates = Array.from(diasLetivos).map(d => parseISO(d));
-  const hasAvaliacaoDates = Array.from(avaliacoesDates).map(d => parseISO(d));
+  const eventDates = eventos.map(e => {
+    if (typeof e.data === 'string') return parseISO(e.data);
+    if (e.data && typeof e.data.toDate === 'function') return e.data.toDate();
+    return new Date();
+  });
+  const diasLetivosDates = Array.from(diasLetivos).map(d => {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  });
+  const hasAvaliacaoDates = Array.from(avaliacoesDates).map(d => {
+    const [year, month, day] = d.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  });
 
   return (
     <AppLayout>
@@ -178,6 +172,11 @@ export default function Avaliacoes() {
                       hasAvaliacao: 'day-avaliacao'
                     }}
                     modifiersStyles={{
+                      isLetivo: { 
+                        backgroundColor: '#dcfce7', 
+                        color: '#166534',
+                        borderRadius: '50%'
+                      },
                       hasEvent: {
                         fontWeight: 'bold',
                         textDecoration: 'underline',

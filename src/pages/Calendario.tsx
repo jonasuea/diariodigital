@@ -178,6 +178,7 @@ export default function Calendario() {
         // Adicionar dia letivo
         await addDoc(collection(db, 'dias_letivos'), {
           escola_id: escolaAtivaId,
+          escola_ids: [escolaAtivaId],
           data: dateStr,
           criado_em: new Date(),
           criado_por: 'sistema' // Idealmente o ID do utilizador
@@ -206,6 +207,7 @@ export default function Calendario() {
       hora_fim: formData.hora_fim,
       local: formData.local || null,
       escola_id: escolaAtivaId,
+      escola_ids: [escolaAtivaId],
       criado_por_id: user?.uid || null,
       criado_por_role: role || null,
     };

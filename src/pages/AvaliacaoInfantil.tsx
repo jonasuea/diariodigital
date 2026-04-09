@@ -7,8 +7,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Save, User, ChevronRight, Loader2 } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { localDb } from '@/lib/db';
+import { turmaRepo, estudanteRepo } from '@/repositories/CadastrosRepository';
+import { avaliacaoRepo } from '@/repositories/AvaliacaoRepository';
 import { toast } from 'sonner';
 import { logActivity } from '@/lib/logger';
 import { useAuth } from '@/contexts/AuthContext';
@@ -215,78 +216,69 @@ export default function AvaliacaoInfantil() {
   const [saving, setSaving] = useState(false);
   const [searchParams] = useSearchParams();
   const selectedDate = searchParams.get('data');
+  const escolaAtivaId = localStorage.getItem('escolaAtivaId') || '';
   const [avaliacao, setAvaliacao] = useState<AvaliacaoData>({ criterios: {}, observacoes: {} });
 
-  // Carrega turma e estudantes
+  async function loadData() {
+    if (!turmaId || !escolaAtivaId) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      // 1. Tenta baixar dados novos se online (Pre-fetch/Seed)
+      if (navigator.onLine) {
+        try {
+          await Promise.all([
+            turmaRepo.seed(escolaAtivaId),
+            estudanteRepo.seed(turmaId, escolaAtivaId),
+            avaliacaoRepo.seedAvaliacoes(turmaId, escolaAtivaId)
+          ]);
+        } catch (e) {
+          console.warn("[Infantil] Erro ao carregar avaliações online", e);
+        }
+      }
+
+      // 2. Carrega localmente (Fonte da Verdade)
+      const [turmaData, estudantesData] = await Promise.all([
+        turmaRepo.getById(turmaId),
+        estudanteRepo.getByTurma(turmaId)
+      ]);
+
+      setTurmaNome(turmaData?.nome || '');
+      setEstudantes(estudantesData);
+
+      // Busca IDs de estudantes que já possuem avaliação para esta data
+      if (selectedDate) {
+        const ids = await avaliacaoRepo.getAvaliadosIdsByData(turmaId, selectedDate);
+        setAvaliadosIds(ids);
+      }
+
+    } catch (error) {
+      toast.error("Erro ao carregar dados offline");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    if (!turmaId) return;
     if (!selectedDate) {
       navigate(`/diario-digital/avaliacao-infantil/${turmaId}/calendario`);
       return;
     }
-    (async () => {
-      setLoading(true);
-      try {
-        const turmaDoc = await getDoc(doc(db, 'turmas', turmaId));
-        if (turmaDoc.exists()) setTurmaNome(turmaDoc.data().nome || '');
-
-        const q = query(
-          collection(db, 'estudantes'),
-          where('turma_id', '==', turmaId),
-          where('excluido', '==', false),
-          orderBy('nome')
-        );
-        const snap = await getDocs(q);
-        const estudantesData = snap.docs.map(d => ({ id: d.id, ...d.data() } as Estudante));
-        setEstudantes(estudantesData);
-
-        // Busca quais estudantes já têm avaliação salva para ESTA DATA
-        const avalIds = new Set<string>();
-        await Promise.all(
-          estudantesData.map(async est => {
-            // Tenta data específica primeiro
-            const docIdDate = `${turmaId}_${est.id}_${selectedDate}`;
-            const avalSnapDate = await getDoc(doc(db, 'avaliacoes_infantil', docIdDate));
-            if (avalSnapDate.exists()) {
-              avalIds.add(est.id);
-            } else {
-              // Fallback para o ano (legado)
-              const anoAtual = new Date().getFullYear();
-              const docIdYear = `${turmaId}_${est.id}_${anoAtual}`;
-              const avalSnapYear = await getDoc(doc(db, 'avaliacoes_infantil', docIdYear));
-              if (avalSnapYear.exists()) avalIds.add(est.id);
-            }
-          })
-        );
-        setAvaliadosIds(avalIds);
-      } catch (err) {
-        console.error(err);
-        toast.error('Erro ao carregar estudantes.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [turmaId]);
+    loadData();
+  }, [turmaId, selectedDate]);
 
   // Carrega avaliação existente ao selecionar estudante
   async function handleSelectEstudante(est: Estudante) {
     setSelectedEstudante(est);
     setAvaliacao({ criterios: {}, observacoes: {} });
     if (!turmaId || !selectedDate) return;
+    
     try {
-      // Tenta carregar da data específica
-      const docIdDate = `${turmaId}_${est.id}_${selectedDate}`;
-      let snap = await getDoc(doc(db, 'avaliacoes_infantil', docIdDate));
-      
-      // Fallback para ano (legado) se não encontrar na data
-      if (!snap.exists()) {
-        const anoAtual = new Date().getFullYear();
-        const docIdYear = `${turmaId}_${est.id}_${anoAtual}`;
-        snap = await getDoc(doc(db, 'avaliacoes_infantil', docIdYear));
-      }
-
-      if (snap.exists()) {
-        const data = snap.data();
+      const data = await avaliacaoRepo.getAvaliacaoInfantil(turmaId, est.id, selectedDate);
+      if (data) {
         setAvaliacao({
           criterios: data.criterios || {},
           observacoes: data.observacoes || {},
@@ -306,24 +298,24 @@ export default function AvaliacaoInfantil() {
   }
 
   async function handleSave() {
-    if (!selectedEstudante || !turmaId || !user) return;
-    setSaving(true);
+    if (!selectedEstudante || !turmaId || !user || !selectedDate) return;
+    
     try {
-      const docId = `${turmaId}_${selectedEstudante.id}_${selectedDate}`;
-      const dataParsed = selectedDate ? parseISO(selectedDate) : new Date();
-      const ano = isValid(dataParsed) ? dataParsed.getFullYear() : new Date().getFullYear();
-
-      await setDoc(doc(db, 'avaliacoes_infantil', docId), {
+      setSaving(true);
+      const dataToSave = {
+        id: `${turmaId}_${selectedEstudante.id}_${selectedDate}`,
         turma_id: turmaId,
         estudante_id: selectedEstudante.id,
         estudante_nome: selectedEstudante.nome,
-        ano: ano,
         data_avaliacao: selectedDate,
         criterios: avaliacao.criterios,
         observacoes: avaliacao.observacoes,
         atualizado_por: user.email,
-        atualizado_em: serverTimestamp(),
-      }, { merge: true });
+        timestamp: new Date().toISOString()
+      };
+
+      await avaliacaoRepo.saveAvaliacaoInfantil(dataToSave);
+      
       toast.success('Avaliação salva com sucesso!');
       await logActivity(`salvou a avaliação infantil de "${selectedEstudante.nome}" na turma "${turmaNome}" para o dia ${selectedDate}.`);
       setAvaliadosIds(prev => new Set(prev).add(selectedEstudante.id));
