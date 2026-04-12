@@ -120,11 +120,9 @@ export default function Frequencia() {
       const estudantesData = await estudanteRepo.getByTurma(turmaId);
       setEstudantes(estudantesData);
 
-      const diasLetivosData = await localDb.dias_letivos
-        .where('escola_id').equals(escolaAtivaId)
-        .filter(d => d.data >= startDate && d.data <= endDate)
-        .toArray();
-      setDiasLetivos(new Set(diasLetivosData.map(d => d.data)));
+      const queryDias = await diasLetivosRepo.getByEscola(escolaAtivaId);
+      const filteredDias = queryDias.filter((d: any) => d.data >= startDate && d.data <= endDate);
+      setDiasLetivos(new Set(filteredDias.map((d: any) => d.data)));
 
       const isTurmaInfantil = turmaData?.nome ? ["Crianças", "Bebês", "Infantil"].some(nome => turmaData.nome.includes(nome)) : false;
 

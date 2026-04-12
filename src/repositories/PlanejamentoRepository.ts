@@ -15,32 +15,49 @@ export class PlanejamentoRepository extends BaseResilientService<any> {
    */
   async seedBaseCurricular(serie: string, componente?: string) {
     if (!navigator.onLine) return;
+    
+    // Normalização para busca
+    const serieDoc = serie.trim().toUpperCase();
 
-    let q = query(
-      collection(db, "base_curricular"),
-      where("serie", "array-contains", serie.toUpperCase())
-    );
+    try {
+      let q = query(
+        collection(db, "base_curricular"),
+        where("serie", "array-contains", serieDoc)
+      );
 
-    if (componente) {
-      q = query(q, where("componente", "==", componente));
+      if (componente) {
+        q = query(q, where("componente", "==", componente));
+      }
+
+      const snap = await getDocs(q);
+      const records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      if (records.length > 0) {
+        await localDb.base_curricular.bulkPut(records);
+        console.log(`[PlanejamentoRepo] Sincronizados ${records.length} itens de base curricular para ${serieDoc}`);
+      }
+    } catch (error) {
+      console.error(`[PlanejamentoRepo] Erro ao sincronizar base curricular:`, error);
     }
-
-    const snap = await getDocs(q);
-    const records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    await localDb.base_curricular.bulkPut(records);
   }
 
   /**
    * Busca a base curricular do cache local
    */
   async getBaseCurricularLocal(serie: string, componente?: string) {
-    let collection = localDb.base_curricular.where('serie').equals(serie.toUpperCase());
+    const serieDoc = serie.trim().toUpperCase();
     
-    if (componente) {
-      return await collection.and(item => item.componente === componente).toArray();
-    }
+    // Busca por todas as entradas onde a série está no array
+    let results = await localDb.base_curricular
+      .filter(item => {
+        const itemSeries = Array.isArray(item.serie) ? item.serie : [item.serie];
+        const matchSerie = itemSeries.some((s: string) => s.toUpperCase() === serieDoc);
+        const matchComponente = componente ? item.componente === componente : true;
+        return matchSerie && matchComponente;
+      })
+      .toArray();
     
-    return await collection.toArray();
+    return results;
   }
 
   /**

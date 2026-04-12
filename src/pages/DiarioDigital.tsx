@@ -11,6 +11,8 @@ import { collection, query, where, orderBy, getDocs, limit } from 'firebase/fire
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useSyncData } from '@/hooks/useSyncData';
+import { OfflineIndicator } from '@/components/OfflineIndicator';
 
 interface ComponenteCurricular {
   nome: string;
@@ -38,6 +40,9 @@ export default function DiarioDigital() {
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
   const [componentes, setComponentes] = useState<ComponenteCurricular[]>([]);
+
+  // Hook de Sincronização Proativa
+  const { isSyncing, progress, lastSync, startSync } = useSyncData(escolaAtivaId, contextProfessorId, turmas);
 
   const STORAGE_KEY = 'diario_filtros';
 
@@ -247,14 +252,23 @@ export default function DiarioDigital() {
         <p className="text-muted-foreground -mt-2">Gestão pedagógica completa</p>
 
         <Card className="overflow-hidden border-border/60 shadow-sm">
-          <div className="px-5 py-4 border-b flex items-center gap-2.5 bg-muted/30">
-            <Filter className="h-4 w-4 text-primary" />
-            <h3 className="font-bold text-sm text-foreground">Filtros do Diário</h3>
-            {selectedTurmaId && (
-              <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                Frequentando
-              </span>
-            )}
+          <div className="px-5 py-4 border-b flex items-center justify-between bg-muted/30">
+            <div className="flex items-center gap-2.5">
+              <Filter className="h-4 w-4 text-primary" />
+              <h3 className="font-bold text-sm text-foreground">Filtros do Diário</h3>
+              {selectedTurmaId && (
+                <span className="ml-2 text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
+                  Frequentando
+                </span>
+              )}
+            </div>
+            
+            <OfflineIndicator 
+              isSyncing={isSyncing} 
+              progress={progress} 
+              lastSync={lastSync} 
+              onSync={() => startSync(true)} 
+            />
           </div>
           <CardContent className="px-5 py-6">
             <div className={`grid grid-cols-1 ${isGestor ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4 md:gap-6`}>

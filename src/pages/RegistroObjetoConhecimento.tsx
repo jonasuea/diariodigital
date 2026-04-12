@@ -15,6 +15,7 @@ import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   Command,
   CommandEmpty,
@@ -63,10 +64,10 @@ const SERIES_INFANTIL = [
 export default function RegistroObjetoConhecimento() {
   const navigate = useNavigate();
   const { turmaId } = useParams<{ turmaId: string }>();
-  const [searchParams] = useSearchParams();
+  const searchParams = useSearchParams()[0];
   const componente = searchParams.get('componente');
   const dataParams = searchParams.get('data');
-  const escolaAtivaId = localStorage.getItem('escolaAtivaId') || '';
+  const { escolaAtivaId, professorId: contextProfessorId } = useUserRole();
 
   const [turma, setTurma] = useState<Turma | null>(null);
   const [loading, setLoading] = useState(true);

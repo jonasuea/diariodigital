@@ -6,11 +6,13 @@ import { useParams, useSearchParams, useNavigate } from "react-router-dom";
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
-import { Loader2, ArrowLeft, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Loader2, ArrowLeft } from 'lucide-react';
 import { Calendar } from "@/components/ui/calendar";
 import { ptBR } from 'date-fns/locale';
-import { format, isSameDay, parseISO } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { useUserRole } from "@/hooks/useUserRole";
+import { eventosRepo, diasLetivosRepo, turmaRepo } from '@/repositories/CadastrosRepository';
+import { planejamentoRepo } from '@/repositories/PlanejamentoRepository';
 
 interface Turma {
   id: string;
@@ -47,59 +49,45 @@ export default function ObjetosDeConhecimento() {
       setLoading(true);
 
       try {
-        // Fetch Turma
-        const turmaDocRef = doc(db, 'turmas', turmaId);
-        const turmaDoc = await getDoc(turmaDocRef);
-        if (turmaDoc.exists()) {
-          setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
+        // 1. Tentar sincronizar online antes de ler do cache (Silent seed)
+        if (navigator.onLine) {
+          await Promise.all([
+            diasLetivosRepo.seed(escolaAtivaId),
+            eventosRepo.seed(escolaAtivaId),
+            planejamentoRepo.seedRegistros(turmaId, componente || '')
+          ]);
         }
 
-        // Fetch Eventos
-        const qEventos = query(
-          collection(db, 'eventos'),
-          where('escola_id', '==', escolaAtivaId),
-          orderBy('data', 'asc')
-        );
-        const queryEvents = await getDocs(qEventos);
-        const eventosData = queryEvents.docs.map(doc => {
-          const data = doc.data();
+        // 2. Fetch Turma do Cache Local
+        const turmaData = await turmaRepo.getById(turmaId);
+        if (turmaData) {
+          setTurma(turmaData);
+        }
+
+        // 3. Fetch Eventos do Cache Local
+        const queryEvents = await eventosRepo.getByEscola(escolaAtivaId);
+        const eventosData = queryEvents.map(data => {
           if (data.data && typeof data.data === 'string') {
             data.data = Timestamp.fromDate(parseISO(data.data));
           }
-          return { id: doc.id, ...data } as Evento;
+          return { id: data.id, ...data } as Evento;
         });
         setEventos(eventosData);
 
-        // Fetch Dias Letivos
-        const qDias = query(
-          collection(db, 'dias_letivos'),
-          where('escola_id', '==', escolaAtivaId)
-        );
-        const queryDias = await getDocs(qDias);
+        // 4. Fetch Dias Letivos do Cache Local
+        const queryDias = await diasLetivosRepo.getByEscola(escolaAtivaId);
         const dias = new Set<string>();
         queryDias.forEach(doc => {
-          dias.add(doc.data().data);
+          dias.add(doc.data);
         });
         setDiasLetivos(dias);
 
-        // Fetch Dias Planejados (registros de aulas)
-        // For Early Childhood (no componente), query only by turma_id
-        const qPlanejados = componente
-          ? query(
-              collection(db, 'registros_aulas'),
-              where('turma_id', '==', turmaId),
-              where('componente', '==', componente)
-            )
-          : query(
-              collection(db, 'registros_aulas'),
-              where('turma_id', '==', turmaId)
-            );
-        const queryPlanejados = await getDocs(qPlanejados);
+        // 5. Fetch Dias Planejados (registros de aulas) do Cache Local
+        const registrosData = await planejamentoRepo.getRegistrosByTurma(turmaId, componente || '');
         const ministrados = new Set<string>();
         const naoMinistrados = new Set<string>();
 
-        queryPlanejados.forEach(doc => {
-          const data = doc.data();
+        registrosData.forEach(data => {
           if (data.status === 'Ministrado') {
             ministrados.add(data.data);
           } else {
