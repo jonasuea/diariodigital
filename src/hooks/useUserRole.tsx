@@ -62,6 +62,16 @@ interface UserRoleContextType {
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined);
 
 const SESSION_ACTIVE_PROFILE_KEY = 'activeProfile';
+const PERMISSIONS_SNAPSHOT_KEY = (uid: string) => `user_permissions_snapshot_${uid}`;
+
+interface PermissionsSnapshot {
+  role: string | null;
+  escolaAtivaId: string | null;
+  permittedEscolas: string[];
+  activeProfile: UserProfile | null;
+  availableProfiles: UserProfile[];
+  isMaster: boolean;
+}
 
 export function UserRoleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
@@ -74,6 +84,51 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [isInMaintenance, setIsInMaintenance] = useState(false);
   const [availableProfiles, setAvailableProfiles] = useState<UserProfile[]>([]);
   const [activeProfile, setActiveProfileState] = useState<UserProfile | null>(null);
+
+  // Auxiliar para carregar snapshot inicial por UID
+  const getInitialSnapshot = (uid: string): PermissionsSnapshot | null => {
+    try {
+      const saved = localStorage.getItem(PERMISSIONS_SNAPSHOT_KEY(uid));
+      return saved ? JSON.parse(saved) : null;
+    } catch (_) { return null; }
+  };
+
+  // Efeito para carregar dados do snapshot assim que o usuário é detectado
+  useEffect(() => {
+    if (user?.uid) {
+      const snapshot = getInitialSnapshot(user.uid);
+      if (snapshot) {
+        if (!role) setRole(snapshot.role);
+        if (!escolaAtivaId) setEscolaAtivaId(snapshot.escolaAtivaId);
+        if (permittedEscolas.length === 0) setPermittedEscolas(snapshot.permittedEscolas);
+        if (!activeProfile) setActiveProfileState(snapshot.activeProfile);
+        if (availableProfiles.length === 0) setAvailableProfiles(snapshot.availableProfiles);
+        setIsMaster(snapshot.isMaster);
+        
+        // Se temos um role no snapshot, podemos parar o loading visual mais cedo se quisermos,
+        // mas é melhor deixar o fetchUserRole terminar para garantir dados frescos.
+        console.log("[useUserRole] Snapshot carregado para o usuário:", user.uid);
+      }
+    }
+  }, [user?.uid]);
+
+  const savePermissionsSnapshot = (data: Partial<PermissionsSnapshot>) => {
+    if (!user?.uid) return;
+    try {
+      const current = getInitialSnapshot(user.uid) || {
+        role: null,
+        escolaAtivaId: null,
+        permittedEscolas: [],
+        activeProfile: null,
+        availableProfiles: [],
+        isMaster: false
+      };
+      const updated = { ...current, ...data };
+      localStorage.setItem(PERMISSIONS_SNAPSHOT_KEY(user.uid), JSON.stringify(updated));
+    } catch (e) {
+      console.error("[useUserRole] Erro ao salvar snapshot de permissões:", e);
+    }
+  };
 
   async function setActiveProfile(profile: UserProfile) {
     setActiveProfileState(profile);
@@ -133,6 +188,13 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         escola_id: profile.escola_id,
       }).catch(err => {
         console.warn('Não foi possível sincronizar o perfil ativo no Firestore:', err);
+      });
+
+      // Atualiza o snapshot local
+      savePermissionsSnapshot({
+        role: profile.role,
+        escolaAtivaId: profile.escola_id,
+        activeProfile: profile
       });
     }
   }
@@ -221,6 +283,16 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           sessionStorage.setItem(SESSION_ACTIVE_PROFILE_KEY, JSON.stringify(profileToUse));
           setAvailableProfiles(dbRoles.length >= 1 ? dbRoles : [profileToUse]);
 
+          // Atualiza snapshot
+          savePermissionsSnapshot({
+            role: 'professor',
+            escolaAtivaId: escolaAtiva,
+            permittedEscolas: escolaIds,
+            activeProfile: profileToUse,
+            availableProfiles: dbRoles.length >= 1 ? dbRoles : [profileToUse],
+            isMaster: isMaster
+          });
+
           const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes('professor'));
           setMenuItems(accessibleItems);
           setLoading(false);
@@ -265,7 +337,18 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
             setLoading(false);
             return;
           }
-          await setActiveProfile(dbRoles[0]);
+          setActiveProfile(dbRoles[0]);
+          
+          // Atualiza snapshot para single profile
+          savePermissionsSnapshot({
+            role: dbRoles[0].role,
+            escolaAtivaId: dbRoles[0].escola_id,
+            permittedEscolas: dbEscolas.length > 0 ? dbEscolas : [dbRoles[0].escola_id],
+            activeProfile: dbRoles[0],
+            availableProfiles: dbRoles,
+            isMaster: isMaster
+          });
+
           setLoading(false);
           return;
         }
@@ -334,8 +417,33 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           setMenuItems([]);
         }
 
+        // Atualiza snapshot para o caminho legacy
+        savePermissionsSnapshot({
+          role: userRole,
+          escolaAtivaId: dbEscolaId,
+          permittedEscolas: dbEscolas.length > 0 ? dbEscolas : (dbEscolaId ? [dbEscolaId] : []),
+          availableProfiles: dbRoles,
+          isMaster: isMaster
+        });
+
       } catch (error) {
         console.error('Error fetching user role data:', error);
+        // Em caso de erro (provavelmente offline), tentamos usar o snapshot uma última vez
+        const snapshot = getInitialSnapshot(user.uid);
+        if (snapshot && !role) {
+          console.log("[useUserRole] Usando snapshot como fallback após erro de rede.");
+          setRole(snapshot.role);
+          setEscolaAtivaId(snapshot.escolaAtivaId);
+          setPermittedEscolas(snapshot.permittedEscolas);
+          setActiveProfileState(snapshot.activeProfile);
+          setAvailableProfiles(snapshot.availableProfiles);
+          
+          const currentRole = snapshot.role;
+          if (currentRole) {
+            const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes(currentRole));
+            setMenuItems(accessibleItems);
+          }
+        }
       } finally {
         setLoading(false);
       }

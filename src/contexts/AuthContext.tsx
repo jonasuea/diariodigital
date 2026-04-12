@@ -179,7 +179,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const uid = auth.currentUser?.uid;
       if (uid) {
         localStorage.removeItem(`user_role_${uid}`);
+        localStorage.removeItem(`user_permissions_snapshot_${uid}`);
         localStorage.removeItem('activeProfile'); // Persistido pelo useUserRole
+        sessionStorage.removeItem('activeProfile');
+        sessionStorage.removeItem('escolaAtivaId');
       }
       
       await localDb.delete();
