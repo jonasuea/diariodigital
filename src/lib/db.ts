@@ -30,17 +30,17 @@ export class OfflineDB extends Dexie {
 
   constructor() {
     super('DiarioDigitalDB');
-    this.version(1).stores({
+    this.version(2).stores({
       turmas: 'id, escola_id',
       estudantes: 'id, turma_id, escola_id',
       dias_letivos: 'id, data, escola_id',
       base_curricular: 'id, componente, *serie',
       eventos: 'id, data, escola_id',
       
-      frequencias: 'id, [estudante_id+data], turma_id',
+      frequencias: 'id, [estudante_id+data], [turma_id+data]',
       entradas_diario: 'id, [turma_id+data]',
-      registros_aulas: 'id, [turma_id+data+componente]',
-      avaliacoes: 'id, turma_id',
+      registros_aulas: 'id, [turma_id+data+componente], [turma_id+componente]',
+      avaliacoes: 'id, turma_id, [turma_id+componente+data]',
       notas: 'id, avaliacao_id, estudante_id',
       notas_parciais: 'id, turma_id, estudante_id',
       avaliacoes_infantil: 'id, [turma_id+estudante_id+data_avaliacao]',
