@@ -98,14 +98,20 @@ export default function DiarioDigital() {
     async function fetchTurmas() {
       setLoading(true);
       try {
+        console.log("[DiarioDigital] Buscando turmas para:", { escolaAtivaId, professorId });
+        
+        // Tentamos buscar turmas da escola onde o professor está alocado.
+        // Removido o filtro de ano estrito por segurança, ou podemos tentar ambos.
         const turmasQuery = query(
           collection(db, 'turmas'),
           where('escola_id', '==', escolaAtivaId),
-          where('ano', '==', new Date().getFullYear()),
           where('professoresIds', 'array-contains', professorId),
           limit(50)
         );
+        
         const turmasSnapshot = await getDocs(turmasQuery);
+        console.log("[DiarioDigital] Turmas encontradas:", turmasSnapshot.size);
+        
         const turmasData = turmasSnapshot.docs
           .map(doc => {
             const data = doc.data();
@@ -117,9 +123,14 @@ export default function DiarioDigital() {
               professoresIds: data.professoresIds || [],
             } as Turma;
           })
+          .filter(t => !t.ano || t.ano === new Date().getFullYear()) // Filtro local mais flexível
           .sort((a, b) => a.nome.localeCompare(b.nome));
 
         setTurmas(turmasData);
+        
+        if (turmasData.length === 0) {
+          console.warn("[DiarioDigital] Nenhuma turma encontrada para o professor nesta escola.");
+        }
 
         // Se a turma restaurada ou selecionada não existe na lista desta escola, limpa a seleção
         if (selectedTurmaId && !turmasData.some(t => t.id === selectedTurmaId) && !isRestoring) {

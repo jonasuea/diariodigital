@@ -249,24 +249,47 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
 
         if (isProfessorRole) {
           let escolaIds: string[] = [];
+          let profIdFound: string | null = null;
+          const userEmail = user.email?.toLowerCase();
+          
           try {
+            // 1. Tenta carregar pelo UID diretamente (documento tem o mesmo ID que o usuário)
             const profByUid = await getDoc(doc(db, 'professores', user.uid));
             if (profByUid.exists()) {
               const d = profByUid.data();
               escolaIds = d.escola_ids?.length > 0 ? d.escola_ids : (d.escola_id ? [d.escola_id] : []);
-              setProfessorId(profByUid.id);
+              profIdFound = profByUid.id;
             } else {
-              // Fallback: busca por usuario_id
+              // 2. Tenta busca pelo campo usuario_id
               const profSnap = await getDocs(
                 query(collection(db, 'professores'), where('usuario_id', '==', user.uid), limit(1))
               );
               if (!profSnap.empty) {
                 const d = profSnap.docs[0].data();
                 escolaIds = d.escola_ids?.length > 0 ? d.escola_ids : (d.escola_id ? [d.escola_id] : []);
-                setProfessorId(profSnap.docs[0].id);
+                profIdFound = profSnap.docs[0].id;
+              } else if (userEmail) {
+                // 3. Fallback por EMAIL (vital para compatibilidade legada)
+                const profByEmail = await getDocs(
+                  query(collection(db, 'professores'), where('email', '==', userEmail), limit(1))
+                );
+                if (!profByEmail.empty) {
+                  const d = profByEmail.docs[0].data();
+                  escolaIds = d.escola_ids?.length > 0 ? d.escola_ids : (d.escola_id ? [d.escola_id] : []);
+                  profIdFound = profByEmail.docs[0].id;
+
+                  // Otimização: Vincula o UID ao registro para as próximas buscas serem por UID
+                  if (!d.usuario_id) {
+                    updateDoc(doc(db, 'professores', profIdFound), { usuario_id: user.uid }).catch(() => {});
+                  }
+                }
               }
             }
-          } catch (_) { /* ignore, use fallback below */ }
+          } catch (err) {
+            console.error("[useUserRole] Erro ao buscar professor:", err);
+          }
+
+          if (profIdFound) setProfessorId(profIdFound);
 
           // Fallback para user_roles se não encontrou no professores
           if (escolaIds.length === 0) {
@@ -289,7 +312,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           sessionStorage.setItem(SESSION_ACTIVE_PROFILE_KEY, JSON.stringify(profileToUse));
           setAvailableProfiles(dbRoles.length >= 1 ? dbRoles : [profileToUse]);
 
-          // Atualiza snapshot
+          // Atualiza snapshot - IMPORTANTE: Usar profIdFound em vez do estado professorId (que ainda não atualizou)
           savePermissionsSnapshot({
             role: 'professor',
             escolaAtivaId: escolaAtiva,
@@ -297,7 +320,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
             activeProfile: profileToUse,
             availableProfiles: dbRoles.length >= 1 ? dbRoles : [profileToUse],
             isMaster: isMaster,
-            professorId: professorId // Persiste o ID encontrado acima
+            professorId: profIdFound 
           });
 
           const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes('professor'));
