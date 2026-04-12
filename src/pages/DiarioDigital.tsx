@@ -33,7 +33,7 @@ interface Turma {
 export default function DiarioDigital() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { role, escolaAtivaId, loading: roleLoading } = useUserRole();
+  const { role, escolaAtivaId, loading: roleLoading, professorId: contextProfessorId } = useUserRole();
 
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [turmas, setTurmas] = useState<Turma[]>([]);
@@ -60,45 +60,8 @@ export default function DiarioDigital() {
 
   const isGestor = role && role !== 'professor';
 
-  const [loggedProfessorId, setLoggedProfessorId] = useState<string | null>(null);
-
-  // Efeito para buscar o ID real do professor logado pelo e-mail
-  useEffect(() => {
-    if (!user?.email || isGestor || !escolaAtivaId) return;
-
-    async function fetchLoggedProfessorId() {
-      try {
-        // Busca por email sem filtrar por escola_id — professor multi-escola tem um único documento
-        const profQuery = query(
-          collection(db, 'professores'),
-          where('email', '==', user.email),
-          limit(1)
-        );
-        const profSnapshot = await getDocs(profQuery);
-        if (!profSnapshot.empty) {
-          setLoggedProfessorId(profSnapshot.docs[0].id);
-        } else {
-          // Fallback: busca por usuario_id
-          const profByUid = query(
-            collection(db, 'professores'),
-            where('usuario_id', '==', user.uid),
-            limit(1)
-          );
-          const profByUidSnap = await getDocs(profByUid);
-          if (!profByUidSnap.empty) {
-            setLoggedProfessorId(profByUidSnap.docs[0].id);
-          } else {
-            console.warn("Nenhum professor encontrado para o usuário logado.");
-          }
-        }
-      } catch (error) {
-        console.error("Sem permissão para buscar professor logado:", error);
-      }
-    }
-
-    fetchLoggedProfessorId();
-  // Não depende de escolaAtivaId — o documento do professor é único independente da escola ativa
-  }, [user, isGestor]);
+  // O ID do professor agora vem diretamente do useUserRole (contextProfessorId)
+  // que já gerencia cache e persistência offline.
 
   // Efeito para carregar professores (apenas para gestores)
   useEffect(() => {
@@ -119,7 +82,7 @@ export default function DiarioDigital() {
 
   // Efeito para carregar turmas baseado no usuário logado (professor) ou selecionado (gestor)
   useEffect(() => {
-    const professorId = isGestor ? selectedProfessorId : loggedProfessorId;
+    const professorId = isGestor ? selectedProfessorId : contextProfessorId;
 
     if (!professorId || !escolaAtivaId) {
       setTurmas([]);
@@ -168,7 +131,7 @@ export default function DiarioDigital() {
     }
 
     fetchTurmas();
-  }, [selectedProfessorId, isGestor, loggedProfessorId, escolaAtivaId]);
+  }, [selectedProfessorId, isGestor, contextProfessorId, escolaAtivaId]);
 
   // useEffect para persistir os filtros no sessionStorage quando forem alterados
   useEffect(() => {
@@ -200,7 +163,7 @@ export default function DiarioDigital() {
 
   // Efeito para filtrar componentes quando a turma muda
   useEffect(() => {
-    const professorId = isGestor ? selectedProfessorId : loggedProfessorId;
+    const professorId = isGestor ? selectedProfessorId : contextProfessorId;
 
     if (selectedTurmaId && professorId) {
       const turmaSelecionada = turmas.find(t => t.id === selectedTurmaId);
@@ -221,7 +184,7 @@ export default function DiarioDigital() {
         setSelectedComponente('');
       }
     }
-  }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, loggedProfessorId, selectedComponente, isRestoring]);
+  }, [selectedTurmaId, turmas, isGestor, selectedProfessorId, contextProfessorId, selectedComponente, isRestoring]);
 
   const selectedTurma = turmas.find(t => t.id === selectedTurmaId);
   const isInfantil = selectedTurma ? ["Crianças Bem Pequenas I", "Crianças Bem Pequenas II", "Crianças Pequenas I", "Crianças Pequenas II"].some(nome => selectedTurma.nome.includes(nome)) : false;

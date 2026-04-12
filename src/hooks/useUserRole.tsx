@@ -57,6 +57,7 @@ interface UserRoleContextType {
   activeProfile: UserProfile | null;
   setActiveProfile: (profile: UserProfile) => void;
   needsProfileSelection: boolean;
+  professorId: string | null;
 }
 
 const UserRoleContext = createContext<UserRoleContextType | undefined>(undefined);
@@ -71,6 +72,7 @@ interface PermissionsSnapshot {
   activeProfile: UserProfile | null;
   availableProfiles: UserProfile[];
   isMaster: boolean;
+  professorId: string | null;
 }
 
 export function UserRoleProvider({ children }: { children: ReactNode }) {
@@ -84,6 +86,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
   const [isInMaintenance, setIsInMaintenance] = useState(false);
   const [availableProfiles, setAvailableProfiles] = useState<UserProfile[]>([]);
   const [activeProfile, setActiveProfileState] = useState<UserProfile | null>(null);
+  const [professorId, setProfessorId] = useState<string | null>(null);
 
   // Auxiliar para carregar snapshot inicial por UID
   const getInitialSnapshot = (uid: string): PermissionsSnapshot | null => {
@@ -104,6 +107,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         if (!activeProfile) setActiveProfileState(snapshot.activeProfile);
         if (availableProfiles.length === 0) setAvailableProfiles(snapshot.availableProfiles);
         setIsMaster(snapshot.isMaster);
+        if (!professorId) setProfessorId(snapshot.professorId || null);
         
         // Se temos um role no snapshot, podemos parar o loading visual mais cedo se quisermos,
         // mas é melhor deixar o fetchUserRole terminar para garantir dados frescos.
@@ -121,7 +125,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         permittedEscolas: [],
         activeProfile: null,
         availableProfiles: [],
-        isMaster: false
+        isMaster: false,
+        professorId: null
       };
       const updated = { ...current, ...data };
       localStorage.setItem(PERMISSIONS_SNAPSHOT_KEY(user.uid), JSON.stringify(updated));
@@ -243,13 +248,13 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           (dbRoles.length >= 1 && dbRoles.some(r => r.role === 'professor'));
 
         if (isProfessorRole) {
-          // Busca o documento professores: primeiro pelo uid (ID do doc), depois por usuario_id
           let escolaIds: string[] = [];
           try {
             const profByUid = await getDoc(doc(db, 'professores', user.uid));
             if (profByUid.exists()) {
               const d = profByUid.data();
               escolaIds = d.escola_ids?.length > 0 ? d.escola_ids : (d.escola_id ? [d.escola_id] : []);
+              setProfessorId(profByUid.id);
             } else {
               // Fallback: busca por usuario_id
               const profSnap = await getDocs(
@@ -258,6 +263,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
               if (!profSnap.empty) {
                 const d = profSnap.docs[0].data();
                 escolaIds = d.escola_ids?.length > 0 ? d.escola_ids : (d.escola_id ? [d.escola_id] : []);
+                setProfessorId(profSnap.docs[0].id);
               }
             }
           } catch (_) { /* ignore, use fallback below */ }
@@ -290,7 +296,8 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
             permittedEscolas: escolaIds,
             activeProfile: profileToUse,
             availableProfiles: dbRoles.length >= 1 ? dbRoles : [profileToUse],
-            isMaster: isMaster
+            isMaster: isMaster,
+            professorId: professorId // Persiste o ID encontrado acima
           });
 
           const accessibleItems = allMenuItems.filter(item => item.allowedRoles.includes('professor'));
@@ -437,6 +444,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           setPermittedEscolas(snapshot.permittedEscolas);
           setActiveProfileState(snapshot.activeProfile);
           setAvailableProfiles(snapshot.availableProfiles);
+          setProfessorId(snapshot.professorId || null);
           
           const currentRole = snapshot.role;
           if (currentRole) {
@@ -485,6 +493,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         activeProfile,
         setActiveProfile,
         needsProfileSelection,
+        professorId,
       }}
     >
       {children}
