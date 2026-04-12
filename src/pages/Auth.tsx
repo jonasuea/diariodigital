@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
+import { useOfflineStatus } from '@/contexts/OfflineStatusContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +19,7 @@ export default function Auth() {
   const [nome, setNome] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const { isOnline } = useOfflineStatus();
 
   const { role, loading: loadingRole, needsProfileSelection } = useUserRole();
 
@@ -192,6 +194,13 @@ export default function Auth() {
               <p className="text-[#8B6508]/60 font-medium">{isLogin ? t('login.title') : t('login.titleCreate')}</p>
             </div>
 
+            {!isOnline && (
+              <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm font-medium flex items-center gap-2">
+                <HelpCircle className="h-5 w-5 shrink-0" />
+                <span>Modo Offline: O primeiro login após a instalação requer conexão com a internet.</span>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               {!isLogin && (
                 <div className="space-y-2">
@@ -260,10 +269,12 @@ export default function Auth() {
               <Button
                 type="submit"
                 className="w-full dd-button"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isOnline}
               >
                 {isSubmitting ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
+                ) : !isOnline ? (
+                  "Conexão requerida"
                 ) : isLogin ? (
                   t('login.submitLogin')
                 ) : (

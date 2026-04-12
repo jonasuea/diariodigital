@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getFunctions } from "firebase/functions";
 
@@ -22,7 +22,9 @@ const analytics = getAnalytics(app);
 
 // Inicializa e exporta os serviços conforme a arquitetura do projeto
 export const auth = getAuth(app);
-export const db = getFirestore(app, 'database');
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({})
+}, 'database');
 export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export { analytics };

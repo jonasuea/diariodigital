@@ -25,11 +25,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (authUser) {
         try {
           const roleDocRef = doc(db, 'user_roles', authUser.uid);
-          const roleDoc = await getDoc(roleDocRef);
-          const roleData = roleDoc.data();
+          let roleData: any = null;
+
+          try {
+            const roleDoc = await getDoc(roleDocRef);
+            roleData = roleDoc.data();
+            
+            if (roleData) {
+              // Cache do role para uso offline
+              localStorage.setItem(`user_role_${authUser.uid}`, JSON.stringify(roleData));
+            }
+          } catch (error) {
+            console.warn("[AuthContext] Erro ao carregar role do Firestore, tentando cache local:", error);
+            const cached = localStorage.getItem(`user_role_${authUser.uid}`);
+            if (cached) {
+              roleData = JSON.parse(cached);
+              console.log("[AuthContext] Usando role do cache local.");
+            }
+          }
           
+          if (!roleData) {
+            // Se não houver dados no Firestore nem no cache, e estivermos online, o usuário realmente não tem acesso.
+            // Se estivermos offline e sem cache, infelizmente não podemos validar o acesso.
+            if (navigator.onLine) {
+              await firebaseSignOut(auth);
+              setUser(null);
+            } else {
+              // Mantém o estado de carregamento ou permite o usuário entrar mas sem roles? 
+              // Melhor permitir o usuário logado e deixar os hooks de role lidarem com a ausência de dados.
+              setUser(authUser);
+            }
+            setLoading(false);
+            return;
+          }
+
           // Aceita qualquer role reconhecido em qualquer sistema.
-          // O redirecionamento para o sistema correto é feito na EscolhaPerfil.
           const ALL_KNOWN_ROLES = ['admin', 'professor', 'gestor', 'pedagogo', 'secretario', 'responsavel', 'estudante'];
           const extraRoles: string[] = (roleData?.roles || []).map((r: any) => r.role);
           const primaryRole: string | null = roleData?.role || null;
@@ -37,14 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           
           const hasAccess = allRoles.some(r => ALL_KNOWN_ROLES.includes(r));
           
-          if (!hasAccess || roleData?.status === 'inativo') {
+          if ((!hasAccess || roleData?.status === 'inativo') && navigator.onLine) {
             await firebaseSignOut(auth);
             setUser(null);
           } else {
             setUser(authUser);
           }
         } catch (error) {
-          setUser(null);
+          console.error("[AuthContext] Erro crítico no onAuthStateChanged:", error);
+          // Se falhar drasticamente, só desloga se estiver online
+          if (navigator.onLine) {
+            setUser(null);
+          }
         }
       } else {
         setUser(null);
@@ -141,15 +175,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Tenta sincronizar uma última vez antes de sair (opcional, mas recomendado)
       // await syncService.processQueue();
       
-      await firebaseSignOut(auth);
-      
       // Limpa os dados locais ao sair por segurança
+      const uid = auth.currentUser?.uid;
+      if (uid) {
+        localStorage.removeItem(`user_role_${uid}`);
+        localStorage.removeItem('activeProfile'); // Persistido pelo useUserRole
+      }
+      
       await localDb.delete();
-      console.log("[AuthContext] IndexedDB limpo após logout.");
+      console.log("[AuthContext] IndexedDB e caches de autenticação limpos após logout.");
       
       // Recria a instância para o próximo uso (Dexie reabre automaticamente se necessário, 
       // mas deletar o banco requer uma limpeza cuidadosa)
-      window.location.reload(); // Recarrega para garantir que os estados globais e o DB sejam resetados
+      await firebaseSignOut(auth);
+      window.location.reload();
     } catch (error) {
       console.error("Erro ao realizar logout e limpar DB:", error);
       await firebaseSignOut(auth);
