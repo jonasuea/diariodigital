@@ -47,6 +47,11 @@ export class AvaliacaoRepository extends BaseResilientService<any> {
     await localDb.avaliacoes_infantil.bulkPut(snapInfantil.docs.map(d => ({ id: d.id, ...d.data() })));
   }
 
+  // Alias para manter consistência semântica nas páginas
+  async seedAvaliacoesInfantil(turmaId: string, escolaId: string) {
+    return this.seedAvaliacoes(turmaId, escolaId);
+  }
+
   async saveNota(data: any) {
     await localDb.notas.put(data);
     await localDb.sync_queue.add({
@@ -120,6 +125,12 @@ export class AvaliacaoRepository extends BaseResilientService<any> {
       .where({ turma_id: turmaId, data_avaliacao: data })
       .toArray();
     return new Set(list.map(a => a.estudante_id));
+  }
+
+  async getAvaliacoesInfantilByTurma(turmaId: string) {
+    return await localDb.avaliacoes_infantil
+      .where('turma_id').equals(turmaId)
+      .toArray();
   }
 }
 

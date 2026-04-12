@@ -3,8 +3,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, Timestamp, orderBy } from 'firebase/firestore';
+import { turmaRepo, eventosRepo, diasLetivosRepo } from '@/repositories/CadastrosRepository';
+import { avaliacaoRepo } from '@/repositories/AvaliacaoRepository';
+import { safeToDate } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Calendar as CalendarIcon } from 'lucide-react';
 import { Calendar } from "@/components/ui/calendar";
@@ -54,51 +55,38 @@ export default function CalendarioAvaliacaoInfantil() {
       setLoading(true);
 
       try {
-        // Fetch Turma
-        const turmaDocRef = doc(db, 'turmas', turmaId);
-        const turmaDoc = await getDoc(turmaDocRef);
-        if (turmaDoc.exists()) {
-          setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
+        // 1. Tenta sincronizar se estiver online (Seeding)
+        if (navigator.onLine) {
+          try {
+            await Promise.all([
+              turmaRepo.seed(escolaAtivaId),
+              eventosRepo.seed(escolaAtivaId),
+              diasLetivosRepo.seed(escolaAtivaId),
+              avaliacaoRepo.seedAvaliacoesInfantil(turmaId, escolaAtivaId)
+            ]);
+          } catch (syncError) {
+            console.warn("[CalendarioAvaliacaoInfantil] Falha ao sincronizar dados remotos, usando cache local.", syncError);
+          }
         }
 
-        // Fetch Eventos
-        const qEventos = query(
-          collection(db, 'eventos'),
-          where('escola_id', '==', escolaAtivaId),
-          orderBy('data', 'asc')
-        );
-        const queryEvents = await getDocs(qEventos);
-        const eventosData = queryEvents.docs.map(doc => {
-          const data = doc.data();
-          if (data.data && typeof data.data === 'string') {
-            data.data = Timestamp.fromDate(parseISO(data.data));
-          }
-          return { id: doc.id, ...data } as Evento;
-        });
-        setEventos(eventosData);
+        // 2. Carrega do banco local (Fonte da Verdade)
+        const [turmaData, eventosData, diasData, avaliacoesData] = await Promise.all([
+          turmaRepo.getById(turmaId),
+          eventosRepo.getByEscola(escolaAtivaId),
+          diasLetivosRepo.getByEscola(escolaAtivaId),
+          avaliacaoRepo.getAvaliacoesInfantilByTurma(turmaId)
+        ]);
 
-        // Fetch Dias Letivos
-        const qDias = query(
-          collection(db, 'dias_letivos'),
-          where('escola_id', '==', escolaAtivaId)
-        );
-        const queryDias = await getDocs(qDias);
+        if (turmaData) setTurma(turmaData);
+        setEventos(eventosData);
+        
         const dias = new Set<string>();
-        queryDias.forEach(doc => {
-          dias.add(doc.data().data);
-        });
+        diasData.forEach((d: any) => dias.add(d.data));
         setDiasLetivos(dias);
 
-        // Fetch Avaliacoes Existentes (para marcar no calendário)
-        const qAvaliacoes = query(
-          collection(db, 'avaliacoes_infantil'),
-          where('turma_id', '==', turmaId)
-        );
-        const queryAvaliacoes = await getDocs(qAvaliacoes);
         const avalDates = new Set<string>();
-        queryAvaliacoes.forEach(doc => {
-          const dataAval = doc.data().data_avaliacao;
-          if (dataAval) avalDates.add(dataAval);
+        avaliacoesData.forEach((doc: any) => {
+          if (doc.data_avaliacao) avalDates.add(doc.data_avaliacao);
         });
         setAvaliacoesDates(avalDates);
 
@@ -118,7 +106,7 @@ export default function CalendarioAvaliacaoInfantil() {
     navigate(`/diario-digital/avaliacao-infantil/${turmaId}?data=${dateStr}`);
   };
 
-  const eventDates = eventos.map(e => e.data.toDate());
+  const eventDates = eventos.map(e => safeToDate(e.data));
   const diasLetivosDates = Array.from(diasLetivos).map(d => {
     const [year, month, day] = d.split('-').map(Number);
     return new Date(year, month - 1, day);

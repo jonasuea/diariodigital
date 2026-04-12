@@ -45,11 +45,17 @@ service cloud.firestore {
     match /user_roles/{uid} {
       allow read: if isAdmin() || isGestor() || request.auth.uid == uid;
       allow create: if (isSignedIn() && request.auth.uid == uid && request.resource.data.get('role', 'pending') == 'pending') || isAdmin() || isGestor();
-      allow update, delete: if isAdmin() || isGestor();
+      // Admin e Gestor podem alterar tudo; o próprio usuário pode apenas atualizar 'role' e 'escola_id'
+      // (necessário para o sistema de multi-perfil — sincroniza o perfil ativo com as Security Rules)
+      allow update: if isAdmin() || isGestor() ||
+        (isSignedIn() && request.auth.uid == uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['role', 'escola_id', 'escola_ids']));
+      allow delete: if isAdmin() || isGestor();
     }
 
     match /profiles/{uid} {
       allow read: if isSignedIn();
+      // O próprio usuário sempre pode escrever no seu perfil (curto-circuito — não chama getRole())
       allow write: if request.auth.uid == uid || isAdmin() || isGestor() || isSecretario();
       
       match /mensagens_vistas/{messageId} {
@@ -68,19 +74,19 @@ service cloud.firestore {
     }
 
     match /professores/{id} {
-      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante() || isResponsavel(); // Admin, Gestor, Secretário, Professor, Estudante e Responsável podem ver os professores
-      allow write: if isAdmin() || isGestor() || isSecretario(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario();
     }
 
-    // ✅ EQUIPE GESTORA (nome correto da coleção: equipe_gestora)
+    // ✅ EQUIPE GESTORA
     match /equipe_gestora/{id} {
       allow read: if isSignedIn();
       allow write: if isAdmin() || isGestor() || isSecretario();
     }
 
     match /turmas/{id} {
-      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor() || isEstudante() || isResponsavel(); // Admin, Gestor, Secretário, Professor, Estudante e Responsável podem ver as turmas
-      allow write: if isAdmin() || isGestor() || isSecretario(); // Mas só Admin, Gestor e Secretário podem salvar dados nelas
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario();
     }
 
     match /notas/{id} {
@@ -109,11 +115,14 @@ service cloud.firestore {
     }
 
     match /activity_log/{id} {
-      // Admin, Gestor e Secretário podem ver as turmas
-      allow read: if isAdmin() || isGestor() || isSecretario();
+      // Admin, Gestor, Pedagogo e Secretário podem ler os logs
+      allow read: if isAdmin() || isGestor() || isSecretario() || getRole() == 'pedagogo';
       
-      // Mas só Admin, Gestor e Secretário podem salvar dados nelas
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      // Qualquer usuário autenticado pode criar entradas de log (professor, pedagogo, etc.)
+      allow create: if isSignedIn();
+      
+      // Ninguém pode editar ou excluir logs — apenas direto no banco de dados
+      allow update, delete: if false;
     }
 
     match /eventos/{id} {
@@ -178,14 +187,16 @@ service cloud.firestore {
       allow write: if isAdmin() || isGestor();
     }
 
-    // ✅ SEGURANÇA: famílias criam, somente gestão lê/edita/deleta
+    // ✅ SEGURANÇA: famílias criam (formulário de matrícula), somente gestão lê/edita/deleta
     match /pre_matriculas/{id} {
       allow create: if isSignedIn();
       allow read, update, delete: if isAdmin() || isGestor() || isSecretario();
     }
 
-
-
+    match /base_curricular/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isGestor() || isSecretario();
+    }
     match /mensagens/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -195,13 +206,13 @@ service cloud.firestore {
                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lido', 'data_leitura']));
       allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == resource.data.remetente_id);
     }
-
+    
     // ✅ SEGURANÇA: contadores só podem ser alterados pela gestão
     match /counters/{id} {
       allow read: if isSignedIn();
       allow write: if isAdmin() || isGestor() || isSecretario();
     }
-
+    
     match /logs/{id} {
       allow read: if isAdmin() || isGestor();
       allow create: if isSignedIn();
@@ -209,10 +220,10 @@ service cloud.firestore {
     }
 
     // =========================================================================
-    // 4. REGRA RESIDUAL — BLINDAGEM
+    // 4. REGRA RESIDUAL (COLEÇÕES NÃO LISTADAS ACIMA)
     // =========================================================================
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if false; // BLINDAGEM: Fechar coleções não explicitadas
     }
   }
 }

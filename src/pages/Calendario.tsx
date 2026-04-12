@@ -18,6 +18,7 @@ import { format, isSameDay, isSameMonth, parseISO, startOfMonth, endOfMonth } fr
 import { ptBR } from 'date-fns/locale';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
+import { safeToDate } from '@/lib/utils';
 
 interface Evento {
   id: string;
@@ -305,10 +306,9 @@ export default function Calendario() {
   }
 
   function openEditDialog(evento: Evento) {
-    setEventoToEdit(evento);
     setFormData({
       titulo: evento.titulo,
-      data: format(evento.data.toDate(), 'yyyy-MM-dd'),
+      data: format(safeToDate(evento.data), 'yyyy-MM-dd'),
       hora_inicio: evento.hora_inicio || '08:00',
       tipo: evento.tipo || 'evento escolar',
       hora_fim: evento.hora_fim || '09:00',
@@ -323,14 +323,14 @@ export default function Calendario() {
   }
 
   const eventosNaDataSelecionada = eventos.filter(e =>
-    isSameDay(e.data.toDate(), selectedDate)
+    isSameDay(safeToDate(e.data), selectedDate)
   );
 
   const eventosDoMes = eventos.filter(e =>
-    isSameMonth(e.data.toDate(), currentMonth)
+    isSameMonth(safeToDate(e.data), currentMonth)
   );
 
-  const eventDates = eventos.map(e => e.data.toDate());
+  const eventDates = eventos.map(e => safeToDate(e.data));
   const diasLetivosDates = Array.from(diasLetivos).map(d => parseISO(d));
 
   return (
@@ -515,7 +515,7 @@ export default function Calendario() {
                         <h4 className="font-medium text-foreground truncate">{evento.titulo}</h4>
                         <div className="flex items-center gap-1 text-sm text-primary mt-1">
                           <CalendarIcon className="h-3.5 w-3.5" />
-                          <span>{format(evento.data.toDate(), "d 'de' MMMM", { locale: ptBR })}</span>
+                          <span>{format(safeToDate(evento.data), "d 'de' MMMM", { locale: ptBR })}</span>
                         </div>
                         {(evento.hora_inicio || evento.hora_fim) && (
                           <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">

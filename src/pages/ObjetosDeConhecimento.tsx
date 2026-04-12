@@ -11,6 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { ptBR } from 'date-fns/locale';
 import { format, parseISO } from 'date-fns';
 import { useUserRole } from "@/hooks/useUserRole";
+import { safeToDate } from "@/lib/utils";
 import { eventosRepo, diasLetivosRepo, turmaRepo } from '@/repositories/CadastrosRepository';
 import { planejamentoRepo } from '@/repositories/PlanejamentoRepository';
 
@@ -66,12 +67,11 @@ export default function ObjetosDeConhecimento() {
 
         // 3. Fetch Eventos do Cache Local
         const queryEvents = await eventosRepo.getByEscola(escolaAtivaId);
-        const eventosData = queryEvents.map(data => {
-          if (data.data && typeof data.data === 'string') {
-            data.data = Timestamp.fromDate(parseISO(data.data));
-          }
-          return { id: data.id, ...data } as Evento;
-        });
+        const eventosData = queryEvents.map(data => ({
+          id: data.id,
+          ...data,
+          data: safeToDate(data.data) // Garante que seja Date para facilitar uso posterior
+        } as any));
         setEventos(eventosData);
 
         // 4. Fetch Dias Letivos do Cache Local
@@ -108,7 +108,7 @@ export default function ObjetosDeConhecimento() {
     fetchData();
   }, [turmaId, componente, escolaAtivaId]);
 
-  const eventDates = eventos.map(e => e.data.toDate());
+  const eventDates = eventos.map(e => safeToDate(e.data));
   const diasLetivosDates = Array.from(diasLetivos).map(d => {
     const [year, month, day] = d.split('-').map(Number);
     return new Date(year, month - 1, day);

@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ArrowLeft, Calendar, CheckCircle, XCircle, FileText } from 'lucide-react';
 import { localDb } from '@/lib/db';
-import { turmaRepo, estudanteRepo } from '@/repositories/CadastrosRepository';
+import { turmaRepo, estudanteRepo, diasLetivosRepo } from '@/repositories/CadastrosRepository';
+import { safeToDate } from '@/lib/utils';
 import { frequenciaRepo } from '@/repositories/FrequenciaRepository';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
@@ -122,7 +123,8 @@ export default function Frequencia() {
 
       const queryDias = await diasLetivosRepo.getByEscola(escolaAtivaId);
       const filteredDias = queryDias.filter((d: any) => d.data >= startDate && d.data <= endDate);
-      setDiasLetivos(new Set(filteredDias.map((d: any) => d.data)));
+      const datasLetivas = new Set(filteredDias.map((d: any) => d.data));
+      setDiasLetivos(datasLetivas);
 
       const isTurmaInfantil = turmaData?.nome ? ["Crianças", "Bebês", "Infantil"].some(nome => turmaData.nome.includes(nome)) : false;
 

@@ -46,7 +46,8 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
         await estudanteRepo.seed(turma.id, escolaId);
         
         // Identificar série para BNCC
-        const serie = (turma.serie || turma.classificacao || turma.ano || turma.nome || "").trim();
+        const serieVal = turma.serie || turma.classificacao || turma.ano || turma.nome || "";
+        const serie = String(serieVal).trim();
         
         // Sincronizar registros de aula e base curricular para cada componente do professor nesta turma
         if (turma.componentes && Array.isArray(turma.componentes)) {

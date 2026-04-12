@@ -11,6 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { ptBR } from 'date-fns/locale';
 import { format, parseISO } from 'date-fns';
 import { useUserRole } from "@/hooks/useUserRole";
+import { safeToDate } from '@/lib/utils';
 
 interface Turma {
   id: string;
@@ -78,7 +79,7 @@ export default function Avaliacoes() {
 
         setEventos(queryEvents.map(e => ({
           ...e,
-          data: typeof e.data === 'string' ? { toDate: () => parseISO(e.data) } : e.data
+          data: safeToDate(e.data)
         } as any)));
 
         setDiasLetivos(new Set(queryDias.map(d => d.data)));
@@ -95,11 +96,7 @@ export default function Avaliacoes() {
     fetchData();
   }, [turmaId, componente, escolaAtivaId]);
 
-  const eventDates = eventos.map(e => {
-    if (typeof e.data === 'string') return parseISO(e.data);
-    if (e.data && typeof e.data.toDate === 'function') return e.data.toDate();
-    return new Date();
-  });
+  const eventDates = eventos.map(e => safeToDate(e.data));
   const diasLetivosDates = Array.from(diasLetivos).map(d => {
     const [year, month, day] = d.split('-').map(Number);
     return new Date(year, month - 1, day);
