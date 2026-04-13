@@ -73,7 +73,7 @@ import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { cn } from "@/lib/utils";
+import { cn, safeToDate } from "@/lib/utils";
 
 interface Message {
     id: string;
@@ -443,7 +443,7 @@ export default function Mensagens() {
                                                             </div>
                                                             <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                                                                 <Clock className="h-3 w-3" />
-                                                                {msg.data_envio?.toDate() ? format(msg.data_envio.toDate(), "dd/MM 'às' HH:mm", { locale: ptBR }) : 'Recentemente'}
+                                                                {safeToDate(msg.data_envio) ? format(safeToDate(msg.data_envio) as Date, "dd/MM 'às' HH:mm", { locale: ptBR }) : 'Recentemente'}
                                                             </span>
                                                         </div>
                                                         <h4 className={`text-sm truncate ${!msg.lido ? 'text-foreground' : 'text-muted-foreground'}`}>{msg.assunto}</h4>
@@ -497,7 +497,7 @@ export default function Mensagens() {
                                                                         <span>Pendente</span>
                                                                     </div>
                                                                 )}
-                                                                {msg.data_envio?.toDate() ? format(msg.data_envio.toDate(), "dd/MM 'às' HH:mm", { locale: ptBR }) : 'Pendente'}
+                                                                {safeToDate(msg.data_envio) ? format(safeToDate(msg.data_envio) as Date, "dd/MM 'às' HH:mm", { locale: ptBR }) : 'Pendente'}
                                                             </span>
                                                         </div>
                                                         <h4 className="text-sm font-medium text-muted-foreground truncate">{msg.assunto}</h4>
@@ -658,7 +658,7 @@ export default function Mensagens() {
                                         {selectedMessage.tipo === 'grupo' ? `Grupo: ${selectedMessage.destinatario_grupo}` : 'Mensagem Direta'}
                                     </Badge>
                                     <span className="text-xs text-muted-foreground">
-                                        {selectedMessage.data_envio?.toDate() ? format(selectedMessage.data_envio.toDate(), "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : ''}
+                                        {safeToDate(selectedMessage.data_envio) ? format(safeToDate(selectedMessage.data_envio) as Date, "EEEE, dd 'de' MMMM 'às' HH:mm", { locale: ptBR }) : ''}
                                     </span>
                                 </div>
                                 <DialogTitle className="text-2xl">{selectedMessage.assunto}</DialogTitle>

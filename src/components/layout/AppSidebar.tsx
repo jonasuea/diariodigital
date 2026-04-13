@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { useTranslation } from 'react-i18next';
+import { PWAInstallButton } from '@/components/PWAInstallButton';
+import { Download } from 'lucide-react';
 
 export function AppSidebar() {
   const { t } = useTranslation();
@@ -38,7 +40,7 @@ export function AppSidebar() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className={`fixed top-0 h-full bg-sidebar-background shadow-lg z-40 transition-all duration-300 ${isExpanded ? 'w-64 left-0' : isMobile ? 'w-64 -left-64' : 'w-16 left-0'}`}>
+      <div className={`fixed top-0 h-full bg-sidebar-background shadow-lg z-40 transition-all duration-300 flex flex-col ${isExpanded ? 'w-64 left-0' : isMobile ? 'w-64 -left-64' : 'w-16 left-0'}`}>
         <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border bg-sidebar-background">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary flex-shrink-0">
@@ -66,7 +68,7 @@ export function AppSidebar() {
           )}
         </div>
 
-        <div className="px-3 py-4 scrollbar-thin bg-sidebar-background flex-1 overflow-y-auto" style={{ height: 'calc(100vh - 64px - 60px)' }}>
+        <div className="px-3 py-4 scrollbar-thin bg-sidebar-background flex-1 overflow-y-auto min-h-0">
           <div className="space-y-1">
             {menuItems.map((item) => (
               <NavLink
@@ -90,10 +92,16 @@ export function AppSidebar() {
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-0 right-0 border-t border-sidebar-border p-3 bg-sidebar-background">
+        <div className="mt-auto border-t border-sidebar-border p-3 bg-sidebar-background space-y-2">
+          {!isMobile && (
+            <PWAInstallButton 
+              className="w-full justify-start border-none bg-sidebar-accent/40 hover:bg-sidebar-accent text-sidebar-foreground" 
+              showIconOnly={!isExpanded} 
+            />
+          )}
           <button
             onClick={signOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sidebar-foreground transition-all hover:bg-destructive hover:text-destructive-foreground"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 bg-sidebar-accent/40 text-sidebar-foreground font-medium transition-all hover:bg-destructive hover:text-destructive-foreground shadow-sm"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
             {isExpanded && <span className="whitespace-nowrap">{t('common.logout')}</span>}

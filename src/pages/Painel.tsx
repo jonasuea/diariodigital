@@ -23,7 +23,7 @@ import { db } from '@/lib/firebase';
 import { format, formatDistanceToNow, getDay, parseISO, startOfMonth, startOfWeek, subYears } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { cn } from '@/lib/utils';
+import { cn, safeToDate } from '@/lib/utils';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -448,8 +448,8 @@ export default function Painel() {
                       proximosEventos.map(evento => (
                         <div key={evento.id} className="flex items-start gap-3">
                           <div className="flex-shrink-0 text-center font-semibold bg-blue-50 border border-blue-100 p-2 rounded-lg min-w-[56px]">
-                            <div className="text-[10px] uppercase text-red-500 font-bold">{format(evento.data.toDate(), 'MMM', { locale: ptBR })}</div>
-                            <div className="text-xl text-[#1354ff]">{format(evento.data.toDate(), 'dd')}</div>
+                            <div className="text-[10px] uppercase text-red-500 font-bold">{format(safeToDate(evento.data), 'MMM', { locale: ptBR })}</div>
+                            <div className="text-xl text-[#1354ff]">{format(safeToDate(evento.data), 'dd')}</div>
                           </div>
                           <div className="flex-1">
                             <p className="text-sm font-semibold leading-tight">{evento.titulo}</p>
@@ -503,7 +503,7 @@ export default function Painel() {
                             </p>
                             <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                               <Clock className="h-3 w-3" />
-                              {activity.created_at ? formatDistanceToNow(activity.created_at.toDate(), { addSuffix: true, locale: ptBR }) : t('dashboard.justNow')}
+                              {activity.created_at ? formatDistanceToNow(safeToDate(activity.created_at), { addSuffix: true, locale: ptBR }) : t('dashboard.justNow')}
                             </p>
                           </div>
                         </div>

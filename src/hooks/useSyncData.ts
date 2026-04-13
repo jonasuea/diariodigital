@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { turmaRepo, estudanteRepo, diasLetivosRepo, eventosRepo } from '@/repositories/CadastrosRepository';
+import { frequenciaRepo } from '@/repositories/FrequenciaRepository';
 import { planejamentoRepo } from '@/repositories/PlanejamentoRepository';
 import { avaliacaoRepo } from '@/repositories/AvaliacaoRepository';
 import { toast } from 'sonner';
@@ -53,12 +54,18 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
         if (turma.componentes && Array.isArray(turma.componentes)) {
           const componentesProfessor = turma.componentes.filter((c: any) => c.professorId === professorId);
           
+          // Janela de sincronização para frequências: 30 dias atrás e 30 dias à frente
+          const now = new Date();
+          const startDate = new Date(now.getTime() - (30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+          const endDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
           if (componentesProfessor.length > 0) {
             for (const comp of componentesProfessor) {
               await Promise.all([
                 planejamentoRepo.seedBaseCurricular(serie, comp.nome),
                 planejamentoRepo.seedRegistros(turma.id, comp.nome),
-                avaliacaoRepo.seedAvaliacoes(turma.id, escolaId)
+                avaliacaoRepo.seedAvaliacoes(turma.id, escolaId),
+                frequenciaRepo.seed(turma.id, escolaId, startDate, endDate)
               ]);
             }
           } else {
@@ -66,7 +73,8 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
             await Promise.all([
               planejamentoRepo.seedBaseCurricular(serie),
               planejamentoRepo.seedRegistros(turma.id),
-              avaliacaoRepo.seedAvaliacoes(turma.id, escolaId)
+              avaliacaoRepo.seedAvaliacoes(turma.id, escolaId),
+              frequenciaRepo.seed(turma.id, escolaId, startDate, endDate)
             ]);
           }
         }
@@ -88,8 +96,10 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
     }
   }, [escolaId, professorId, turmas]);
 
-  // Sync automático apenas se a última sync for de mais de 1 hora atrás
+  // Sync automático apenas se a última sync for de mais de 1 hora atrás e estiver online
   useEffect(() => {
+    if (!navigator.onLine) return;
+    
     if (!status.lastSync && turmas.length > 0) {
       startSync();
     } else if (status.lastSync && turmas.length > 0) {
@@ -99,7 +109,7 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
         startSync();
       }
     }
-  }, [turmas.length, escolaId, professorId]);
+  }, [turmas.length, escolaId, professorId, navigator.onLine]);
 
   return { ...status, startSync };
 }

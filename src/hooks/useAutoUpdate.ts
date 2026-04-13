@@ -8,6 +8,8 @@ export function useAutoUpdate() {
     const [newVersionInfo, setNewVersionInfo] = useState<{ version: string, notes: string } | null>(null);
 
     const checkUpdate = async () => {
+        if (!navigator.onLine) return false;
+
         try {
             const response = await fetch(`/version.json?t=${Date.now()}`);
             if (!response.ok) return;
@@ -23,7 +25,11 @@ export function useAutoUpdate() {
                 setNewVersionInfo(null);
             }
         } catch (error) {
-            console.error('Sem permissão para verificar atualização automática:', error);
+            // Silencia erro de fetch falho por falta de internet
+            if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                return false;
+            }
+            console.error('Erro ao verificar atualização automática:', error);
         }
         return false;
     };

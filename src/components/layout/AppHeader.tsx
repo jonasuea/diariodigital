@@ -17,6 +17,7 @@ import { useAutoUpdate } from '@/hooks/useAutoUpdate';
 import { useTranslation } from 'react-i18next';
 import { LanguageSelector } from '@/components/LanguageSelector';
 import { SyncStatus } from '@/components/SyncStatus';
+import { PWAInstallButton } from '@/components/PWAInstallButton';
 
 interface AppHeaderProps {
   title?: string;
@@ -367,6 +368,10 @@ export function AppHeader({ title }: AppHeaderProps) {
               <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
             )}
           </Button>
+
+          <div className="hidden sm:flex items-center px-1">
+            <PWAInstallButton />
+          </div>
 
           {/* Language Selector */}
           <div className="hidden sm:flex items-center px-2 border-r border-gray-200 mr-2">

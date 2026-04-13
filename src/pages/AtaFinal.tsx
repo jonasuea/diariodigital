@@ -6,6 +6,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, FileText, Save } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
+import { turmaRepo, estudanteRepo } from '@/repositories/CadastrosRepository';
+import { useUserRole } from '@/hooks/useUserRole';
 import { toast } from 'sonner';
 
 interface Estudante {
@@ -39,6 +41,7 @@ export default function AtaFinal() {
   const { turmaId } = useParams();
   const [turma, setTurma] = useState<Turma | null>(null);
   const [Estudantes, setestudantes] = useState<Estudante[]>([]);
+  const { escolaAtivaId } = useUserRole();
   const [notas, setNotas] = useState<Record<string, NotaCompleta>>({});
   const [situacoes, setSituacoes] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -54,23 +57,27 @@ export default function AtaFinal() {
     setLoading(true);
 
     try {
-      const turmaDocRef = doc(db, 'turmas', turmaId);
-      const turmaDoc = await getDoc(turmaDocRef);
-      if (turmaDoc.exists()) {
-        setTurma({ id: turmaDoc.id, ...turmaDoc.data() } as Turma);
+      // Offline-first: Tenta carregar do cache local via Repo
+      if (escolaAtivaId) {
+        await turmaRepo.seed(escolaAtivaId);
+        await estudanteRepo.seed(turmaId, escolaAtivaId);
       }
 
-      const estudantesQuery = query(collection(db, 'estudantes'), where('turma_id', '==', turmaId), where('status', '==', 'Frequentando'), orderBy('nome'));
-      const estudantesSnapshot = await getDocs(estudantesQuery);
-      const estudantesData = estudantesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Estudante));
-      setestudantes(estudantesData);
+      const turmaIdData = await turmaRepo.getById(turmaId);
+      if (turmaIdData) {
+        setTurma(turmaIdData as Turma);
+      }
+
+      const estudantesData = await estudanteRepo.getByTurma(turmaId);
+      const filteredEstudantes = estudantesData.filter((e: any) => e.status === 'Frequentando' && !e.excluido);
+      setestudantes(filteredEstudantes);
 
       // NOTE: The following data for 'notas' and 'situacoes' is mocked for demonstration.
       // In a real application, you would fetch this data from Firestore.
       const notasMap: Record<string, NotaCompleta> = {};
       const situacoesMap: Record<string, string> = {};
 
-      estudantesData.forEach(estudante => {
+      filteredEstudantes.forEach((estudante: any) => {
         situacoesMap[estudante.id] = 'Aprovado';
         componentes.forEach(disc => {
           notasMap[`${estudante.id}-${disc}`] = {
@@ -85,7 +92,7 @@ export default function AtaFinal() {
       setNotas(notasMap);
       setSituacoes(situacoesMap);
     } catch (error) {
-      toast.error('Sem permissão para carregar dados');
+      toast.error('Erro ao carregar dados');
       console.error(error);
     }
 
