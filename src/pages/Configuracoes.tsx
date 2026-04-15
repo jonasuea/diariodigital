@@ -75,6 +75,7 @@ export default function Configuracoes() {
     autenticacaoDoisFatores: false,
     modoManutencao: false,
     telaCheiaPadrao: false,
+    sincronizacaoOffline: false,
   });
 
   const [profileData, setProfileData] = useState({
@@ -124,6 +125,7 @@ export default function Configuracoes() {
             const prefs = profileSnap.data().preferencias;
             setPreferencias(prefs);
             localStorage.setItem('telaCheiaPadrao', JSON.stringify(prefs.telaCheiaPadrao || false));
+            localStorage.setItem('sincronizacaoOffline', JSON.stringify(prefs.sincronizacaoOffline || false));
           } else if (role === 'admin') {
             // Fallback para admin: ler preferências globais da escola
             const configDocRef = doc(db, 'configuracoes', 'escola');
@@ -132,6 +134,7 @@ export default function Configuracoes() {
               const prefs = configDocSnap.data().preferencias;
               setPreferencias(prefs);
               localStorage.setItem('telaCheiaPadrao', JSON.stringify(prefs.telaCheiaPadrao || false));
+              localStorage.setItem('sincronizacaoOffline', JSON.stringify(prefs.sincronizacaoOffline || false));
             }
           }
         }
@@ -257,6 +260,7 @@ export default function Configuracoes() {
   const handleSavePreferencias = async (newPreferencias: typeof preferencias) => {
     setPreferencias(newPreferencias);
     localStorage.setItem('telaCheiaPadrao', JSON.stringify(newPreferencias.telaCheiaPadrao));
+    localStorage.setItem('sincronizacaoOffline', JSON.stringify(newPreferencias.sincronizacaoOffline || false));
     try {
       if (role === 'admin') {
         const docRef = doc(db, 'configuracoes', 'escola');
@@ -765,6 +769,32 @@ export default function Configuracoes() {
                     <Switch
                       checked={preferencias.telaCheiaPadrao}
                       onCheckedChange={(checked) => handleSavePreferencias({ ...preferencias, telaCheiaPadrao: checked })}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-3">
+                      <ToggleLeft className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div>
+                        <p className="font-medium">Sincronização Offline (Pré-Cache)</p>
+                        <p className="text-sm text-muted-foreground">
+                          Baixa os dados automaticamente para funcionamento sem internet.
+                        </p>
+                      </div>
+                    </div>
+                    <Switch
+                      checked={preferencias.sincronizacaoOffline || false}
+                      onCheckedChange={(checked) => {
+                        handleSavePreferencias({ ...preferencias, sincronizacaoOffline: checked });
+                        if (checked && navigator.onLine) {
+                          toast.info('Baixando dados e dependências para uso offline...');
+                          // Trigger prefetching here
+                          if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.ready.then(reg => {
+                              reg.active?.postMessage({ type: 'PREFETCH_OFFLINE_DATA' });
+                            });
+                          }
+                        }
+                      }}
                     />
                   </div>
                 </CardContent>

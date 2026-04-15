@@ -73,8 +73,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           } else {
             setUser(authUser);
           }
-        } catch (error) {
-          console.error("[AuthContext] Erro crítico no onAuthStateChanged:", error);
+        } catch (error: any) {
+          if (navigator.onLine && !error?.message?.includes('offline')) {
+            console.error("[AuthContext] Erro crítico no onAuthStateChanged:", error);
+          }
           // Se falhar drasticamente, só desloga se estiver online
           if (navigator.onLine) {
             setUser(null);

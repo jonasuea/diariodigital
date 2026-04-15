@@ -94,9 +94,9 @@ export function AppSidebar() {
 
         <div className="mt-auto border-t border-sidebar-border p-3 bg-sidebar-background space-y-2">
           {!isMobile && (
-            <PWAInstallButton 
-              className="w-full justify-start border-none bg-sidebar-accent/40 hover:bg-sidebar-accent text-sidebar-foreground" 
-              showIconOnly={!isExpanded} 
+            <PWAInstallButton
+              className="w-full justify-start border-none bg-sidebar-accent/40 hover:bg-sidebar-accent text-sidebar-foreground"
+              showIconOnly={!isExpanded}
             />
           )}
           <button

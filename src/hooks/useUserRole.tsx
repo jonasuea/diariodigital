@@ -285,8 +285,10 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
                 }
               }
             }
-          } catch (err) {
-            console.error("[useUserRole] Erro ao buscar professor:", err);
+          } catch (err: any) {
+            if (navigator.onLine && !err?.message?.includes('offline')) {
+              console.error("[useUserRole] Erro ao buscar professor:", err);
+            }
           }
 
           if (profIdFound) setProfessorId(profIdFound);
@@ -456,8 +458,10 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
           isMaster: isMaster
         });
 
-      } catch (error) {
-        console.error('Error fetching user role data:', error);
+      } catch (error: any) {
+        if (navigator.onLine && !error?.message?.includes('offline')) {
+          console.error('Error fetching user role data:', error);
+        }
         // Em caso de erro (provavelmente offline), tentamos usar o snapshot uma última vez
         const snapshot = getInitialSnapshot(user.uid);
         if (snapshot && !role) {

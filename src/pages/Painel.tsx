@@ -24,6 +24,7 @@ import { format, formatDistanceToNow, getDay, parseISO, startOfMonth, startOfWee
 import { ptBR } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { cn, safeToDate } from '@/lib/utils';
+import { localDb } from '@/lib/db';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -134,6 +135,36 @@ export default function Painel() {
   async function fetchStatsAndEvents() {
     if (!escolaAtivaId) return;
     try {
+      if (!navigator.onLine) {
+        let estudantesCount = 0;
+        let turmasCount = 0;
+        let eventosData: Evento[] = [];
+        try {
+          estudantesCount = await localDb.estudantes.filter(e => e.escola_id === escolaAtivaId).count();
+          turmasCount = await localDb.turmas.filter(t => t.escola_id === escolaAtivaId).count();
+          const eventosOffline = await localDb.eventos.filter(ev => ev.escola_id === escolaAtivaId).toArray() as Evento[];
+          const hojeDate = new Date();
+          hojeDate.setHours(0, 0, 0, 0);
+          eventosData = eventosOffline
+            .filter(e => safeToDate(e.data) >= hojeDate)
+            .sort((a,b) => safeToDate(a.data).getTime() - safeToDate(b.data).getTime())
+            .slice(0, 5);
+        } catch (e) {
+          console.warn('Erro ao carregar do localDb no painel', e);
+        }
+
+        setStats({
+          totalEstudantes: estudantesCount,
+          totalTurmas: turmasCount,
+          totalProfessores: 0,
+          totalEventos: eventosData.length,
+          mediaNotas: null,
+        });
+
+        setProximosEventos(eventosData);
+        return;
+      }
+
       const hojeDate = new Date();
       hojeDate.setHours(0, 0, 0, 0);
       const hojeStr = format(hojeDate, 'yyyy-MM-dd');
@@ -205,8 +236,10 @@ export default function Painel() {
 
       setProximosEventos(eventosData);
     } catch (error) {
-      console.error('Error fetching stats and events:', error);
-      toast.error("Sem permissão para carregar estatísticas e eventos.");
+      if (navigator.onLine) {
+        console.error('Error fetching stats and events:', error);
+        toast.error("Sem permissão para carregar estatísticas e eventos.");
+      }
     }
   }
 
@@ -265,8 +298,10 @@ export default function Painel() {
 
       setFrequenciaData(dadosGrafico);
     } catch (error) {
-      console.error('Error fetching frequency data:', error);
-      toast.error("Sem permissão para carregar dados de frequência.");
+      if (navigator.onLine) {
+        console.error('Error fetching frequency data:', error);
+        toast.error("Sem permissão para carregar dados de frequência.");
+      }
     }
   }
 
@@ -310,8 +345,10 @@ export default function Painel() {
 
       setNotasBimestraisData(dadosGrafico);
     } catch (error) {
-      console.error('Error fetching bimester grades data:', error);
-      toast.error("Sem permissão para carregar dados de notas bimestrais.");
+      if (navigator.onLine) {
+        console.error('Error fetching bimester grades data:', error);
+        toast.error("Sem permissão para carregar dados de notas bimestrais.");
+      }
     }
   }
 
@@ -332,8 +369,10 @@ export default function Painel() {
       } as ActivityLog));
       setAtividadesRecentes(activitiesData);
     } catch (error) {
-      console.error("Sem permissão para buscar atividades recentes:", error);
-      toast.error("Não foi possível carregar o log de atividades.");
+      if (navigator.onLine) {
+        console.error("Sem permissão para buscar atividades recentes:", error);
+        toast.error("Não foi possível carregar o log de atividades.");
+      }
     }
   }
 
@@ -359,10 +398,10 @@ export default function Painel() {
 
           {!isEstudante && (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-              <StatCard title={t('dashboard.totalStudents')} value={loading ? '...' : stats.totalEstudantes?.toFixed(1) || 'N/A'} icon={Trophy} />
-              <StatCard title={t('dashboard.totalTeachers')} value={loading ? '...' : stats.totalProfessores?.toFixed(1) || 'N/A'} icon={Trophy} />
-              <StatCard title={t('dashboard.totalClasses')} value={loading ? '...' : stats.totalTurmas?.toFixed(1) || 'N/A'} icon={Trophy} />
-              <StatCard title={t('dashboard.averageGrades')} value={loading ? '...' : stats.mediaNotas?.toFixed(1) || 'N/A'} icon={Trophy} />
+              <StatCard title={t('dashboard.totalStudents')} value={loading ? '...' : stats.totalEstudantes || 0} icon={Trophy} />
+              <StatCard title={t('dashboard.totalTeachers')} value={loading ? '...' : stats.totalProfessores || 0} icon={Trophy} />
+              <StatCard title={t('dashboard.totalClasses')} value={loading ? '...' : stats.totalTurmas || 0} icon={Trophy} />
+              <StatCard title={t('dashboard.averageGrades')} value={loading ? '...' : stats.mediaNotas?.toFixed(0) || 'N/A'} icon={Trophy} />
             </div>
           )}
 
@@ -488,11 +527,11 @@ export default function Painel() {
                 {loading ? (
                   <p className="text-sm text-muted-foreground text-center py-4">{t('dashboard.loadingActivities')}</p>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {atividadesRecentes.length > 0 ? (
                       atividadesRecentes.map(activity => (
                         <div key={activity.id} className="flex items-start gap-3">
-                          <div className="flex-shrink-0 pt-1">
+                          <div className="flex-shrink-0 pt-0.5">
                             <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center">
                               <User className="h-4 w-4 text-muted-foreground" />
                             </div>

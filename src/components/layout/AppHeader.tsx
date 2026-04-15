@@ -225,7 +225,7 @@ export function AppHeader({ title }: AppHeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
       <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 w-full">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 sm:gap-4">
           {isMobile && (
             <Button
               variant="ghost"
@@ -236,13 +236,11 @@ export function AppHeader({ title }: AppHeaderProps) {
               <Menu className="h-5 w-5" />
             </Button>
           )}
-        </div>
 
-        <div className="flex items-center gap-2 sm:gap-4 flex-1 justify-end">
           {(isAdmin || (permittedEscolas && permittedEscolas.length > 1)) && (
-            <>
+            <div className="flex items-center gap-2">
               {/* Desktop School Select */}
-              <div className="w-[300px] lg:w-[400px] hidden lg:block mr-2">
+              <div className="w-[200px] xs:w-[250px] sm:w-[300px] lg:w-[350px] hidden md:block">
                 <Select
                   value={escolaAtivaId || ""}
                   onValueChange={(val) => {
@@ -251,10 +249,10 @@ export function AppHeader({ title }: AppHeaderProps) {
                     window.location.href = '/painel';
                   }}
                 >
-                  <SelectTrigger className="h-9">
+                  <SelectTrigger className="h-9 border-gray-200 bg-gray-50/50">
                     <div className="flex items-center gap-2 truncate">
-                      <School className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <span className="truncate">
+                      <School className="h-4 w-4 text-primary flex-shrink-0" />
+                      <span className="truncate font-medium text-gray-700">
                         {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || t('header.selectSchool')}
                       </span>
                     </div>
@@ -267,10 +265,10 @@ export function AppHeader({ title }: AppHeaderProps) {
                 </Select>
               </div>
 
-              <div className="lg:hidden mr-2">
+              <div className="md:hidden">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9" title={t('header.changeSchool')}>
+                    <Button variant="outline" size="icon" className="h-9 w-9 border-gray-200" title={t('header.changeSchool')}>
                       <School className="h-4 w-4 text-primary" />
                     </Button>
                   </DialogTrigger>
@@ -301,8 +299,11 @@ export function AppHeader({ title }: AppHeaderProps) {
                   </DialogContent>
                 </Dialog>
               </div>
-            </>
+            </div>
           )}
+        </div>
+
+        <div className="flex items-center gap-2 sm:gap-4 flex-1 justify-end">
 
           {role !== 'estudante' && (
             <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
@@ -356,22 +357,6 @@ export function AppHeader({ title }: AppHeaderProps) {
               </PopoverContent>
             </Popover>
           )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="relative hidden sm:flex text-gray-500 hover:text-primary hover:bg-gray-100"
-            onClick={() => navigate('/configuracoes')}
-          >
-            <Bell className="h-5 w-5" />
-            {hasUpdate && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-destructive animate-pulse" />
-            )}
-          </Button>
-
-          <div className="hidden sm:flex items-center px-1">
-            <PWAInstallButton />
-          </div>
 
           {/* Language Selector */}
           <div className="hidden sm:flex items-center px-2 border-r border-gray-200 mr-2">

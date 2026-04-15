@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -13,12 +13,21 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID // Corrigido aqui
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
 // Inicializa o Firebase (apenas uma vez)
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+
+// Analytics: inicializa somente quando há conexão para evitar erros offline
+let analytics: ReturnType<typeof getAnalytics> | null = null;
+if (navigator.onLine) {
+  isSupported().then((supported) => {
+    if (supported) {
+      analytics = getAnalytics(app);
+    }
+  }).catch(() => { /* silencia erros de suporte offline */ });
+}
 
 // Inicializa e exporta os serviços conforme a arquitetura do projeto
 export const auth = getAuth(app);
@@ -29,4 +38,4 @@ export const storage = getStorage(app);
 export const functions = getFunctions(app);
 export { analytics };
 
-export default app;
+export default app;

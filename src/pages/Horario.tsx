@@ -12,6 +12,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, doc, addDoc, updateDoc, deleteDoc, limit, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { logActivity } from '@/lib/logger';
+import { localDb } from '@/lib/db';
 import { useUserRole } from '@/hooks/useUserRole';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -92,6 +93,47 @@ export default function Horario() {
 
   async function fetchTurmas() {
     try {
+      if (!navigator.onLine) {
+        let turmasData: Turma[] = [];
+        if (isEstudante && user) {
+          const estudantesOffline = await localDb.estudantes
+            .filter(e => e.usuario_id === user.uid || e.email === user.email || e.email_responsavel === user.email)
+            .toArray();
+          if (estudantesOffline.length > 0 && estudantesOffline[0].turma_id) {
+            const turmaResult = await localDb.turmas.get(estudantesOffline[0].turma_id);
+            if (turmaResult) turmasData = [turmaResult];
+          }
+        } else if (role === 'professor' && user) {
+          // Descobre o ID do professor no localDb (pode ser diferente do user.uid)
+          let professorId: string | null = null;
+          const profByUid = await localDb.professores.get(user.uid);
+          if (profByUid) {
+            professorId = user.uid;
+          } else if (user.email) {
+            const profByEmail = await localDb.professores
+              .filter(p => p.email === user.email)
+              .first();
+            if (profByEmail) professorId = profByEmail.id;
+          }
+          
+          if (professorId && escolaAtivaId) {
+            turmasData = await localDb.turmas
+              .filter(t => t.escola_id === escolaAtivaId && Array.isArray(t.professoresIds) && t.professoresIds.includes(professorId))
+              .toArray() as Turma[];
+          }
+        } else {
+          turmasData = await localDb.turmas
+            .filter(t => t.escola_id === escolaAtivaId)
+            .toArray() as Turma[];
+        }
+        
+        turmasData.sort((a, b) => a.nome.localeCompare(b.nome));
+        setTurmas(turmasData);
+        if (turmasData.length > 0) setSelectedTurma(turmasData[0]);
+        setLoading(false);
+        return;
+      }
+
       if (isEstudante && user) {
         let q = query(collection(db, 'estudantes'), where('usuario_id', '==', user.uid), limit(1));
         let snap = await getDocs(q);
@@ -165,9 +207,11 @@ export default function Horario() {
           setSelectedTurma(turmasData[0]);
         }
       }
-    } catch (error) {
-      toast.error('Sem permissão para carregar turmas');
-      console.error(error);
+    } catch (error: any) {
+      if (navigator.onLine && !error?.message?.includes('offline')) {
+        toast.error('Sem permissão para carregar turmas');
+        console.error(error);
+      }
     }
     setLoading(false);
   }
@@ -175,6 +219,16 @@ export default function Horario() {
   async function fetchHorarios(turmaId: string) {
     setLoading(true);
     try {
+      if (!navigator.onLine) {
+        const horariosData = await localDb.horarios
+          .filter(h => h.turma_ids && h.turma_ids.includes(turmaId))
+          .toArray() as Horario[];
+        horariosData.sort((a, b) => a.inicio.localeCompare(b.inicio));
+        setHorarios(horariosData);
+        setLoading(false);
+        return;
+      }
+
       const q = query(collection(db, 'horarios'), where('turma_ids', 'array-contains', turmaId), orderBy('inicio'));
       const querySnapshot = await getDocs(q);
       const horariosData = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Horario));

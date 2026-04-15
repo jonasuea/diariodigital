@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { syncService } from '@/services/SyncService';
+import { db } from '@/lib/firebase';
+import { disableNetwork, enableNetwork } from 'firebase/firestore';
 
 interface OfflineStatusContextType {
   isOnline: boolean;
@@ -18,22 +20,34 @@ export const OfflineStatusProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    const handleOnline = () => {
+    const handleOnline = async () => {
       setIsOnline(true);
-      console.log('[OfflineStatus] Rede restabelecida. Iniciando sincronização...');
+      console.log('[OfflineStatus] Rede restabelecida. Ativando Firebase e sincronizando...');
+      try {
+        await enableNetwork(db);
+      } catch (e) {
+        console.warn('Erro ao restaurar rede Firebase', e);
+      }
       triggerSync();
     };
 
-    const handleOffline = () => {
+    const handleOffline = async () => {
       setIsOnline(false);
-      console.log('[OfflineStatus] Dispositivo offline.');
+      console.log('[OfflineStatus] Dispositivo offline. Desativando chamadas Firebase...');
+      try {
+        await disableNetwork(db);
+      } catch (e) {
+        console.warn('Erro ao desativar rede Firebase', e);
+      }
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Tenta sincronizar ao montar o componente se estiver online
-    if (navigator.onLine) {
+    // Ajuste inicial de rede
+    if (!navigator.onLine) {
+      disableNetwork(db).catch(() => {});
+    } else {
       triggerSync();
     }
 

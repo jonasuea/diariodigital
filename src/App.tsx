@@ -91,6 +91,7 @@ const router = createBrowserRouter([
 });
 
 import { OfflineStatusProvider } from "@/contexts/OfflineStatusContext";
+import { OfflineAutoSync } from "./components/OfflineAutoSync";
 
 const App = () => {
   return (
@@ -103,6 +104,7 @@ const App = () => {
             <UserRoleProvider>
               <RouterProvider router={router} />
               <MessagePopup />
+              <OfflineAutoSync />
             </UserRoleProvider>
           </AuthProvider>
         </OfflineStatusProvider>
@@ -110,6 +112,5 @@ const App = () => {
     </QueryClientProvider>
   );
 };
-
 
 export default App;

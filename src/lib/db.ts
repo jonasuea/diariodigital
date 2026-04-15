@@ -15,6 +15,8 @@ export class OfflineDB extends Dexie {
   dias_letivos!: Table<any>;
   base_curricular!: Table<any>;
   eventos!: Table<any>;
+  horarios!: Table<any>;
+  professores!: Table<any>;
 
   // Registros Pedagógicos
   frequencias!: Table<any>;
@@ -30,13 +32,13 @@ export class OfflineDB extends Dexie {
 
   constructor() {
     super('DiarioDigitalDB');
+    // Versão 1 e 2: schema original
     this.version(2).stores({
       turmas: 'id, escola_id',
       estudantes: 'id, turma_id, escola_id',
       dias_letivos: 'id, data, escola_id',
       base_curricular: 'id, componente, *serie',
       eventos: 'id, data, escola_id',
-      
       frequencias: 'id, [estudante_id+data], [turma_id+data]',
       entradas_diario: 'id, [turma_id+data]',
       registros_aulas: 'id, [turma_id+data+componente], [turma_id+componente]',
@@ -44,7 +46,24 @@ export class OfflineDB extends Dexie {
       notas: 'id, avaliacao_id, estudante_id',
       notas_parciais: 'id, turma_id, estudante_id',
       avaliacoes_infantil: 'id, [turma_id+estudante_id+data_avaliacao]',
-      
+      sync_queue: '++id, timestamp'
+    });
+    // Versão 3: adiciona horarios e professores
+    this.version(3).stores({
+      turmas: 'id, escola_id',
+      estudantes: 'id, turma_id, escola_id',
+      dias_letivos: 'id, data, escola_id',
+      base_curricular: 'id, componente, *serie',
+      eventos: 'id, data, escola_id',
+      horarios: 'id, *turma_ids',
+      professores: 'id, escola_id, uid, email',
+      frequencias: 'id, [estudante_id+data], [turma_id+data]',
+      entradas_diario: 'id, [turma_id+data]',
+      registros_aulas: 'id, [turma_id+data+componente], [turma_id+componente]',
+      avaliacoes: 'id, turma_id, [turma_id+componente+data]',
+      notas: 'id, avaliacao_id, estudante_id',
+      notas_parciais: 'id, turma_id, estudante_id',
+      avaliacoes_infantil: 'id, [turma_id+estudante_id+data_avaliacao]',
       sync_queue: '++id, timestamp'
     });
   }
