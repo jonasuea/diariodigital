@@ -32,6 +32,14 @@ export default {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
         },
+        brand: {
+          blue: "hsl(var(--primary))",
+          "blue-light": "hsl(var(--secondary))",
+          "blue-soft": "hsl(221 83% 95%)",
+          green: "hsl(var(--success))",
+          highlight: "hsl(217 91% 60%)",
+          yellow: "hsl(var(--warning))",
+        },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
@@ -62,6 +70,10 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+      },
+      boxShadow: {
+        soft: "0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 10px -2px rgba(0, 0, 0, 0.05)",
+        "soft-lg": "0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05)",
       },
       borderRadius: {
         lg: "var(--radius)",

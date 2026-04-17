@@ -40,16 +40,16 @@ export function AppSidebar() {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <div className={`fixed top-0 h-full bg-sidebar-background shadow-lg z-40 transition-all duration-300 flex flex-col ${isExpanded ? 'w-64 left-0' : isMobile ? 'w-64 -left-64' : 'w-16 left-0'}`}>
-        <div className="flex h-16 items-center justify-between px-4 border-b border-sidebar-border bg-sidebar-background">
+      <div className={`fixed top-0 h-full bg-white shadow-xl z-40 transition-all duration-300 flex flex-col border-r border-gray-100 ${isExpanded ? 'w-64 left-0' : isMobile ? 'w-64 -left-64' : 'w-16 left-0'}`}>
+        <div className="flex h-16 items-center justify-between px-4 border-b border-gray-100 bg-white">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sidebar-primary flex-shrink-0">
-              <GraduationCap className="h-5 w-5 text-sidebar-primary-foreground" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand-blue shadow-soft shadow-brand-blue/30 flex-shrink-0 transition-transform hover:scale-105 active:scale-95">
+              <GraduationCap className="h-5 w-5 text-white" />
             </div>
             {isExpanded && (
-              <span className="text-lg font-bold text-sidebar-primary whitespace-nowrap">
+              <span className="text-lg font-bold text-brand-blue whitespace-nowrap tracking-tight">
                 Diário Digital
-                <div className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-tight sm:tracking-widest leading-tight line-clamp-1 max-w-[120px] xs:max-w-none">
+                <div className="text-[9px] xs:text-[10px] sm:text-xs font-bold text-brand-blue/60 uppercase tracking-tight sm:tracking-widest leading-tight line-clamp-1 max-w-[120px] xs:max-w-none">
                   {t('header.prefeitura')}
                 </div>
               </span>
@@ -60,7 +60,7 @@ export function AppSidebar() {
               variant="ghost"
               size="icon"
               onClick={toggleSidebar}
-              className="h-8 w-8 text-sidebar-foreground/60 hover:text-sidebar-foreground flex-shrink-0"
+              className="h-8 w-8 text-brand-blue/60 hover:text-brand-blue hover:bg-brand-blue/5 flex-shrink-0 rounded-lg"
               title="Fechar menu"
             >
               <PanelLeftClose className="h-4 w-4" />
@@ -68,7 +68,7 @@ export function AppSidebar() {
           )}
         </div>
 
-        <div className="px-3 py-4 scrollbar-thin bg-sidebar-background flex-1 overflow-y-auto min-h-0">
+        <div className="px-3 py-4 scrollbar-thin bg-white flex-1 overflow-y-auto min-h-0">
           <div className="space-y-1">
             {menuItems.map((item) => (
               <NavLink
@@ -82,28 +82,28 @@ export function AppSidebar() {
                     sessionStorage.removeItem('diario_filtros');
                   }
                 }}
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 bg-sidebar-accent/40 text-sidebar-foreground font-medium transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground shadow-sm mb-1"
-                activeClassName="bg-sidebar-primary text-sidebar-primary-foreground font-bold shadow-md hover:bg-sidebar-primary hover:text-sidebar-primary-foreground scale-[1.02]"
+                className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-brand-blue/70 transition-all duration-200 hover:bg-brand-blue/5 hover:text-brand-blue shadow-none mb-1 group"
+                activeClassName="bg-brand-blue text-white font-semibold shadow-soft shadow-brand-blue/30 hover:bg-brand-blue hover:text-white group"
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
-                {isExpanded && <span className="whitespace-nowrap">{t(`menu.${item.title}`, item.title)}</span>}
+                <item.icon className="h-5 w-5 flex-shrink-0 transition-transform group-hover:scale-110" />
+                {isExpanded && <span className="whitespace-nowrap font-medium">{t(`menu.${item.title}`, item.title)}</span>}
               </NavLink>
             ))}
           </div>
         </div>
 
-        <div className="mt-auto border-t border-sidebar-border p-3 bg-sidebar-background space-y-2">
+        <div className="mt-auto border-t border-gray-100 p-3 bg-white space-y-2">
           {!isMobile && (
             <PWAInstallButton
-              className="w-full justify-start border-none bg-sidebar-accent/40 hover:bg-sidebar-accent text-sidebar-foreground"
+              className="w-full justify-start border-none bg-brand-blue/5 hover:bg-brand-blue/10 text-brand-blue rounded-xl font-semibold transition-all"
               showIconOnly={!isExpanded}
             />
           )}
           <button
             onClick={signOut}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 bg-sidebar-accent/40 text-sidebar-foreground font-medium transition-all hover:bg-destructive hover:text-destructive-foreground shadow-sm"
+            className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-red-500/80 font-semibold transition-all hover:bg-red-50 hover:text-red-600 group"
           >
-            <LogOut className="h-5 w-5 flex-shrink-0" />
+            <LogOut className="h-5 w-5 flex-shrink-0 transition-transform group-hover:-translate-x-1" />
             {isExpanded && <span className="whitespace-nowrap">{t('common.logout')}</span>}
           </button>
         </div>
@@ -111,3 +111,4 @@ export function AppSidebar() {
     </div>
   );
 }
+

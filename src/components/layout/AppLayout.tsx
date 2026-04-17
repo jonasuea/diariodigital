@@ -7,6 +7,7 @@ import { useSystemConfig } from '@/hooks/useSystemConfig';
 import { useUserRole } from '@/hooks/useUserRole';
 import { MaintenancePage } from '@/components/MaintenancePage';
 import { MessagePopup } from '@/components/MessagePopup';
+import { CommandPalette } from '@/components/CommandPalette';
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -42,6 +43,7 @@ export function AppLayout({ children, title }: AppLayoutProps) {
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background/50">
         <AppSidebar />
+        <CommandPalette />
         <MainContent title={title}>{children}</MainContent>
       </div>
     </SidebarProvider>

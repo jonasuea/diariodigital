@@ -223,24 +223,21 @@ export function AppHeader({ title }: AppHeaderProps) {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-      <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 w-full">
+    <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50 transition-all">
+      <div className="flex items-center justify-between px-4 py-2 sm:px-6 sm:py-3 w-full max-w-[1600px] mx-auto">
         <div className="flex items-center gap-2 sm:gap-4">
-          {isMobile && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={toggleSidebar}
-              className="lg:hidden text-primary hover:bg-primary/10 mr-1"
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleSidebar}
+            className="text-brand-blue/60 hover:text-brand-blue hover:bg-brand-blue/5 rounded-xl transition-colors lg:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
 
           {(isAdmin || (permittedEscolas && permittedEscolas.length > 1)) && (
             <div className="flex items-center gap-2">
-              {/* Desktop School Select */}
-              <div className="w-[200px] xs:w-[250px] sm:w-[300px] lg:w-[350px] hidden md:block">
+              <div className="w-[180px] xs:w-[220px] sm:w-[280px] lg:w-[320px] hidden md:block group">
                 <Select
                   value={escolaAtivaId || ""}
                   onValueChange={(val) => {
@@ -249,17 +246,21 @@ export function AppHeader({ title }: AppHeaderProps) {
                     window.location.href = '/painel';
                   }}
                 >
-                  <SelectTrigger className="h-9 border-gray-200 bg-gray-50/50">
-                    <div className="flex items-center gap-2 truncate">
-                      <School className="h-4 w-4 text-primary flex-shrink-0" />
-                      <span className="truncate font-medium text-gray-700">
+                  <SelectTrigger className="h-10 border-gray-200/60 bg-white/50 hover:bg-white hover:border-brand-blue/30 hover:shadow-soft transition-all rounded-xl ring-offset-background focus:ring-1 focus:ring-brand-blue px-3">
+                    <div className="flex items-center gap-2.5 truncate">
+                      <div className="h-7 w-7 rounded-lg bg-brand-blue items-center justify-center hidden sm:flex flex-shrink-0 transition-transform group-hover:scale-105">
+                        <School className="h-3.5 w-3.5 text-white" />
+                      </div>
+                      <span className="truncate font-semibold text-gray-700 text-sm">
                         {escolasDisponiveis.find(e => e.id === escolaAtivaId)?.nome || t('header.selectSchool')}
                       </span>
                     </div>
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl border-gray-100 shadow-xl p-1">
                     {escolasDisponiveis.map(esc => (
-                      <SelectItem key={esc.id} value={esc.id}>{esc.nome}</SelectItem>
+                      <SelectItem key={esc.id} value={esc.id} className="rounded-lg py-2.5 focus:bg-brand-blue/5 focus:text-brand-blue transition-colors cursor-pointer">
+                        {esc.nome}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -268,31 +269,35 @@ export function AppHeader({ title }: AppHeaderProps) {
               <div className="md:hidden">
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="icon" className="h-9 w-9 border-gray-200" title={t('header.changeSchool')}>
-                      <School className="h-4 w-4 text-primary" />
+                    <Button variant="outline" size="icon" className="h-10 w-10 border-gray-200/60 rounded-xl hover:bg-brand-blue/5 hover:text-brand-blue hover:border-brand-blue/30" title={t('header.changeSchool')}>
+                      <School className="h-4 w-4" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-[90vw] rounded-lg">
-                    <DialogHeader>
-                      <DialogTitle>{t('header.changeSchoolTitle')}</DialogTitle>
-                      <DialogDescription>
+                  <DialogContent className="max-w-[90vw] rounded-2xl p-4 sm:p-6 gallery-scrollbar">
+                    <DialogHeader className="mb-4">
+                      <DialogTitle className="text-xl font-bold text-brand-blue">{t('header.changeSchoolTitle')}</DialogTitle>
+                      <DialogDescription className="text-sm">
                         {t('header.changeSchoolDesc')}
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="grid gap-2 py-4">
+                    <div className="grid gap-2 overflow-y-auto max-h-[60vh] pr-1">
                       {escolasDisponiveis.map(esc => (
                         <Button
                           key={esc.id}
                           variant={escolaAtivaId === esc.id ? "default" : "outline"}
-                          className="justify-start h-12"
+                          className={`justify-start h-14 px-4 rounded-xl transition-all border-gray-200/60 ${
+                            escolaAtivaId === esc.id 
+                            ? "bg-brand-blue hover:bg-brand-blue/90 shadow-soft-lg" 
+                            : "hover:bg-brand-blue/5 hover:text-brand-blue hover:border-brand-blue/20"
+                          }`}
                           onClick={() => {
                             setEscolaAtivaId(esc.id);
                             sessionStorage.setItem('escolaAtivaId', esc.id);
                             window.location.href = '/painel';
                           }}
                         >
-                          <School className="mr-2 h-4 w-4" />
-                          <span className="truncate">{esc.nome}</span>
+                          <School className={`mr-3 h-5 w-5 ${escolaAtivaId === esc.id ? "text-white" : "text-brand-blue/60"}`} />
+                          <span className="truncate font-semibold text-base">{esc.nome}</span>
                         </Button>
                       ))}
                     </div>
@@ -304,95 +309,62 @@ export function AppHeader({ title }: AppHeaderProps) {
         </div>
 
         <div className="flex items-center gap-2 sm:gap-4 flex-1 justify-end">
-
           {role !== 'estudante' && (
-            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-              <PopoverTrigger asChild>
-                <div className="relative w-full sm:w-64 max-w-[100px] xs:max-w-[140px] sm:max-w-none md:max-w-[16rem] ml-1 sm:ml-2">
-                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    type="search"
-                    placeholder={t('common.search')}
-                    className="w-full pl-8 bg-gray-100 border-transparent focus-visible:ring-primary transition-all h-8 sm:h-9 text-xs sm:text-sm"
-                    value={searchQuery}
-                    onChange={handleSearchChange}
-                    onFocus={() => {
-                      if (searchQuery.length > 1) {
-                        setIsPopoverOpen(true);
-                      }
-                    }}
-                  />
-                </div>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 sm:w-80 p-0" align="end" onOpenAutoFocus={(e) => e.preventDefault()}>
-                {isSearching ? (
-                  <div className="flex items-center justify-center p-4">
-                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : searchResults.length > 0 ? (
-                  <div className="py-2">
-                    {searchResults.map(result => (
-                      <div
-                        key={result.id}
-                        className="flex items-center gap-3 px-3 py-2 hover:bg-muted cursor-pointer"
-                        onClick={() => handleResultClick(result)}
-                      >
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={result.foto_url} />
-                          <AvatarFallback>{result.nome.substring(0, 2).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <p className="text-sm font-medium">{result.nome}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{result.tipo}</p>
-                        </div>
-                        {getTipoIcon(result.tipo)}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="p-4 text-sm text-center text-muted-foreground">
-                    {debouncedSearchQuery.length > 1 ? t('common.noResults') : t('common.typeToSearch')}
-                  </p>
-                )}
-              </PopoverContent>
-            </Popover>
+            <div className="relative w-full sm:w-64 max-w-[100px] xs:max-w-[140px] sm:max-w-none md:max-w-[16rem] ml-1 sm:ml-2 group">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-hover:text-brand-blue" />
+              <Input
+                type="search"
+                placeholder="Buscar..."
+                className="w-full pl-9 pr-16 bg-gray-100/50 hover:bg-gray-100/80 border-transparent focus-visible:ring-brand-blue/30 focus:bg-white focus:border-brand-blue/20 transition-all h-10 rounded-xl text-sm cursor-pointer shadow-none hover:shadow-soft"
+                readOnly
+                onClick={() => {
+                  const ev = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true });
+                  document.dispatchEvent(ev);
+                }}
+              />
+              <kbd className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center h-5 select-none gap-1 rounded border border-gray-300/60 bg-white/10 px-1.5 font-mono text-[10px] font-medium text-gray-500 opacity-100 shadow-sm">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </div>
           )}
 
-          {/* Language Selector */}
-          <div className="hidden sm:flex items-center px-2 border-r border-gray-200 mr-2">
+          <div className="hidden sm:flex items-center gap-3">
             <SyncStatus />
-          </div>
-
-          <div className="hidden sm:flex items-center px-2">
+            <div className="h-4 w-[1px] bg-gray-200" />
             <LanguageSelector />
           </div>
 
-          <div className="flex items-center gap-2 pl-2 sm:pl-3 border-l sm:border-gray-200">
-            <Avatar className="h-7 w-7 sm:h-9 sm:w-9 border border-gray-200 shadow-sm shrink-0">
-              <AvatarImage src={userProfile?.foto_url} />
-              <AvatarFallback className="bg-primary/10 text-primary text-[10px] sm:text-sm font-bold">
-                {getInitials(userProfile?.nome || user?.email)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="hidden lg:block mr-2">
-              <p className="text-sm font-bold text-gray-900 truncate max-w-[120px]">
-                {userProfile?.nome || user?.email}
-              </p>
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">{capitalize(role)}</p>
+          <div className="flex items-center gap-2 pl-2 sm:pl-4 border-l border-gray-200/50">
+            <div className="flex items-center gap-2.5 group cursor-pointer p-0.5 pr-2 rounded-xl hover:bg-gray-50 transition-colors lg:flex hidden">
+              <Avatar className="h-9 w-9 border-2 border-white shadow-soft ring-1 ring-gray-100 transition-transform group-hover:scale-105">
+                <AvatarImage src={userProfile?.foto_url} />
+                <AvatarFallback className="bg-brand-blue/10 text-brand-blue text-sm font-bold">
+                  {getInitials(userProfile?.nome || user?.email)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col text-left">
+                <p className="text-sm font-bold text-gray-900 truncate max-w-[140px] leading-tight group-hover:text-brand-blue transition-colors">
+                  {userProfile?.nome || user?.email}
+                </p>
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-brand-blue/60 uppercase tracking-widest">{t(`roles.${role}`, role)}</span>
+                  {isAdmin && <span className="h-1 w-1 rounded-full bg-brand-blue/30" />}
+                </div>
+              </div>
             </div>
 
-            <button
-              onClick={handleLogout}
-              className="font-body font-semibold text-gray-600 hover:text-primary hover:bg-gray-100 px-3 py-1.5 rounded transition-colors text-sm items-center gap-2 hidden lg:flex"
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleLogout} 
+              className="rounded-xl text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all flex group"
+              title={t('common.logout')}
             >
-              {t('common.logout')}
-            </button>
-            <Button variant="ghost" size="icon" onClick={handleLogout} className="lg:hidden text-gray-500 hover:text-primary">
-              <LogOut className="h-4 w-4" />
+              <LogOut className="h-5 w-5 transition-transform group-hover:translate-x-0.5" />
             </Button>
           </div>
         </div>
       </div>
-    </header >
+    </header>
   );
 }
