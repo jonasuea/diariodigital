@@ -151,7 +151,7 @@ function KPICard({ title, value, icon: Icon, gradient, iconBg, trend, onClick }:
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 flex-1 min-w-0">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
+            <p className="text-[13px] font-semibold text-muted-foreground uppercase tracking-tight truncate">
               {title}
             </p>
             <p className="text-3xl font-bold tracking-tight tabular-nums leading-none">
@@ -170,10 +170,10 @@ function KPICard({ title, value, icon: Icon, gradient, iconBg, trend, onClick }:
             ) : (
               <TrendingDown className="h-3.5 w-3.5 text-red-500" />
             )}
-            <span className={cn('text-xs font-medium', trend.value >= 0 ? 'text-emerald-600' : 'text-red-600')}>
+            <span className={cn('text-[12px] font-medium', trend.value >= 0 ? 'text-emerald-600' : 'text-red-600')}>
               {trend.value > 0 ? '+' : ''}{trend.value}%
             </span>
-            <span className="text-xs text-muted-foreground">{trend.label}</span>
+            <span className="text-[12px] text-muted-foreground">{trend.label}</span>
           </div>
         )}
       </CardContent>
@@ -587,16 +587,16 @@ export default function Painel() {
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <div className="space-y-6 animate-fade-in">
+        <div className="space-y-8 animate-fade-in max-w-7xl mx-auto pb-10">
 
           {/* ── Header greeting ──────────────────────────────────────────── */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">
-                {getGreeting(t)}{displayName ? `, ${displayName}` : ''}
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                {getGreeting(t)}, {displayName ? `${displayName}` : t('dashboard.user')}!
               </h1>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                {t('dashboard.welcomeSub')}
+              <p className="text-base text-slate-500 font-medium mt-0.5">
+                {t('dashboard.welcomeSub')} — {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
               </p>
             </div>
             {!isProfessor && !isEstudante && (
@@ -615,11 +615,11 @@ export default function Painel() {
           {/* ── KPI Cards ────────────────────────────────────────────────── */}
           {!isEstudante && (
             loading ? (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
                 {[...Array(4)].map((_, i) => <StatSkeleton key={i} />)}
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
                 <KPICard
                   title={t('dashboard.totalStudents')}
                   value={stats.totalEstudantes}
@@ -653,16 +653,16 @@ export default function Painel() {
           )}
 
           {/* ── Main grid: chart + sidebar ───────────────────────────────── */}
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 lg:gap-8 lg:grid-cols-3">
 
             {/* Chart */}
             {!isEstudante && (
               <Card className="lg:col-span-2 border-0 shadow-soft">
                 <Tabs defaultValue="frequencia" onValueChange={setActiveChartTab}>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-6 pt-6 pb-4 gap-4">
-                    <div>
-                      <p className="font-semibold text-sm">{t('dashboard.performanceTitle')}</p>
-                      <p className="text-xs text-muted-foreground">{t('dashboard.performanceSub')}</p>
+                    <div className="space-y-1">
+                      <CardTitle className="text-lg font-bold text-slate-800">{t('dashboard.performanceTitle')}</CardTitle>
+                      <CardDescription className="text-sm">{t('dashboard.performanceSub')}</CardDescription>
                     </div>
                     <div className="flex items-center gap-2 w-full sm:w-auto">
                       <TabsList className="w-full sm:w-auto h-8">
@@ -689,8 +689,8 @@ export default function Painel() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={frequenciaData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                          <XAxis dataKey="dia" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                          <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
+                          <XAxis dataKey="dia" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} domain={[0, 100]} tickFormatter={v => `${v}%`} />
                           <RechartsTooltip
                             formatter={(value: number) => [`${value}%`, t('dashboard.absenceRate')]}
                             contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,.08)' }}
@@ -706,8 +706,8 @@ export default function Painel() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={notasBimestraisData}>
                           <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-                          <XAxis dataKey="bimestre" stroke="#888" fontSize={11} tickLine={false} axisLine={false} />
-                          <YAxis stroke="#888" fontSize={11} tickLine={false} axisLine={false} domain={[0, 10]} />
+                          <XAxis dataKey="bimestre" stroke="#888" fontSize={12} tickLine={false} axisLine={false} />
+                          <YAxis stroke="#888" fontSize={12} tickLine={false} axisLine={false} domain={[0, 10]} />
                           <RechartsTooltip
                             contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: 'var(--radius)', boxShadow: '0 4px 12px rgba(0,0,0,.08)' }}
                           />
@@ -721,14 +721,14 @@ export default function Painel() {
             )}
 
             {/* Sidebar: Alerts + Events + Quick Actions */}
-            <div className="space-y-4">
+            <div className="space-y-6">
 
               {/* Alerts */}
               {!isProfessor && !isEstudante && (
                 <Card className="border-0 shadow-soft">
                   <CardHeader className="pb-3 pt-5 px-5">
-                    <CardTitle className="text-sm font-semibold">{t('dashboard.alertsHeader')}</CardTitle>
-                    <CardDescription className="text-xs">{t('dashboard.alertsSub')}</CardDescription>
+                    <CardTitle className="text-lg font-bold text-slate-800">{t('dashboard.alertsHeader')}</CardTitle>
+                    <CardDescription className="text-sm">{t('dashboard.alertsSub')}</CardDescription>
                   </CardHeader>
                   <CardContent className="px-5 pb-5 space-y-2">
                     {loading ? (
@@ -747,7 +747,7 @@ export default function Painel() {
               {/* Quick Actions */}
               <Card className="border-0 shadow-soft">
                 <CardHeader className="pb-3 pt-5 px-5">
-                  <CardTitle className="text-sm font-semibold">{t('dashboard.quickActions')}</CardTitle>
+                  <CardTitle className="text-lg font-bold text-slate-800">{t('dashboard.quickActions')}</CardTitle>
                 </CardHeader>
                 <CardContent className="px-5 pb-5">
                   <div className="grid grid-cols-2 gap-2">
@@ -771,11 +771,11 @@ export default function Painel() {
               {/* Events */}
               <Card className="border-0 shadow-soft">
                 <CardHeader className="pb-3 pt-5 px-5">
-                  <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                    <Calendar className="h-4 w-4 text-primary" />
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                    <Calendar className="h-5 w-5 text-primary" />
                     {t('dashboard.upcomingEvents')}
                   </CardTitle>
-                  <CardDescription className="text-xs">{t('dashboard.upcomingEventsDesc')}</CardDescription>
+                  <CardDescription className="text-sm">{t('dashboard.upcomingEventsDesc')}</CardDescription>
                 </CardHeader>
                 <CardContent className="px-5 pb-5">
                   {loading ? (
@@ -818,11 +818,11 @@ export default function Painel() {
             <Card className="border-0 shadow-soft">
               <CardHeader className="flex flex-row items-center justify-between pt-5 px-5 pb-3">
                 <div>
-                  <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                    <List className="h-4 w-4 text-primary" />
+                  <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-800">
+                    <List className="h-5 w-5 text-primary" />
                     {t('dashboard.recentActivities')}
                   </CardTitle>
-                  <CardDescription className="text-xs">{t('dashboard.recentActivitiesDesc')}</CardDescription>
+                  <CardDescription className="text-sm">{t('dashboard.recentActivitiesDesc')}</CardDescription>
                 </div>
                 <Button variant="outline" size="sm" className="text-xs h-8" onClick={() => navigate('/logs')}>
                   {t('dashboard.viewAll')}

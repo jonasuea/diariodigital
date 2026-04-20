@@ -25,8 +25,8 @@ export default function Auth() {
 
   if (loading || loadingRole) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F1D1]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#D4A017]" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
@@ -53,9 +53,9 @@ export default function Auth() {
         // Redireciona para o sistema externo correto
         window.location.href = externalUrl;
         return (
-          <div className="min-h-screen flex items-center justify-center bg-[#F8F1D1]">
-            <Loader2 className="h-8 w-8 animate-spin text-[#D4A017]" />
-            <span className="ml-2 text-[#8B6508]">Redirecionando para o sistema correto...</span>
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <span className="ml-2 text-muted-foreground">Redirecionando para o sistema correto...</span>
           </div>
         );
       }
@@ -64,9 +64,9 @@ export default function Auth() {
     }
 
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8F1D1]">
-        <Loader2 className="h-8 w-8 animate-spin text-[#D4A017]" />
-        <span className="ml-2 text-[#8B6508]">Verificando permissões...</span>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <span className="ml-2 text-muted-foreground">Verificando permissões...</span>
       </div>
     );
   }
@@ -138,10 +138,10 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen auth-bg-main font-sans selection:bg-[#D4A017]/30 selection:text-[#8B6508]">
+    <div className="min-h-screen auth-bg-main font-sans selection:bg-primary/30 selection:text-primary">
       {/* Top Header Strip */}
       <div className="auth-header-strip flex items-center justify-end px-8 md:px-20">
-        <div className="bg-[#D4A017] rounded-b-xl px-4 py-1 shadow-md flex items-center gap-2 border-x border-b border-[#B8860B]">
+        <div className="bg-primary rounded-b-xl px-4 py-1 shadow-md flex items-center gap-2 border-x border-b border-primary/20">
           <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center p-1 overflow-hidden">
             <img src="/timbre_semed.png" alt="Prefeitura" className="object-contain" />
           </div>
@@ -164,18 +164,17 @@ export default function Auth() {
               src="/timbre_semed.png"
               alt="Diário Digital Semed"
               className="h-48 md:h-64 object-contain filter drop-shadow-xl"
-              style={{ filter: 'sepia(1) saturate(2) hue-rotate(5deg) brightness(0.8)' }}
             />
             <div className="mt-4">
-              <h2 className="text-4xl md:text-5xl font-black text-[#8B6508] tracking-tight">
-                Diário <span className="text-[#D4A017]">Digital</span>
+              <h2 className="text-4xl md:text-5xl font-black text-primary tracking-tight">
+                Diário <span className="text-blue-500">Digital</span>
               </h2>
-              <p className="text-lg font-bold text-[#8B6508]/70 tracking-widest uppercase">Semed</p>
+              <p className="text-lg font-bold text-primary/70 tracking-widest uppercase">Semed</p>
             </div>
           </div>
 
           <div className="max-w-sm hidden md:block">
-            <p className="text-[#8B6508]/80 leading-relaxed font-medium italic">
+            <p className="text-primary/80 leading-relaxed font-medium italic">
               O Diário Digital é uma aplicação web utilizada pelos docentes objetivando dinamizar o fazer pedagógico e manter uma base de dados centralizada e atualizada.
             </p>
           </div>
@@ -184,14 +183,14 @@ export default function Auth() {
         {/* Right Aspect - Login Card */}
         <div className="w-full max-w-md relative">
           {/* Floating Hat Icon */}
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-[#D4A017] w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border-2 border-white z-20">
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-primary w-12 h-12 rounded-xl flex items-center justify-center shadow-lg border-2 border-white z-20">
             <GraduationCap className="text-white w-7 h-7" />
           </div>
 
           <div className="auth-card-premium pt-12">
             <div className="text-center mb-10">
-              <h1 className="text-3xl font-bold text-[#8B6508]">Diário Digital</h1>
-              <p className="text-[#8B6508]/60 font-medium">{isLogin ? t('login.title') : t('login.titleCreate')}</p>
+              <h1 className="text-3xl font-bold text-primary">Diário Digital</h1>
+              <p className="text-muted-foreground font-medium">{isLogin ? t('login.title') : t('login.titleCreate')}</p>
             </div>
 
             {!isOnline && (
@@ -204,7 +203,7 @@ export default function Auth() {
             <form onSubmit={handleSubmit} className="space-y-6">
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="nome" className="text-[#8B6508] font-bold ml-1">{t('login.name')}</Label>
+                  <Label htmlFor="nome" className="text-primary font-bold ml-1">{t('login.name')}</Label>
                   <Input
                     id="nome"
                     type="text"
@@ -218,7 +217,7 @@ export default function Auth() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-[#8B6508] font-bold ml-1">{t('login.email')}</Label>
+                <Label htmlFor="email" className="text-primary font-bold ml-1">{t('login.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -232,7 +231,7 @@ export default function Auth() {
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center ml-1">
-                  <Label htmlFor="password" className="text-[#8B6508] font-bold">{t('login.password')}</Label>
+                  <Label htmlFor="password" className="text-primary font-bold">{t('login.password')}</Label>
                 </div>
                 <div className="relative">
                   <Input
@@ -248,7 +247,7 @@ export default function Auth() {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8B6508]/40 hover:text-[#8B6508] transition-colors"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-primary/40 hover:text-primary transition-colors"
                   >
                     {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                   </button>
@@ -258,7 +257,7 @@ export default function Auth() {
                     <button
                       type="button"
                       onClick={handleResetPassword}
-                      className="text-xs font-bold text-[#D4A017] hover:dd-text-gold transition-colors"
+                      className="text-xs font-bold text-primary/60 hover:text-primary transition-colors"
                     >
                       {t('login.forgotPassword')}
                     </button>
@@ -285,7 +284,7 @@ export default function Auth() {
 
             <div className="mt-8 text-center space-y-4">
 
-              <div className="pt-6 border-t border-[#8B6508]/10 text-xs text-[#8B6508]/50 flex flex-col items-center gap-1">
+              <div className="pt-6 border-t border-primary/10 text-xs text-muted-foreground flex flex-col items-center gap-1">
                 <p className="font-bold uppercase tracking-wider">{t('login.devMessage1')}</p>
                 <p>{t('login.devMessage2')} - {t('login.devMessage3')}</p>
               </div>
@@ -296,7 +295,7 @@ export default function Auth() {
 
       {/* Floating help button - matched to screenshot circle-? */}
       <div className="fixed bottom-8 left-8 z-50">
-        <button className="w-14 h-14 bg-[#D4A017] rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 active:scale-95 transition-all">
+        <button className="w-14 h-14 bg-primary rounded-full flex items-center justify-center text-white shadow-lg hover:scale-110 active:scale-95 transition-all">
           <HelpCircle size={32} />
         </button>
       </div>

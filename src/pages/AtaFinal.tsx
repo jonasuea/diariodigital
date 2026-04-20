@@ -20,6 +20,7 @@ interface NotaCompleta {
   componente: string;
   media: number;
   faltas: number;
+  frequencia: number;
 }
 
 interface Turma {
@@ -31,10 +32,7 @@ interface Turma {
   capacidade: number;
 }
 
-const componentes = [
-  'Língua Portuguesa', 'Arte', 'Educação Física', 'Língua Inglesa',
-  'Matemática', 'Ciências', 'Geografia', 'História'
-];
+// Dynamic components will be fetched from the turma object
 
 export default function AtaFinal() {
   const navigate = useNavigate();
@@ -72,25 +70,82 @@ export default function AtaFinal() {
       const filteredEstudantes = estudantesData.filter((e: any) => e.status === 'Frequentando' && !e.excluido);
       setestudantes(filteredEstudantes);
 
-      // NOTE: The following data for 'notas' and 'situacoes' is mocked for demonstration.
-      // In a real application, you would fetch this data from Firestore.
-      const notasMap: Record<string, NotaCompleta> = {};
-      const situacoesMap: Record<string, string> = {};
+      // Fetch components from turma
+      const componentesDaTurma = (turmaIdData.componentes || []) as any[];
 
-      filteredEstudantes.forEach((estudante: any) => {
-        situacoesMap[estudante.id] = 'Aprovado';
-        componentes.forEach(disc => {
-          notasMap[`${estudante.id}-${disc}`] = {
-            estudante_id: estudante.id,
-            componente: disc,
-            media: Math.round((Math.random() * 4 + 6) * 10) / 10,
-            faltas: Math.floor(Math.random() * 10),
-          };
-        });
+      // Load all notes for this turma and year
+      const currentYear = new Date().getFullYear();
+      const notasQuery = query(
+        collection(db, 'notas'),
+        where('turma_id', '==', turmaId),
+        where('ano', '==', currentYear)
+      );
+      const notasSnapshot = await getDocs(notasQuery);
+      const fetchedNotasMap: Record<string, Record<string, any>> = {};
+      notasSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (!fetchedNotasMap[data.estudante_id]) fetchedNotasMap[data.estudante_id] = {};
+        fetchedNotasMap[data.estudante_id][data.componente] = data;
       });
 
-      setNotas(notasMap);
-      setSituacoes(situacoesMap);
+      // Load all frequencies for this turma
+      const freqQuery = query(
+        collection(db, 'frequencias'),
+        where('turma_id', '==', turmaId)
+      );
+      const freqSnapshot = await getDocs(freqQuery);
+      const faltasMap: Record<string, Record<string, number>> = {};
+      freqSnapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.status === 'faltou') {
+          if (!faltasMap[data.estudante_id]) faltasMap[data.estudante_id] = {};
+          faltasMap[data.estudante_id][data.componente] = (faltasMap[data.estudante_id][data.componente] || 0) + 1;
+        }
+      });
+
+      const processedNotas: Record<string, NotaCompleta> = {};
+      const calculatedSituacoes: Record<string, string> = {};
+
+      filteredEstudantes.forEach((estudante: any) => {
+        let failsGrade = 0;
+        let failsFreq = 0;
+
+        componentesDaTurma.forEach(comp => {
+          const compNota = fetchedNotasMap[estudante.id]?.[comp.nome];
+          const media = compNota?.media_anual || 0;
+          const faltas = faltasMap[estudante.id]?.[comp.nome] || 0;
+          const carga = comp.cargaHoraria || 0;
+          const freqPercent = carga > 0 ? ((carga - faltas) / carga) * 100 : 100;
+
+          processedNotas[`${estudante.id}-${comp.nome}`] = {
+            estudante_id: estudiante.id,
+            componente: comp.nome,
+            media: Number(media),
+            faltas: Number(faltas),
+            frequencia: freqPercent
+          } as any;
+
+          if (media < 6) failsGrade++;
+          if (freqPercent < 75) failsFreq++;
+        });
+
+        // Business Rules:
+        // Aprovado: media >= 6 and freq > 75 in ALL
+        // Pendente: 1-2 medias < 6 and freq > 75 in ALL
+        // Reprovado: medias < 6 in > 2 or freq < 75 in any
+        
+        if (failsGrade === 0 && failsFreq === 0) {
+          calculatedSituacoes[estudante.id] = 'Aprovado';
+        } else if (failsGrade <= 2 && failsFreq === 0) {
+          calculatedSituacoes[estudante.id] = 'Pendente';
+        } else {
+          calculatedSituacoes[estudante.id] = 'Reprovado';
+        }
+      });
+
+      setNotas(processedNotas);
+      setSituacoes(calculatedSituacoes);
+
     } catch (error) {
       toast.error('Erro ao carregar dados');
       console.error(error);
@@ -185,19 +240,20 @@ export default function AtaFinal() {
                   <tr className="border-b bg-muted/50">
                     <th className="p-3 text-left font-medium" rowSpan={2}>Nº</th>
                     <th className="p-3 text-left font-medium" rowSpan={2}>NOME DO ESTUDANTE(A)</th>
-                    {componentes.map((disc) => (
-                      <th key={disc} className="p-2 text-center font-medium border-l" colSpan={2}>
-                        {disc}
+                    {/* Dynamic Headers based on Turma Components */}
+                    {(turma?.componentes || []).map((comp: any) => (
+                      <th key={comp.id || comp.nome} className="p-2 text-center font-medium border-l" colSpan={2}>
+                        {comp.nome}
                       </th>
                     ))}
                     <th className="p-3 text-center font-medium border-l" rowSpan={2}>SITUAÇÃO</th>
                   </tr>
                   <tr className="border-b bg-muted/30">
-                    {componentes.map((disc) => (
-                      <>
-                        <th key={`${disc}-res`} className="p-2 text-center text-xs border-l">Res</th>
-                        <th key={`${disc}-fal`} className="p-2 text-center text-xs">Fal</th>
-                      </>
+                    {(turma?.componentes || []).map((comp: any) => (
+                      <React.Fragment key={comp.id || comp.nome}>
+                        <th className="p-2 text-center text-[10px] border-l uppercase">Res</th>
+                        <th className="p-2 text-center text-[10px] uppercase">Fal</th>
+                      </React.Fragment>
                     ))}
                   </tr>
                 </thead>
@@ -206,17 +262,27 @@ export default function AtaFinal() {
                     <tr key={estudante.id} className="border-b hover:bg-muted/30">
                       <td className="p-3 font-medium">{String(index + 1).padStart(2, '0')}</td>
                       <td className="p-3 font-medium">{estudante.nome}</td>
-                      {componentes.map((disc) => {
-                        const nota = notas[`${estudante.id}-${disc}`];
+                      {(turma?.componentes || []).map((comp: any) => {
+                        const nota = notas[`${estudante.id}-${comp.nome}`];
+                        const freqFail = (nota?.frequencia || 0) < 75;
+                        const gradeFail = (nota?.media || 0) < 6;
+                        
                         return (
-                          <>
-                            <td key={`${estudante.id}-${disc}-res`} className={`p-2 text-center border-l ${getMediaColor(nota?.media || 0)}`}>
-                              {nota?.media?.toFixed(1) || '-'}
+                          <React.Fragment key={`${estudante.id}-${comp.nome}`}>
+                            <td className={`p-2 text-center border-l ${gradeFail ? 'bg-red-50 text-red-600 font-bold' : ''}`}>
+                              {nota ? nota.media.toFixed(1) : '-'}
                             </td>
-                            <td key={`${estudante.id}-${disc}-fal`} className="p-2 text-center">
-                              {nota?.faltas || 0}
+                            <td className={`p-2 text-center ${freqFail ? 'bg-orange-50 text-orange-600 font-bold' : ''}`}>
+                              <div className="flex flex-col items-center leading-tight">
+                                <span>{nota?.faltas || 0}</span>
+                                {nota && (
+                                  <span className="text-[10px] opacity-70">
+                                    {Math.round(nota.frequencia)}%
+                                  </span>
+                                )}
+                              </div>
                             </td>
-                          </>
+                          </React.Fragment>
                         );
                       })}
                       <td className="p-3 text-center border-l">
@@ -229,6 +295,7 @@ export default function AtaFinal() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="Aprovado">Aprovado</SelectItem>
+                            <SelectItem value="Pendente">Pendente</SelectItem>
                             <SelectItem value="Reprovado">Reprovado</SelectItem>
                             <SelectItem value="Transferido">Transferido</SelectItem>
                           </SelectContent>
@@ -242,7 +309,7 @@ export default function AtaFinal() {
 
             {/* Legenda */}
             <div className="p-4 border-t bg-muted/30 text-sm text-muted-foreground">
-              <p><strong>OBS:</strong> Res = Resultado (média dos bimestres) / Fal = Faltas (total anual por componente)</p>
+              <p><strong>OBS:</strong> Res = Resultado (média anual) / Fal = Faltas (total anual e % de frequência com base na carga horária)</p>
             </div>
           </div>
         )}

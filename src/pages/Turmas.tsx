@@ -21,6 +21,7 @@ interface ComponenteCurricular {
   nome: string;
   professorId: string;
   professorNome?: string;
+  cargaHoraria?: number;
 }
 
 interface Turma {
@@ -92,7 +93,7 @@ export default function Turmas() {
   const [alocarDialogOpen, setAlocarDialogOpen] = useState(false);
   const [turmaParaAlocar, setTurmaParaAlocar] = useState<Turma | null>(null);
   const [alocacaoData, setAlocacaoData] = useState<Omit<ComponenteCurricular, 'professorNome'>[]>([]);
-  const [novaAlocacao, setNovaAlocacao] = useState({ professorId: '', nome: '' });
+  const [novaAlocacao, setNovaAlocacao] = useState({ professorId: '', nome: '', cargaHoraria: 0 });
 
   const { user } = useAuth();
   const { isAdmin, isMasterAdmin, isSecretario, escolaAtivaId } = useUserRole();
@@ -447,15 +448,19 @@ export default function Turmas() {
 
   function openAlocarDialog(turma: Turma) {
     setTurmaParaAlocar(turma);
-    // Remove o campo professorNome antes de colocar no estado de edição
-    const disciplinasParaEdicao = turma.componentes?.map(({ nome, professorId }) => ({ nome, professorId })) || [];
+    // Include cargaHoraria in the edicao state
+    const disciplinasParaEdicao = turma.componentes?.map(({ nome, professorId, cargaHoraria }) => ({ 
+      nome, 
+      professorId, 
+      cargaHoraria: cargaHoraria || 0 
+    })) || [];
     setAlocacaoData(disciplinasParaEdicao);
     setAlocarDialogOpen(true);
   }
 
   function adicionarAlocacao() {
-    if (!novaAlocacao.professorId || !novaAlocacao.nome) {
-      toast.error('Selecione um professor e um componente curricular.');
+    if (!novaAlocacao.professorId || !novaAlocacao.nome || !novaAlocacao.cargaHoraria) {
+      toast.error('Preencha o professor, componente e carga horária.');
       return;
     }
     if (alocacaoData.some(a => a.nome === novaAlocacao.nome)) {
@@ -463,7 +468,7 @@ export default function Turmas() {
       return;
     }
     setAlocacaoData(prev => [...prev, novaAlocacao]);
-    setNovaAlocacao({ professorId: '', nome: '' });
+    setNovaAlocacao({ professorId: '', nome: '', cargaHoraria: 0 });
   }
 
   function removerAlocacao(disciplinaNome: string) {
@@ -975,6 +980,15 @@ export default function Turmas() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label>Carga Horária (Anual)</Label>
+                <Input
+                  type="number"
+                  placeholder="Ex: 200"
+                  value={novaAlocacao.cargaHoraria || ''}
+                  onChange={(e) => setNovaAlocacao(prev => ({ ...prev, cargaHoraria: parseInt(e.target.value) || 0 }))}
+                />
+              </div>
               <Button onClick={adicionarAlocacao} className="w-full">
                 <Plus className="h-4 w-4 mr-2" /> Adicionar
               </Button>
@@ -993,7 +1007,9 @@ export default function Turmas() {
                       <div key={index} className="flex items-center justify-between p-3 border-b last:border-b-0">
                         <div>
                           <p className="font-medium">{alocacao.nome}</p>
-                          <p className="text-sm text-muted-foreground">{professor?.nome || 'Professor não encontrado'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {professor?.nome || 'Professor não encontrado'} • {alocacao.cargaHoraria}h
+                          </p>
                         </div>
                         <Button variant="ghost" size="icon" onClick={() => removerAlocacao(alocacao.nome)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
