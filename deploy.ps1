@@ -44,6 +44,10 @@ Write-Host "Arquivos de versão atualizados com sucesso!" -ForegroundColor Cyan
 
 # --- PASSO 1: ATUALIZAR O GITHUB ---
 
+# Desabilita garbage collection automático do Git durante o deploy
+# (evita o prompt "Deletion of directory failed" no Windows)
+git config gc.auto 0
+
 Write-Host "Adicionando todos os arquivos modificados ao Git..." -ForegroundColor Green
 git add .
 
