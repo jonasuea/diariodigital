@@ -71,7 +71,7 @@
       "collectionGroup": "turmas",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "escola_id", "order": "ASCENDING" },
+        { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "ano", "order": "ASCENDING" },
         { "fieldPath": "excluido", "order": "ASCENDING" },
         { "fieldPath": "nome", "order": "ASCENDING" }
@@ -148,6 +148,30 @@
       "fields": [
         { "fieldPath": "escola_ids", "arrayConfig": "CONTAINS" },
         { "fieldPath": "turma_id", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "equipe_gestora",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome_lower", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "professores",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome_lower", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "estudantes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "excluido", "order": "ASCENDING" },
+        { "fieldPath": "nome_lower", "order": "ASCENDING" }
       ]
     },
     {

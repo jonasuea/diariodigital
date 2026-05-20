@@ -1,7 +1,4 @@
 rules_version = '2';
-// ATENÇÃO: Este arquivo é uma cópia do master (educafacil/firestore.rules).
-// Todos os projetos compartilham o mesmo projeto Firebase e portanto as mesmas regras.
-// Sempre sincronize com o master ao fazer alterações.
 service cloud.firestore {
   match /databases/{database}/documents {
     
@@ -13,9 +10,8 @@ service cloud.firestore {
     }
     
     function getRole() {
-      return exists(/databases/$(database)/documents/user_roles/$(request.auth.uid))
-        ? get(/databases/$(database)/documents/user_roles/$(request.auth.uid)).data.get('role', 'none')
-        : 'none';
+      let roleDoc = get(/databases/$(database)/documents/user_roles/$(request.auth.uid));
+      return roleDoc != null ? roleDoc.data.get('role', 'none') : 'none';
     }
 
     // =========================================================================
@@ -24,6 +20,7 @@ service cloud.firestore {
     // Definição clara de quem é quem dentro do sistema
     function isAdmin()       { return getRole() == 'admin'; }
     function isGestor()      { return getRole() == 'gestor'; }
+    function isPedagogo()    { return getRole() == 'pedagogo'; }
     function isSecretario()  { return getRole() == 'secretario'; }
     function isProfessor()   { return getRole() == 'professor'; }
     function isEstudante()   { return getRole() == 'aluno' || getRole() == 'estudante'; }
@@ -43,7 +40,7 @@ service cloud.firestore {
 
     // ✅ SEGURANÇA: leitura restrita ao próprio usuário ou admin/gestor
     match /user_roles/{uid} {
-      allow read: if isAdmin() || isGestor() || request.auth.uid == uid;
+      allow read: if isSignedIn(); // Liberar leitura para qualquer logado facilitar a resolução de papéis no cliente e regras
       allow create: if (isSignedIn() && request.auth.uid == uid && request.resource.data.get('role', 'pending') == 'pending') || isAdmin() || isGestor();
       // Admin e Gestor podem alterar tudo; o próprio usuário pode apenas atualizar 'role' e 'escola_id'
       // (necessário para o sistema de multi-perfil — sincroniza o perfil ativo com as Security Rules)
@@ -56,7 +53,7 @@ service cloud.firestore {
     match /profiles/{uid} {
       allow read: if isSignedIn();
       // O próprio usuário sempre pode escrever no seu perfil (curto-circuito — não chama getRole())
-      allow write: if request.auth.uid == uid || isAdmin() || isGestor() || isSecretario();
+      allow write: if request.auth.uid == uid || isAdmin() || isGestor() || isPedagogo() || isSecretario();
       
       match /mensagens_vistas/{messageId} {
         allow read, write: if request.auth.uid == uid;
@@ -70,53 +67,53 @@ service cloud.firestore {
 
     match /estudantes/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
 
     match /professores/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
 
     // ✅ EQUIPE GESTORA
     match /equipe_gestora/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
 
     match /turmas/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
 
     match /notas/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
     
     match /frequencias/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /entradas_diario/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /notas_parciais/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /notas_parciais_config/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /activity_log/{id} {
       // Admin, Gestor, Pedagogo e Secretário podem ler os logs
-      allow read: if isAdmin() || isGestor() || isSecretario() || getRole() == 'pedagogo';
+      allow read: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
       
       // Qualquer usuário autenticado pode criar entradas de log (professor, pedagogo, etc.)
       allow create: if isSignedIn();
@@ -127,7 +124,7 @@ service cloud.firestore {
 
     match /eventos/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /maintenance_status/{id} {
@@ -145,10 +142,10 @@ service cloud.firestore {
 
     match /objetos_conhecimento/{id} { 
       // Admin, Gestor, Secretário e Professor podem ver as turmas
-      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow read: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
       
       // Mas só Admin, Gestor, Secretário e Professor podem salvar dados nelas
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /dias_letivos/{id} { 
@@ -156,51 +153,51 @@ service cloud.firestore {
       allow read: if hasAnyRole();
       
       // Mas só Admin, Gestor e Secretário podem salvar dados neles
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
 
     match /horarios/{id} { 
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /registros_aulas/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /avaliacoes/{id} { 
       // Admin, Gestor, Secretário e Professor podem ver as turmas
-      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow read: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
       
       // Mas só Admin, Gestor, Secretário e Professor podem salvar dados nelas
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /avaliacoes_infantil/{id} { 
-      allow read: if isAdmin() || isGestor() || isSecretario() || isProfessor();
-      allow write: if isAdmin() || isGestor() || isSecretario() || isProfessor();
+      allow read: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
     }
 
     match /manual-uso/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor();
+      allow write: if isAdmin() || isGestor() || isPedagogo();
     }
 
     // ✅ SEGURANÇA: famílias criam (formulário de matrícula), somente gestão lê/edita/deleta
     match /pre_matriculas/{id} {
       allow create: if isSignedIn();
-      allow read, update, delete: if isAdmin() || isGestor() || isSecretario();
+      allow read, update, delete: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
 
     match /base_curricular/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
     match /mensagens/{id} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isAdmin() || isGestor() || isSecretario() || isProfessor() ||
+      allow update: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor() ||
                     (isSignedIn() && resource.data.tipo == 'direta' && 
                      (request.auth.uid == resource.data.destinatario_id || request.auth.token.email == resource.data.get('destinatario_email', '')) &&
                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lido', 'data_leitura']));
@@ -210,11 +207,11 @@ service cloud.firestore {
     // ✅ SEGURANÇA: contadores só podem ser alterados pela gestão
     match /counters/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isGestor() || isSecretario();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario();
     }
     
     match /logs/{id} {
-      allow read: if isAdmin() || isGestor();
+      allow read: if isAdmin() || isGestor() || isPedagogo();
       allow create: if isSignedIn();
       allow update, delete: if false;
     }

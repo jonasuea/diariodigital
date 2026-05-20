@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, Pencil, ClipboardList, Calendar, Trash2, Users, BookOpen, ChevronDown, ChevronUp, RotateCcw, Trash } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, getDoc, addDoc, updateDoc, deleteDoc, collectionGroup, getCountFromServer, orderBy, writeBatch } from 'firebase/firestore';
+import { FirebaseFacade } from '@/facades/FirebaseFacade';
+import { collection, query, where, getDocs, doc, getDoc, collectionGroup, getCountFromServer, orderBy, writeBatch } from 'firebase/firestore';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -77,7 +78,16 @@ export default function Turmas() {
   const [showDeleted, setShowDeleted] = useState(false);
   const [professores, setProfessores] = useState<Professor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setSearch(searchInput);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [searchInput]);
+
   const [anoFiltro, setAnoFiltro] = useState(new Date().getFullYear().toString());
   const [isOpen, setIsOpen] = useState(false);
   const [editingTurma, setEditingTurma] = useState<Turma | null>(null);
@@ -210,14 +220,13 @@ export default function Turmas() {
 
     try {
       if (editingTurma) {
-        const turmaDocRef = doc(db, 'turmas', editingTurma.id);
-        await updateDoc(turmaDocRef, payload);
+        await FirebaseFacade.updateDocument('turmas', editingTurma.id, payload);
         await logActivity(`(App) ${user.email} atualizou a turma "${payload.nome}".`);
         toast.success('Turma atualizada com sucesso!');
       } else {
         // Para novas turmas, iniciamos com componentes e professores vazios
         const newPayload = { ...payload, componentes: [], professoresIds: [], excluido: false };
-        await addDoc(collection(db, 'turmas'), newPayload);
+        await FirebaseFacade.addDocument('turmas', newPayload);
         await logActivity(`(App) ${user.email} criou a nova turma "${payload.nome}".`);
         toast.success('Turma cadastrada com sucesso!');
       }
@@ -270,16 +279,15 @@ export default function Turmas() {
 
     try {
       if (isMasterAdmin && showDeleted) {
-        await deleteDoc(doc(db, 'turmas', turmaToDelete.id));
+        await FirebaseFacade.deleteDocument('turmas', turmaToDelete.id);
         await logActivity(`(App) ${user.email} excluiu permanentemente a turma "${turmaToDelete.nome}".`);
         toast.success('Turma excluída permanentemente!');
       } else {
-        const docRef = doc(db, 'turmas', turmaToDelete.id);
-        await updateDoc(docRef, {
+        await FirebaseFacade.updateDocument('turmas', turmaToDelete.id, {
           excluido: true,
-          excluido_em: new Date(),
+          excluido_em: new Date().toISOString(),
           excluido_por: isMasterAdmin ? 'Master Admin' : 'Admin/Gestor'
-        } as any);
+        });
         await logActivity(`(App) ${user.email} moveu a turma "${turmaToDelete.nome}" para a lixeira.`);
         toast.success('Turma movida para a lixeira!');
       }
@@ -295,11 +303,10 @@ export default function Turmas() {
   async function handleReactivate(turma: Turma) {
     if (!user) return;
     try {
-      const docRef = doc(db, 'turmas', turma.id);
-      await updateDoc(docRef, {
+      await FirebaseFacade.updateDocument('turmas', turma.id, {
         excluido: false,
-        reativado_em: new Date()
-      } as any);
+        reativado_em: new Date().toISOString()
+      });
       await logActivity(`(App) ${user.email} reativou a turma "${turma.nome}".`);
       toast.success('Turma reativada com sucesso!');
       fetchTurmas();
@@ -407,7 +414,7 @@ export default function Turmas() {
           // Ano não concluído (transferência de escola): atualiza só o nome da escola
           const novoHistorico = [...historicoAtual];
           novoHistorico[idxExistente] = { ...entradaExistente, escola: nomeEscola };
-          await updateDoc(estudanteRef, { historico_academico: novoHistorico });
+          await FirebaseFacade.updateDocument('estudantes', estudanteId, { historico_academico: novoHistorico });
           return;
         }
 
@@ -429,7 +436,7 @@ export default function Turmas() {
           })),
         };
 
-        await updateDoc(estudanteRef, {
+        await FirebaseFacade.updateDocument('estudantes', estudanteId, {
           historico_academico: [...historicoAtual, novaEntrada],
         });
       }));
@@ -482,8 +489,7 @@ export default function Turmas() {
     const professoresIds = [...new Set(alocacaoData.map(d => d.professorId))];
 
     try {
-      const turmaRef = doc(db, 'turmas', turmaParaAlocar.id);
-      await updateDoc(turmaRef, {
+      await FirebaseFacade.updateDocument('turmas', turmaParaAlocar.id, {
         componentes: alocacaoData,
         professoresIds: professoresIds
       });
@@ -523,8 +529,8 @@ export default function Turmas() {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               placeholder="Buscar turmas..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="pl-9"
             />
           </div>

@@ -115,14 +115,14 @@
             "sat": "Sáb"
         },
         "bimestres": {
-          "b1": "1º Bim",
-          "b2": "2º Bim",
-          "b3": "3º Bim",
-          "b4": "4º Bim"
+            "b1": "1º Bim",
+            "b2": "2º Bim",
+            "b3": "3º Bim",
+            "b4": "4º Bim"
         }
     },
     "header": {
-        "prefeitura": "Itacoatiara",
+        "prefeitura": "Município",
         "selectSchool": "Selecciona una Escuela",
         "changeSchool": "Cambiar Escuela",
         "changeSchoolTitle": "Cambiar de Escuela",

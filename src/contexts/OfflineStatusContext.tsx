@@ -22,7 +22,7 @@ export const OfflineStatusProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     const handleOnline = async () => {
       setIsOnline(true);
-      console.log('[OfflineStatus] Rede restabelecida. Ativando Firebase e sincronizando...');
+
       try {
         await enableNetwork(db);
       } catch (e) {
@@ -33,7 +33,7 @@ export const OfflineStatusProvider: React.FC<{ children: React.ReactNode }> = ({
 
     const handleOffline = async () => {
       setIsOnline(false);
-      console.log('[OfflineStatus] Dispositivo offline. Desativando chamadas Firebase...');
+
       try {
         await disableNetwork(db);
       } catch (e) {

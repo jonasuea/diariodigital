@@ -34,7 +34,7 @@ export class PlanejamentoRepository extends BaseResilientService<any> {
       
       if (records.length > 0) {
         await localDb.base_curricular.bulkPut(records);
-        console.log(`[PlanejamentoRepo] Sincronizados ${records.length} itens de base curricular para ${serieDoc}`);
+
       }
     } catch (error) {
       console.error(`[PlanejamentoRepo] Erro ao sincronizar base curricular:`, error);

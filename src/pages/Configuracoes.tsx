@@ -18,9 +18,10 @@ import { logActivity } from '@/lib/logger';
 import { doc, getDoc, setDoc, collection, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { APP_VERSION } from '@/constants/version';
+import { FirebaseFacade } from '@/facades/FirebaseFacade';
 import { httpsCallable } from 'firebase/functions';
 import { TwoFactorSetupDialog } from '@/components/TwoFactorSetupDialog';
-import { multiFactor } from 'firebase/auth';
+import { multiFactor, updatePassword } from 'firebase/auth';
 
 export default function Configuracoes() {
   const { t } = useTranslation();
@@ -214,8 +215,7 @@ export default function Configuracoes() {
   const handleSaveEscola = async () => {
     if (!escolaAtivaId) return;
     try {
-      const docRef = doc(db, 'escolas', escolaAtivaId);
-      await setDoc(docRef, {
+      await FirebaseFacade.setDocument('escolas', escolaAtivaId, {
         inep: escolaConfig.inep,
         nome: escolaConfig.nome,
         decreto_criacao: escolaConfig.decretoCriacao,
@@ -225,7 +225,7 @@ export default function Configuracoes() {
         endereco: escolaConfig.endereco,
         horario_funcionamento: escolaConfig.horarioFuncionamento,
         matriculas_abertas: escolaConfig.matriculas_abertas,
-      }, { merge: true });
+      }, true);
       await logActivity(t('settings.logs.updateSchool'));
       toast.success(t('settings.success.schoolSaved'));
     } catch (error) {
@@ -237,8 +237,7 @@ export default function Configuracoes() {
   const handleSaveInstalacoes = async () => {
     if (!escolaAtivaId) return;
     try {
-      const docRef = doc(db, 'escolas', escolaAtivaId);
-      await setDoc(docRef, {
+      await FirebaseFacade.setDocument('escolas', escolaAtivaId, {
         salas_aula: instalacoes.salasAula.toString(),
         laboratorios: instalacoes.laboratorios.toString(),
         banheiros: instalacoes.banheiros.toString(),
@@ -247,7 +246,7 @@ export default function Configuracoes() {
         quadras: instalacoes.quadras.toString(),
         secretaria: instalacoes.secretaria.toString(),
         salaProfessores: instalacoes.salaProfessores.toString(),
-      }, { merge: true });
+      }, true);
       await logActivity(t('settings.logs.updateFacilities'));
       toast.success(t('settings.success.facilitiesSaved'));
       setIsInstalacoesOpen(false);
@@ -263,22 +262,16 @@ export default function Configuracoes() {
     localStorage.setItem('sincronizacaoOffline', JSON.stringify(newPreferencias.sincronizacaoOffline || false));
     try {
       if (role === 'admin') {
-        const docRef = doc(db, 'configuracoes', 'escola');
-        console.log('[2FA-DEBUG] Tentando escrever em configuracoes/escola');
-        await setDoc(docRef, { preferencias: newPreferencias }, { merge: true });
-        console.log('[2FA-DEBUG] configuracoes/escola OK');
+        await FirebaseFacade.setDocument('configuracoes', 'escola', { preferencias: newPreferencias }, true);
       }
       if (user) {
-        const profileRef = doc(db, 'profiles', user.uid);
-        console.log('[2FA-DEBUG] Tentando escrever em profiles/', user.uid, '| role:', role);
-        await setDoc(profileRef, { preferencias: newPreferencias }, { merge: true });
-        console.log('[2FA-DEBUG] profiles OK');
+        await FirebaseFacade.setDocument('profiles', user.uid, { preferencias: newPreferencias }, true);
       }
       await logActivity(t('settings.logs.updatePreferences'));
       toast.success(t('settings.success.preferencesSaved'));
     } catch (error) {
       toast.error(t('settings.errors.savePreferences'));
-      console.error('[2FA-DEBUG] ERRO:', error);
+      console.error(error);
     }
   };
 
@@ -287,8 +280,7 @@ export default function Configuracoes() {
     setSystemConfig(newConfig);
     setSavingSystem(true);
     try {
-      const ref = doc(db, 'configuracoes', 'sistema');
-      await setDoc(ref, newConfig, { merge: true });
+      await FirebaseFacade.setDocument('configuracoes', 'sistema', newConfig, true);
       await logActivity(t('settings.logs.updateSystem'));
       toast.success(t('settings.success.systemSaved'));
     } catch (error) {
@@ -311,15 +303,22 @@ export default function Configuracoes() {
     }
 
     try {
-      // TODO: Implementar atualização de senha usando a função do AuthContext
-      // if (profileData.novaSenha) { ... }
+      if (profileData.novaSenha) {
+        try {
+          await updatePassword(user, profileData.novaSenha);
+        } catch (error: any) {
+          if (error.code === 'auth/requires-recent-login') {
+            toast.error('Para alterar a senha, você precisa sair e fazer login novamente.');
+            return;
+          }
+          throw error;
+        }
+      }
 
-      const profileDocRef = doc(db, 'profiles', user.uid);
-      const dataToUpdate = {
+      await FirebaseFacade.setDocument('profiles', user.uid, {
         nome: profileData.nome,
         contato: profileData.contato,
-      };
-      await setDoc(profileDocRef, dataToUpdate, { merge: true });
+      }, true);
 
       await logActivity(t('settings.logs.updateProfile'));
       toast.success(t('settings.success.profileUpdated'));
@@ -344,15 +343,12 @@ export default function Configuracoes() {
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `user_${user?.uid}_${Date.now()}.${fileExt}`;
-      const storageRef = ref(storage, `usuarios/fotos/${fileName}`);
-
-      await uploadBytes(storageRef, file);
-      const photoURL = await getDownloadURL(storageRef);
+      const path = `usuarios/fotos/${fileName}`;
+      const photoURL = await FirebaseFacade.uploadFile(path, file);
 
       // Atualiza o estado local e salva a URL no Firestore
       setProfileData(prev => ({ ...prev, foto_url: photoURL }));
-      const profileDocRef = doc(db, 'profiles', user.uid);
-      await setDoc(profileDocRef, { foto_url: photoURL }, { merge: true });
+      await FirebaseFacade.setDocument('profiles', user.uid, { foto_url: photoURL }, true);
 
       await logActivity(t('settings.logs.updatePhoto'));
       toast.success(t('settings.success.photoUpdated'));
@@ -419,19 +415,18 @@ export default function Configuracoes() {
     toast.info(t('settings.info.clearingTransferredStart'));
 
     try {
-      const snapshot = await getDocs(
-        query(collection(db, 'estudantes'), where('status', '==', 'Transferido'))
-      );
+      const students = await FirebaseFacade.queryDocuments<any>('estudantes', [
+        where('status', '==', 'Transferido')
+      ]);
 
       let count = 0;
       let batch = writeBatch(db);
       let opsInBatch = 0;
 
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data() as any;
-        // Apenas limpa os que tÃªm uma escola vinculada (não-vazia)
-        if (data.escola_id && data.escola_id !== '') {
-          batch.update(docSnap.ref, { escola_id: '', turma_id: null });
+      students.forEach(student => {
+        if (student.escola_id && student.escola_id !== '') {
+          const studentDocRef = doc(db, 'estudantes', student.id);
+          batch.update(studentDocRef, { escola_id: '', turma_id: null });
           opsInBatch++;
           count++;
         }
@@ -518,8 +513,7 @@ export default function Configuracoes() {
                 const randomBytes = new Uint8Array(16);
                 crypto.getRandomValues(randomBytes);
                 const tempPassword = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('') + 'A1!';
-                const createUser = httpsCallable(functions, 'createUserAccount');
-                const result = await createUser({
+                const result = await FirebaseFacade.callFunction<any, any>('createUserAccount', {
                   email: emailLower,
                   password: tempPassword,
                   nome: nome || 'Sem nome',
@@ -527,14 +521,11 @@ export default function Configuracoes() {
                   escola_id: escola_id
                 });
 
-                const { uid } = result.data as { uid: string };
+                const uid = result.uid;
                 existingEmails.add(emailLower);
 
                 // Atualiza o cadastro original pra linkar com o authUid
-                const batch = writeBatch(db);
-                const originalRef = doc(db, colInfo.name, id);
-                batch.update(originalRef, { usuario_id: uid });
-                await batch.commit();
+                await FirebaseFacade.updateDocument(colInfo.name, id, { usuario_id: uid });
 
                 createdCount++;
                 // Delay curto para evitar bater rate limits

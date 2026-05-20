@@ -16,7 +16,7 @@ class OfflinePrefetchService {
     }
 
     this.isPrefetching = true;
-    console.log('[OfflinePrefetch] Iniciando download de dependências e dados locais...');
+
 
     try {
       // 1. Sincronizar Coleções Essenciais (Turmas, Estudantes)
@@ -42,7 +42,7 @@ class OfflinePrefetchService {
         }
       }
 
-      console.log('[OfflinePrefetch] Sincronização concluída com sucesso.');
+
     } finally {
       this.isPrefetching = false;
     }

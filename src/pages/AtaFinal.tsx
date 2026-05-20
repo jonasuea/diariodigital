@@ -133,7 +133,7 @@ export default function AtaFinal() {
         // Aprovado: media >= 6 and freq > 75 in ALL
         // Pendente: 1-2 medias < 6 and freq > 75 in ALL
         // Reprovado: medias < 6 in > 2 or freq < 75 in any
-        
+
         if (failsGrade === 0 && failsFreq === 0) {
           calculatedSituacoes[estudante.id] = 'Aprovado';
         } else if (failsGrade <= 2 && failsFreq === 0) {
@@ -220,7 +220,7 @@ export default function AtaFinal() {
                   <p><strong>TURNO:</strong> {turma?.turno}</p>
                 </div>
                 <div className="space-y-2">
-                  <p><strong>MUNICÍPIO:</strong> Itacoatiara - AM</p>
+                  <p><strong>MUNICÍPIO:</strong> Município - AM</p>
                   <p><strong>AMPARO LEGAL:</strong> Res. nº 12/002 - CEE/AM</p>
                   <p><strong>ANO LETIVO:</strong> {turma?.ano}</p>
                   <p className="flex items-center gap-2">
@@ -266,7 +266,7 @@ export default function AtaFinal() {
                         const nota = notas[`${estudante.id}-${comp.nome}`];
                         const freqFail = (nota?.frequencia || 0) < 75;
                         const gradeFail = (nota?.media || 0) < 6;
-                        
+
                         return (
                           <React.Fragment key={`${estudante.id}-${comp.nome}`}>
                             <td className={`p-2 text-center border-l ${gradeFail ? 'bg-red-50 text-red-600 font-bold' : ''}`}>

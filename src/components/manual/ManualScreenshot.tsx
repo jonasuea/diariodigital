@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Upload, Image as ImageIcon, Loader2, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
 
 interface ManualScreenshotProps {
     sectionId: string;
@@ -159,14 +160,5 @@ export function ManualScreenshot({ sectionId, placeholder }: ManualScreenshotPro
                 </Card>
             )}
         </div>
-    );
-}
-
-// Pequeno hack para usar Label sem importar tudo
-function Label({ children, htmlFor, className }: { children: React.ReactNode, htmlFor: string, className?: string }) {
-    return (
-        <label htmlFor={htmlFor} className={className}>
-            {children}
-        </label>
     );
 }

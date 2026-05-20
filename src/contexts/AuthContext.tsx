@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const cached = localStorage.getItem(`user_role_${authUser.uid}`);
             if (cached) {
               roleData = JSON.parse(cached);
-              console.log("[AuthContext] Usando role do cache local.");
+
             }
           }
           
@@ -188,7 +188,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       await localDb.delete();
-      console.log("[AuthContext] IndexedDB e caches de autenticação limpos após logout.");
+
       
       // Recria a instância para o próximo uso (Dexie reabre automaticamente se necessário, 
       // mas deletar o banco requer uma limpeza cuidadosa)

@@ -38,6 +38,8 @@ import { MessagePopup } from "./components/MessagePopup";
 
 import { useAutoUpdate } from "@/hooks/useAutoUpdate";
 import { UserRoleProvider } from "@/hooks/useUserRole";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MessageProvider } from "@/contexts/MessageContext";
 
 const queryClient = new QueryClient();
 
@@ -95,21 +97,25 @@ import { OfflineAutoSync } from "./components/OfflineAutoSync";
 
 const App = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <OfflineStatusProvider>
-          <Toaster />
-          <Sonner />
-          <AuthProvider>
-            <UserRoleProvider>
-              <RouterProvider router={router} />
-              <MessagePopup />
-              <OfflineAutoSync />
-            </UserRoleProvider>
-          </AuthProvider>
-        </OfflineStatusProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <OfflineStatusProvider>
+            <Toaster />
+            <Sonner />
+            <AuthProvider>
+              <UserRoleProvider>
+                <MessageProvider>
+                  <RouterProvider router={router} />
+                  <MessagePopup />
+                  <OfflineAutoSync />
+                </MessageProvider>
+              </UserRoleProvider>
+            </AuthProvider>
+          </OfflineStatusProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 

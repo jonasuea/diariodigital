@@ -7,14 +7,35 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, ArrowLeft, Bot, Sparkles, Printer, Plus, Trash2, Save } from "lucide-react";
-import { db, storage } from "@/lib/firebase";
+import { db, storage, functions } from "@/lib/firebase";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { httpsCallable } from "firebase/functions";
 import { toast } from "sonner";
 import { logActivity } from "@/lib/logger";
 import { ProvaPDFDialog, Questao } from "@/components/relatorios/ProvaPDFDialog";
 import { useUserRole } from "@/hooks/useUserRole";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+
+interface Avaliacao {
+  titulo: string;
+  tipo: string;
+  valor: number;
+  bimestre: string;
+  questoes?: Questao[];
+}
+
+interface Turma {
+  nome: string;
+  serie: string;
+  turno: string;
+}
+
+interface AIQuestao {
+  tipo: 'objetiva' | 'descritiva';
+  enunciado: string;
+  alternativas?: string[];
+  valor?: number;
+}
 
 export default function CriarAvaliacaoIA() {
   const { turmaId, avaliacaoId } = useParams<{ turmaId: string, avaliacaoId: string }>();
@@ -26,8 +47,8 @@ export default function CriarAvaliacaoIA() {
   const [generating, setGenerating] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const [avaliacao, setAvaliacao] = useState<any>(null);
-  const [turma, setTurma] = useState<any>(null);
+  const [avaliacao, setAvaliacao] = useState<Avaliacao | null>(null);
+  const [turma, setTurma] = useState<Turma | null>(null);
   const [escolaInfo, setEscolaInfo] = useState({ nome: '', inep: '', decreto: '' });
   
   const [questoes, setQuestoes] = useState<Questao[]>([]);
@@ -77,12 +98,6 @@ export default function CriarAvaliacaoIA() {
   }, [turmaId, avaliacaoId, escolaAtivaId]);
 
   const handleGenerateAI = async () => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      toast.error("Chave de API do Gemini não configurada (VITE_GEMINI_API_KEY no .env)");
-      return;
-    }
-
     if (!aiConfig.topico) {
       toast.error("Informe o tópico principal para a IA.");
       return;
@@ -90,36 +105,22 @@ export default function CriarAvaliacaoIA() {
 
     setGenerating(true);
     try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      const generateQuestions = httpsCallable(functions, "generateQuestionsWithIA");
+      const response = await generateQuestions({
+        topico: aiConfig.topico,
+        qtdObjetivas: aiConfig.qtdObjetivas,
+        qtdDescritivas: aiConfig.qtdDescritivas,
+        dificuldade: aiConfig.dificuldade,
+        serie: (turma?.serie as string) || "ensino básico"
+      });
 
-      const prompt = `Atue como um professor elaborando uma prova para uma turma de ${turma?.serie || 'ensino básico'}.
-Crie uma avaliação sobre o tópico: "${aiConfig.topico}".
-O nível de dificuldade deve ser: ${aiConfig.dificuldade}.
-Inclua o seguinte formato ESTRITAMENTE em JSON:
-{
-  "questoes": [
-    {
-      "tipo": "objetiva" ou "descritiva",
-      "enunciado": "Texto da questão...",
-      "alternativas": ["a) alt 1", "b) alt 2", "c) alt 3", "d) alt 4"] // Apenas se for objetiva. Forneça exatamente 4 alternativas limpas (sem a letra "a)" no texto, apenas a resposta).,
-      "valor": 1
-    }
-  ]
-}
-Gere exatamente ${aiConfig.qtdObjetivas} questões objetivas com 4 alternativas e ${aiConfig.qtdDescritivas} questões descritivas.
-Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
-
-      const result = await model.generateContent(prompt);
-      const outputText = result.response.text().replace(/```json/gi, '').replace(/```/g, '').trim();
-
-      const parsedJSON = JSON.parse(outputText);
+      const parsedJSON = response.data as { questoes: any[] };
       
       if (parsedJSON.questoes && Array.isArray(parsedJSON.questoes)) {
         const generatedQuestoes: Questao[] = parsedJSON.questoes.map((q: any) => ({
           id: Math.random().toString(36).substr(2, 9),
           tipo: q.tipo === 'objetiva' ? 'objetiva' : 'descritiva',
-          enunciado: q.enunciado,
+          enunciado: q.enunciado || '',
           alternativas: q.tipo === 'objetiva' ? q.alternativas || ['', '', '', ''] : null,
           valor: q.valor || 1
         }));
@@ -141,7 +142,7 @@ Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
     setQuestoes(questoes.filter(q => q.id !== id));
   };
 
-  const handleChangeQuestao = (id: string, field: keyof Questao, value: any) => {
+  const handleChangeQuestao = (id: string, field: keyof Questao, value: Questao[keyof Questao]) => {
     setQuestoes(questoes.map(q => {
       if (q.id === id) {
         return { ...q, [field]: value };
@@ -279,7 +280,7 @@ Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
                 <label className="text-sm font-medium">Dificuldade</label>
                 <Select
                   value={aiConfig.dificuldade}
-                  onValueChange={(v) => setAiConfig(prev => ({ ...prev, dificuldade: v as any }))}
+                  onValueChange={(v) => setAiConfig(prev => ({ ...prev, dificuldade: v as "Fácil" | "Médio" | "Difícil" }))}
                 >
                   <SelectTrigger>
                     <SelectValue />

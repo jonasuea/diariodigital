@@ -522,3 +522,78 @@ export const syncResponsibleData = onCall(async (request) => {
         throw new HttpsError("internal", `Erro durante o processamento: ${error.message}`);
     }
 });
+
+/**
+ * Gera questões de avaliação usando a API do Gemini de forma segura no servidor.
+ * Requer autenticação do usuário.
+ */
+export const generateQuestionsWithIA = onCall(async (request) => {
+    // 1. Validar autenticação
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+    }
+
+    const { topico, qtdObjetivas, qtdDescritivas, dificuldade, serie } = request.data;
+
+    if (!topico) {
+        throw new HttpsError("invalid-argument", "O tópico principal é obrigatório.");
+    }
+
+    // 2. Carregar a chave de API do ambiente seguro no servidor
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new HttpsError("failed-precondition", "Chave de API do Gemini não configurada no servidor.");
+    }
+
+    const prompt = `Atue como um professor elaborando uma prova para uma turma de ${serie || 'ensino básico'}.
+Crie uma avaliação sobre o tópico: "${topico}".
+O nível de dificuldade deve ser: ${dificuldade || 'Médio'}.
+Inclua o seguinte formato ESTRITAMENTE em JSON:
+{
+  "questoes": [
+    {
+      "tipo": "objetiva" ou "descritiva",
+      "enunciado": "Texto da questão...",
+      "alternativas": ["a) alt 1", "b) alt 2", "c) alt 3", "d) alt 4"] // Apenas se for objetiva. Forneça exatamente 4 alternativas limpas (sem a letra "a)" no texto, apenas a resposta).,
+      "valor": 1
+    }
+  ]
+}
+Gere exatamente ${qtdObjetivas || 5} questões objetivas com 4 alternativas e ${qtdDescritivas || 1} questões descritivas.
+Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [{ text: prompt }]
+                }]
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error("Erro na API do Gemini:", errText);
+            throw new HttpsError("internal", `Erro retornado pelo Gemini: ${response.statusText}`);
+        }
+
+        const resData = await response.json() as any;
+        const textResponse = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!textResponse) {
+            throw new HttpsError("internal", "Nenhuma resposta de texto retornada pela IA.");
+        }
+
+        const cleanedText = textResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsedJSON = JSON.parse(cleanedText);
+        return parsedJSON;
+    } catch (error: any) {
+        console.error("Erro ao gerar questões com Gemini:", error);
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError("internal", error.message || "Erro interno de processamento.");
+    }
+});

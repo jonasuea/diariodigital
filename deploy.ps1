@@ -26,7 +26,7 @@ $defaultNotes = if ($notes -ne "") { $notes } else { "Atualização do sistema."
 Write-Host "Atualizando arquivos de versão para v$versionNumber..." -ForegroundColor Cyan
 
 # 1. Atualizar public/version.json
-$versionJsonPath = "e:\Projetos_App\diariodigital\public\version.json"
+$versionJsonPath = Join-Path (Get-Location).Path "public\version.json"
 $newJson = @{
     version     = $versionNumber
     releaseDate = $currentDate
@@ -36,7 +36,7 @@ $UTF8NoBOM = New-Object System.Text.UTF8Encoding($false)
 [System.IO.File]::WriteAllText($versionJsonPath, $newJson, $UTF8NoBOM)
 
 # 2. Atualizar src/constants/version.ts
-$versionTsPath = "e:\Projetos_App\diariodigital\src\constants\version.ts"
+$versionTsPath = Join-Path (Get-Location).Path "src\constants\version.ts"
 $versionTsContent = "export const APP_VERSION = `"$versionNumber`";"
 [System.IO.File]::WriteAllText($versionTsPath, $versionTsContent, $UTF8NoBOM)
 

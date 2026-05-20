@@ -15,8 +15,9 @@ import {
   User as UserIcon,
   FileDown
 } from 'lucide-react';
-import { doc, getDoc, collection, query, where, getDocs, Timestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { FirebaseFacade } from '@/facades/FirebaseFacade';
 import { toast } from 'sonner';
 import { format, parseISO, startOfMonth, endOfMonth, addMonths, isValid } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -280,7 +281,7 @@ export default function PerfilEstudante() {
         todasNotas.docs.forEach(docSnap => {
           const data = docSnap.data();
           if (data.ano == null) {
-            updateDoc(doc(db, 'notas', docSnap.id), { ano: anoInt }).catch(console.error);
+            FirebaseFacade.updateDocument('notas', docSnap.id, { ano: anoInt }).catch(console.error);
           }
         });
         // Não retorna dados - o estudante realmente não tinha notas neste ano
@@ -358,7 +359,7 @@ export default function PerfilEstudante() {
       // show only notes that actually exist in the database for the selected year
       // if no notes for this year, display empty state
 
-      console.log('Notas carregadas para', estudanteId, ano, notasLista);
+
       setNotas(notasLista);
     } catch (error) {
       toast.error('Sem permissão para carregar notas');
@@ -394,7 +395,7 @@ export default function PerfilEstudante() {
         mappedFrequencias = freqAntiga.docs.map(docSnap => {
           const data = docSnap.data();
           if (data.ano == null) {
-            updateDoc(doc(db, 'frequencias', docSnap.id), { ano: anoInt }).catch(console.error);
+            FirebaseFacade.updateDocument('frequencias', docSnap.id, { ano: anoInt }).catch(console.error);
           }
           return data;
         });
@@ -436,7 +437,7 @@ export default function PerfilEstudante() {
         setTurmaHistorica(turmaDoAno);
       }
 
-      console.log('Faltas carregadas para', estudanteId, ano, faltas);
+
       setFaltasAnuais(faltas);
     } catch (error) {
       toast.error('Sem permissão para carregar frequência');

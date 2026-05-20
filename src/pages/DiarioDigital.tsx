@@ -98,7 +98,7 @@ export default function DiarioDigital() {
     async function fetchTurmas() {
       setLoading(true);
       try {
-        console.log("[DiarioDigital] Buscando turmas para:", { escolaAtivaId, professorId });
+
         
         // Tentamos buscar turmas da escola onde o professor está alocado.
         // Removido o filtro de ano estrito por segurança, ou podemos tentar ambos.
@@ -110,7 +110,7 @@ export default function DiarioDigital() {
         );
         
         const turmasSnapshot = await getDocs(turmasQuery);
-        console.log("[DiarioDigital] Turmas encontradas:", turmasSnapshot.size);
+
         
         const turmasData = turmasSnapshot.docs
           .map(doc => {

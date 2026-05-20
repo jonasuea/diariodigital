@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useMemo, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BarChart,
@@ -135,7 +135,7 @@ interface KPICardProps {
   onClick?: () => void;
 }
 
-function KPICard({ title, value, icon: Icon, gradient, iconBg, trend, onClick }: KPICardProps) {
+const KPICard = memo(function KPICard({ title, value, icon: Icon, gradient, iconBg, trend, onClick }: KPICardProps) {
   return (
     <Card
       onClick={onClick}
@@ -179,7 +179,7 @@ function KPICard({ title, value, icon: Icon, gradient, iconBg, trend, onClick }:
       </CardContent>
     </Card>
   );
-}
+});
 
 function AlertItem({ alert }: { alert: DashboardAlert }) {
   const icons = {
@@ -212,6 +212,23 @@ function getGreeting(t: (key: string) => string): string {
   if (h >= 12 && h < 18) return t('common.greetings.afternoon');
   return t('common.greetings.evening');
 }
+
+const getEventTypeVariant = (type: string) => {
+  switch (type?.toLowerCase()) {
+    case 'feriado':       return 'bg-red-100 text-red-800 border border-red-200';
+    case 'prova':         return 'bg-blue-100 text-blue-800 border border-blue-200';
+    case 'reuniao':       return 'bg-purple-100 text-purple-800 border border-purple-200';
+    case 'evento escolar':return 'bg-green-100 text-green-800 border border-green-200';
+    default:              return 'bg-gray-100 text-gray-800 border border-gray-200';
+  }
+};
+
+const quickActions = [
+  { label: 'Diário', icon: ClipboardList, path: '/diario-digital', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
+  { label: 'Frequência', icon: Users, path: '/diario-digital', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
+  { label: 'Notas', icon: Trophy, path: '/diario-digital', color: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
+  { label: 'Calendário', icon: Calendar, path: '/calendario', color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
+];
 
 // ─── Main component ──────────────────────────────────────────────────────────
 
@@ -288,20 +305,21 @@ export default function Painel() {
       }
     }
     fetchAllData();
-  }, [escolaAtivaId]);
+  }, [escolaAtivaId, fetchStatsAndEvents, fetchFrequenciaData, fetchAtividadesRecentes, fetchNotasBimestraisData, fetchAlerts, periodoFrequencia]);
 
   useEffect(() => {
     fetchFrequenciaData(periodoFrequencia);
-  }, [periodoFrequencia, escolaAtivaId]);
+  }, [periodoFrequencia, escolaAtivaId, fetchFrequenciaData]);
 
   // ── Fetch helpers ────────────────────────────────────────────────────────
 
-  async function fetchAlerts() {
+  const fetchAlerts = useCallback(async () => {
     if (!escolaAtivaId || isProfessor) return;
     const newAlerts: DashboardAlert[] = [];
     try {
+      const dbInstance = db;
       // Check missing grades
-      const notasSnap = await getDocs(query(collection(db, 'notas'), where('escola_id', '==', escolaAtivaId)));
+      const notasSnap = await getDocs(query(collection(dbInstance, 'notas'), where('escola_id', '==', escolaAtivaId)));
       const notasDocs = notasSnap.docs.map(d => d.data());
       const missing = notasDocs.filter(n =>
         n.bimestre_1 == null && n.bimestre_2 == null &&
@@ -318,7 +336,7 @@ export default function Painel() {
 
       // Check low attendance
       const freqSnap = await getDocs(query(
-        collection(db, 'frequencias'),
+        collection(dbInstance, 'frequencias'),
         where('escola_id', '==', escolaAtivaId),
         where('status', '==', 'faltou'),
         where('data', '>=', format(startOfMonth(new Date()), 'yyyy-MM-dd'))
@@ -335,7 +353,7 @@ export default function Painel() {
       // Upcoming events today
       const hoje = format(new Date(), 'yyyy-MM-dd');
       const eventosHojeSnap = await getDocs(query(
-        collection(db, 'eventos'),
+        collection(dbInstance, 'eventos'),
         where('escola_id', '==', escolaAtivaId),
         where('data', '==', hoje)
       ));
@@ -358,9 +376,9 @@ export default function Painel() {
       }
     } catch { /* silent — permission may be restricted for professor */ }
     setAlerts(newAlerts);
-  }
+  }, [escolaAtivaId, isProfessor]);
 
-  async function fetchStatsAndEvents() {
+  const fetchStatsAndEvents = useCallback(async () => {
     if (!escolaAtivaId) return;
     try {
       if (!navigator.onLine) {
@@ -385,13 +403,14 @@ export default function Painel() {
       const hojeDate = new Date(); hojeDate.setHours(0, 0, 0, 0);
       const hojeStr = format(hojeDate, 'yyyy-MM-dd');
 
+      const dbInstance = db;
       const [estudantesSnap, turmasSnap, profsSnap, notasRes, eventosTimestampRes, eventosStringRes] = await Promise.all([
-        getCountFromServer(query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId))),
-        getCountFromServer(query(collection(db, 'turmas'), where('escola_id', '==', escolaAtivaId))),
-        getCountFromServer(query(collection(db, 'professores'), where('escola_id', '==', escolaAtivaId))),
-        getDocs(query(collection(db, 'notas'), where('escola_id', '==', escolaAtivaId))),
-        getDocs(query(collection(db, 'eventos'), where('escola_id', '==', escolaAtivaId), where('data', '>=', hojeDate), orderBy('data', 'asc'))),
-        getDocs(query(collection(db, 'eventos'), where('escola_id', '==', escolaAtivaId), where('data', '>=', hojeStr), orderBy('data', 'asc'))),
+        getCountFromServer(query(collection(dbInstance, 'estudantes'), where('escola_id', '==', escolaAtivaId))),
+        getCountFromServer(query(collection(dbInstance, 'turmas'), where('escola_id', '==', escolaAtivaId))),
+        getCountFromServer(query(collection(dbInstance, 'professores'), where('escola_id', '==', escolaAtivaId))),
+        getDocs(query(collection(dbInstance, 'notas'), where('escola_id', '==', escolaAtivaId))),
+        getDocs(query(collection(dbInstance, 'eventos'), where('escola_id', '==', escolaAtivaId), where('data', '>=', hojeDate), orderBy('data', 'asc'))),
+        getDocs(query(collection(dbInstance, 'eventos'), where('escola_id', '==', escolaAtivaId), where('data', '>=', hojeStr), orderBy('orderBy' in query ? 'asc' : 'asc'))),
       ]);
 
       const eventosMap = new Map<string, Evento>();
@@ -434,9 +453,9 @@ export default function Painel() {
         toast.error('Sem permissão para carregar estatísticas e eventos.');
       }
     }
-  }
+  }, [escolaAtivaId]);
 
-  async function fetchFrequenciaData(periodo: string) {
+  const fetchFrequenciaData = useCallback(async (periodo: string) => {
     try {
       const hoje = new Date();
       let dataInicio: Date;
@@ -446,8 +465,9 @@ export default function Painel() {
       else if (periodo === 'ano') dataInicio = subYears(hoje, 1);
       else dataInicio = startOfWeek(hoje, { weekStartsOn: 1 });
 
+      const dbInstance = db;
       const q = query(
-        collection(db, 'frequencias'),
+        collection(dbInstance, 'frequencias'),
         where('escola_id', '==', escolaAtivaId),
         where('data', '>=', format(dataInicio, 'yyyy-MM-dd')),
         where('data', '<=', format(dataFim, 'yyyy-MM-dd'))
@@ -455,7 +475,7 @@ export default function Painel() {
       const snap = await getDocs(q);
       const frequencias = snap.docs.map(d => d.data());
 
-      const estudantesSnap = await getDocs(query(collection(db, 'estudantes'), where('escola_id', '==', escolaAtivaId)));
+      const estudantesSnap = await getDocs(query(collection(dbInstance, 'estudantes'), where('escola_id', '==', escolaAtivaId)));
       const totalAlunos = estudantesSnap.docs.filter(d => {
         const t = d.data().turma_id;
         return t != null && t !== '';
@@ -475,12 +495,13 @@ export default function Painel() {
     } catch (error) {
       if (navigator.onLine) { console.error('fetchFrequenciaData error:', error); }
     }
-  }
+  }, [escolaAtivaId]);
 
-  async function fetchNotasBimestraisData() {
+  const fetchNotasBimestraisData = useCallback(async () => {
     if (!escolaAtivaId) return;
     try {
-      const snap = await getDocs(query(collection(db, 'notas'), where('escola_id', '==', escolaAtivaId)));
+      const dbInstance = db;
+      const snap = await getDocs(query(collection(dbInstance, 'notas'), where('escola_id', '==', escolaAtivaId)));
       const notasData = snap.docs.map(d => d.data());
       const bimestres: { [k: string]: { soma: number; count: number } } = {
         '1º Bim':{soma:0,count:0}, '2º Bim':{soma:0,count:0},
@@ -499,28 +520,29 @@ export default function Painel() {
     } catch (error) {
       if (navigator.onLine) { console.error('fetchNotasBimestraisData error:', error); }
     }
-  }
+  }, [escolaAtivaId]);
 
-  async function fetchAtividadesRecentes() {
+  const fetchAtividadesRecentes = useCallback(async () => {
     if (isProfessor) return;
     try {
+      const dbInstance = db;
       let q;
       if (isAdmin) {
-        q = query(collection(db, 'activity_log'), orderBy('created_at', 'desc'), limit(4));
+        q = query(collection(dbInstance, 'activity_log'), orderBy('created_at', 'desc'), limit(4));
       } else {
         if (!escolaAtivaId) return;
-        q = query(collection(db, 'activity_log'), where('escola_id', '==', escolaAtivaId), orderBy('created_at', 'desc'), limit(4));
+        q = query(collection(dbInstance, 'activity_log'), where('escola_id', '==', escolaAtivaId), orderBy('created_at', 'desc'), limit(4));
       }
       const snap = await getDocs(q);
       setAtividadesRecentes(snap.docs.map(d => ({ id: d.id, ...(d.data() as any) } as ActivityLog)));
     } catch (error) {
       if (navigator.onLine) { console.error('fetchAtividadesRecentes error:', error); }
     }
-  }
+  }, [isAdmin, isProfessor, escolaAtivaId]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
-  function handleExportReport() {
+  const handleExportReport = useCallback(() => {
     const hoje = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
     const printContent = `
       <html><head>
@@ -557,26 +579,7 @@ export default function Painel() {
     printWin.focus();
     setTimeout(() => { printWin.print(); printWin.close(); }, 500);
     toast.success('Relatório gerado com sucesso!');
-  }
-
-  const getEventTypeVariant = (type: string) => {
-    switch (type?.toLowerCase()) {
-      case 'feriado':       return 'bg-red-100 text-red-800 border border-red-200';
-      case 'prova':         return 'bg-blue-100 text-blue-800 border border-blue-200';
-      case 'reuniao':       return 'bg-purple-100 text-purple-800 border border-purple-200';
-      case 'evento escolar':return 'bg-green-100 text-green-800 border border-green-200';
-      default:              return 'bg-gray-100 text-gray-800 border border-gray-200';
-    }
-  };
-
-  // ── Quick actions ────────────────────────────────────────────────────────
-
-  const quickActions = [
-    { label: 'Diário', icon: ClipboardList, path: '/diario-digital', color: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
-    { label: 'Frequência', icon: Users, path: '/diario-digital', color: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
-    { label: 'Notas', icon: Trophy, path: '/diario-digital', color: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
-    { label: 'Calendário', icon: Calendar, path: '/calendario', color: 'bg-purple-50 text-purple-600 hover:bg-purple-100' },
-  ];
+  }, [stats, proximosEventos]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 

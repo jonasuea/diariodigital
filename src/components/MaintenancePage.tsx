@@ -33,7 +33,7 @@ export function MaintenancePage({ message = 'Sistema em manutenção. Retornarem
                 </div>
 
                 <p className="text-xs text-muted-foreground/50 uppercase tracking-widest font-medium">
-                    Matrículas Online — SEMED Itacoatiara
+                    Matrículas Online — SEMED Município
                 </p>
             </div>
         </div>

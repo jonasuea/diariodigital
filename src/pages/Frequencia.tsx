@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { Button } from '@/components/ui/button';
@@ -67,55 +67,48 @@ export default function Frequencia() {
 
   const currentDayRef = useRef<HTMLTableCellElement>(null);
 
-  useEffect(() => {
-    if (turmaId) {
-      loadData();
-    }
-  }, [turmaId, currentMonth, componente, escolaAtivaId]);
-
-  useEffect(() => {
-    setSearchParams(prev => {
-      if (componente) {
-        prev.set('componente', componente);
-      } else {
-        prev.delete('componente');
-      }
-      return prev;
-    }, { replace: true });
-  }, [componente, setSearchParams]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     if (!turmaId || !escolaAtivaId) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const year = turma?.ano || new Date().getFullYear();
-      const startDate = format(startOfMonth(new Date(year, currentMonth)), 'yyyy-MM-dd');
-      const endDate = format(endOfMonth(new Date(year, currentMonth)), 'yyyy-MM-dd');
-
-      // 1. Tenta sincronizar se estiver online (Seeding)
-      if (navigator.onLine) {
+      // 1. Carrega do banco local (Fonte da Verdade) para obter o ano da turma antes de calcular datas
+      let turmaData = await turmaRepo.getById(turmaId);
+      
+      // Se não estiver no localDb mas estiver online, tenta semear a turma primeiro
+      if (!turmaData && navigator.onLine) {
         try {
-          await Promise.all([
-            turmaRepo.seed(escolaAtivaId),
-            estudanteRepo.seed(turmaId, escolaAtivaId),
-            frequenciaRepo.seed(turmaId, escolaAtivaId, startDate, endDate)
-          ]);
+          await turmaRepo.seed(escolaAtivaId);
+          turmaData = await turmaRepo.getById(turmaId);
         } catch (syncError) {
-          console.warn("[Frequencia] Falha ao sincronizar dados remotos, usando cache local.", syncError);
+          console.warn("[Frequencia] Falha ao semear turma remota.", syncError);
         }
       }
 
-      // 2. Carrega do banco local (Fonte da Verdade)
-      const turmaData = await turmaRepo.getById(turmaId);
       setTurma(turmaData);
 
       if (!turmaData) {
         toast.error("Dados da turma não encontrados offline.");
         setLoading(false);
         return;
+      }
+
+      const year = turmaData.ano;
+      const startDate = format(startOfMonth(new Date(year, currentMonth)), 'yyyy-MM-dd');
+      const endDate = format(endOfMonth(new Date(year, currentMonth)), 'yyyy-MM-dd');
+
+      // 2. Tenta sincronizar estudantes e frequências se estiver online (Seeding)
+      if (navigator.onLine) {
+        try {
+          await Promise.all([
+            estudanteRepo.seed(turmaId, escolaAtivaId),
+            frequenciaRepo.seed(turmaId, escolaAtivaId, startDate, endDate)
+          ]);
+        } catch (syncError) {
+          console.warn("[Frequencia] Falha ao sincronizar dados remotos, usando cache local.", syncError);
+        }
       }
 
       const estudantesData = await estudanteRepo.getByTurma(turmaId);
@@ -151,7 +144,22 @@ export default function Frequencia() {
         }
       }, 500);
     }
-  }
+  }, [turmaId, escolaAtivaId, currentMonth, componente]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  useEffect(() => {
+    setSearchParams(prev => {
+      if (componente) {
+        prev.set('componente', componente);
+      } else {
+        prev.delete('componente');
+      }
+      return prev;
+    }, { replace: true });
+  }, [componente, setSearchParams]);
 
   const anoLetivo = turma?.ano || new Date().getFullYear();
   const isInfantil = turma?.nome ? ["Crianças", "Bebês", "Infantil"].some(nome => turma.nome.includes(nome)) : false;

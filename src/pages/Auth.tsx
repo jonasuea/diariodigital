@@ -145,7 +145,7 @@ export default function Auth() {
           <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center p-1 overflow-hidden">
             <img src="/timbre_semed.png" alt="Prefeitura" className="object-contain" />
           </div>
-          <span className="text-white text-xs font-bold whitespace-nowrap">Prefeitura de Itacoatiara</span>
+          <span className="text-white text-xs font-bold whitespace-nowrap">Prefeitura de Município</span>
         </div>
       </div>
 

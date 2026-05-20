@@ -1,6 +1,5 @@
 import { localDb, SyncOperation } from '@/lib/db';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, updateDoc } from 'firebase/firestore';
+import { FirebaseFacade } from '@/facades/FirebaseFacade';
 
 class SyncService {
   private isSyncing = false;
@@ -16,8 +15,6 @@ class SyncService {
       const pendingOperations = await localDb.sync_queue.orderBy('timestamp').toArray();
       
       if (pendingOperations.length === 0) return;
-
-      console.log(`[SyncService] Iniciando sincronização de ${pendingOperations.length} itens...`);
 
       for (const op of pendingOperations) {
         try {
@@ -53,21 +50,19 @@ class SyncService {
       throw new Error(`Item da coleção ${colName} sem ID para sincronização.`);
     }
 
-    const docRef = doc(db, colName, data.id);
-
     switch (action) {
       case 'create':
       case 'update':
         // Usamos merge: true para garantir que não sobrescreveremos campos parciais se houver conflito
-        await setDoc(docRef, {
+        await FirebaseFacade.setDocument(colName, data.id, {
           ...data,
           last_sync: new Date().toISOString()
-        }, { merge: true });
+        }, true);
         break;
 
       case 'delete':
         // No diariodigital, seguimos o padrão de exclusão lógica (Soft Delete)
-        await updateDoc(docRef, {
+        await FirebaseFacade.updateDocument(colName, data.id, {
           excluido: true,
           excluido_em: new Date().toISOString(),
           excluido_por_sync: true
@@ -78,3 +73,4 @@ class SyncService {
 }
 
 export const syncService = new SyncService();
+

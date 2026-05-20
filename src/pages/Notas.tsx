@@ -9,7 +9,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Search, Users, FileText, Save, Edit } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, addDoc, getDoc, orderBy, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, orderBy } from 'firebase/firestore';
+import { FirebaseFacade } from '@/facades/FirebaseFacade';
 import { logActivity } from '@/lib/logger';
 import { toast } from 'sonner';
 import jsPDF from 'jspdf';
@@ -80,7 +81,7 @@ export default function Notas() {
   const [notas, setNotas] = useState<Record<string, Record<string, Nota>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [clearing, setClearing] = useState(false);
+
   const [search, setSearch] = useState('');
   const [componente, setDisciplina] = useState(searchParams.get('componente') || 'todos');
   const [boletimDialogOpen, setBoletimDialogOpen] = useState(false);
@@ -136,7 +137,7 @@ export default function Notas() {
 
         // if ano is missing, persist current year
         if (data.ano == null) {
-          updateDoc(doc(db, 'notas', docSnap.id), { ano: currentYear, escola_ids: [escolaAtivaId] }).catch(console.error);
+          FirebaseFacade.updateDocument('notas', docSnap.id, { ano: currentYear, escola_ids: [escolaAtivaId] }).catch(console.error);
           data.ano = currentYear;
         }
 
@@ -233,7 +234,7 @@ export default function Notas() {
 
           // 1. Salva/atualiza na coleção notas
           if (id) {
-            await updateDoc(doc(db, 'notas', id), {
+            await FirebaseFacade.updateDocument('notas', id, {
               bimestre_1: nota.bimestre_1,
               bimestre_2: nota.bimestre_2,
               bimestre_3: nota.bimestre_3,
@@ -244,7 +245,7 @@ export default function Notas() {
               escola_ids: [escolaAtivaId],
             });
           } else if (temNotaLancada) {
-            await addDoc(collection(db, 'notas'), {
+            await FirebaseFacade.addDocument('notas', {
               ...notaData,
               estudante_id: estudanteId,
               turma_id: turmaId!,
@@ -296,7 +297,7 @@ export default function Notas() {
 
                   const novoHistorico = [...historico];
                   novoHistorico[idxAno] = { ...entrada, componentes: comps };
-                  await updateDoc(estudanteRef, { historico_academico: novoHistorico });
+                  await FirebaseFacade.updateDocument('estudantes', estudanteId, { historico_academico: novoHistorico });
                 }
               }
             } catch (histErr) {
@@ -425,47 +426,11 @@ export default function Notas() {
             Gerar Boletins
           </Button>
 
-          {podeEditar && (
-            <Button onClick={handleSave} disabled={saving || isInputDisabled} className="gap-2">
-              <Save className="h-4 w-4" />
-              {saving ? 'Salvando...' : 'Salvar'}
-            </Button>
-          )}
-
-          {/* botão temporário para apagar todas as notas do banco */}
-          {role === 'admin' && (
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={clearing}
-              onClick={async () => {
-                if (!window.confirm('Tem certeza de que deseja apagar **todas** as notas? Esta ação não pode ser desfeita.')) return;
-                setClearing(true);
-                try {
-                  const snapshot = await getDocs(query(collection(db, 'notas'), where('escola_id', '==', escolaAtivaId)));
-                  await Promise.all(snapshot.docs.map(d => deleteDoc(doc(db, 'notas', d.id))));
-                  toast.success('Todas as notas foram excluídas.');
-                  loadData();
-                } catch (err) {
-                  console.error(err);
-                  toast.error('Sem permissão para apagar notas');
-                } finally {
-                  setClearing(false);
-                }
-              }}
-            >
-              Limpar todas
-            </Button>
-          )}
         </div>
 
-        {isInputDisabled && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-amber-800 text-sm">
-            {!podeEditar 
-              ? `Modo de visualização ativo (${role || 'sem perfil'}). Apenas professores e administradores podem editar as notas finais.`
-              : 'Selecione um componente específico para lançar notas. Com "Todos os componentes" selecionado, as notas são exibidas apenas para visualização.'}
-          </div>
-        )}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-blue-800 text-sm">
+          As notas bimestrais são de caráter consultivo e geradas automaticamente a partir das médias calculadas na página de <strong>Notas Parciais</strong> do Diário Digital.
+        </div>
 
         {loading ? (
           <div className="flex justify-center py-12">
@@ -551,17 +516,17 @@ export default function Notas() {
                             </div>
                             <div className="text-xs text-muted-foreground">{estudante.matricula}</div>
                           </td>
-                          <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_1 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_1', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                          <td className="p-4 text-center">
+                            <span className="font-medium text-sm">{nota?.bimestre_1 !== null && nota?.bimestre_1 !== undefined ? nota.bimestre_1.toFixed(1) : '-'}</span>
                           </td>
-                          <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_2 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_2', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                          <td className="p-4 text-center">
+                            <span className="font-medium text-sm">{nota?.bimestre_2 !== null && nota?.bimestre_2 !== undefined ? nota.bimestre_2.toFixed(1) : '-'}</span>
                           </td>
-                          <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_3 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_3', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                          <td className="p-4 text-center">
+                            <span className="font-medium text-sm">{nota?.bimestre_3 !== null && nota?.bimestre_3 !== undefined ? nota.bimestre_3.toFixed(1) : '-'}</span>
                           </td>
-                          <td className="p-4">
-                            <Input type="number" min="0" max="10" step="0.1" value={nota?.bimestre_4 ?? ''} onChange={(e) => updateNota(estudante.id, componente, 'bimestre_4', e.target.value ? parseFloat(e.target.value) : null)} className="w-20 text-center mx-auto" disabled={isInputDisabled} />
+                          <td className="p-4 text-center">
+                            <span className="font-medium text-sm">{nota?.bimestre_4 !== null && nota?.bimestre_4 !== undefined ? nota.bimestre_4.toFixed(1) : '-'}</span>
                           </td>
                           <td className="p-4">
                             <div className={`w-20 py-2 rounded text-center mx-auto font-semibold ${getMediaColor(media)}`}>

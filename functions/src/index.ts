@@ -5,7 +5,8 @@ import {
     submitReservation,
     cleanupExpiredReservations,
     checkResponsibleByCPF,
-    syncResponsibleData
+    syncResponsibleData,
+    generateQuestionsWithIA
 } from "./adminFunctions";
 
 
@@ -16,6 +17,7 @@ export {
     submitReservation,
     cleanupExpiredReservations,
     checkResponsibleByCPF,
-    syncResponsibleData
+    syncResponsibleData,
+    generateQuestionsWithIA
 };
 

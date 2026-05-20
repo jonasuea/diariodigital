@@ -3,10 +3,31 @@ import { BaseResilientService } from '@/services/BaseResilientService';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 
+export interface Frequencia {
+  id: string;
+  escola_id: string;
+  turma_id: string;
+  data: string;
+  excluido?: boolean;
+  excluido_em?: string;
+  excluido_por?: string;
+  presencas?: Record<string, boolean>;
+}
+
+export interface EntradaDiario {
+  id: string;
+  escola_id: string;
+  turma_id: string;
+  data: string;
+  excluido?: boolean;
+  excluido_em?: string;
+  excluido_por?: string;
+}
+
 /**
  * Repositório de Frequências
  */
-export class FrequenciaRepository extends BaseResilientService<any> {
+export class FrequenciaRepository extends BaseResilientService<Frequencia> {
   protected collectionName = 'frequencias';
   protected localTable = localDb.frequencias;
 
@@ -22,7 +43,7 @@ export class FrequenciaRepository extends BaseResilientService<any> {
       where('data', '<=', endDate)
     );
     const snapFreq = await getDocs(qFreq);
-    const recordsFreq = snapFreq.docs.map(d => ({ id: d.id, ...d.data() }));
+    const recordsFreq = snapFreq.docs.map(d => ({ id: d.id, ...d.data() }) as unknown as Frequencia);
     await this.localTable.bulkPut(recordsFreq);
 
     // Sincroniza entradas no diário (marcadores de data editada)
@@ -34,7 +55,7 @@ export class FrequenciaRepository extends BaseResilientService<any> {
       where('data', '<=', endDate)
     );
     const snapEntradas = await getDocs(qEntradas);
-    const recordsEntradas = snapEntradas.docs.map(d => ({ id: d.id, ...d.data() }));
+    const recordsEntradas = snapEntradas.docs.map(d => ({ id: d.id, ...d.data() }) as unknown as EntradaDiario);
     await localDb.entradas_diario.bulkPut(recordsEntradas);
     
     // Sincroniza dias letivos (consulta)
@@ -65,7 +86,7 @@ export class FrequenciaRepository extends BaseResilientService<any> {
     return { freq, entradas };
   }
 
-  async recordEntrada(data: any) {
+  async recordEntrada(data: EntradaDiario) {
     await localDb.entradas_diario.put(data);
     await localDb.sync_queue.add({
       collection: 'entradas_diario',

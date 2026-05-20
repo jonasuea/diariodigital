@@ -27,7 +27,7 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
     setStatus(prev => ({ ...prev, isSyncing: true, progress: 0 }));
     
     try {
-      console.log(`[Sync] Iniciando sincronização para escola ${escolaId}`);
+
       
       // 1. Sincronizar dados globais da escola
       await Promise.all([
@@ -41,7 +41,7 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
 
       // 2. Sincronizar dados específicos de cada turma do professor
       for (const turma of turmas) {
-        console.log(`[Sync] Sincronizando turma: ${turma.nome}`);
+
         
         // Sincronizar estudantes
         await estudanteRepo.seed(turma.id, escolaId);
@@ -88,7 +88,7 @@ export function useSyncData(escolaId: string | null, professorId: string | null,
       setStatus({ isSyncing: false, progress: 100, lastSync: now });
       
       if (manual) toast.success("Sincronização concluída com sucesso!");
-      console.log(`[Sync] Sincronização finalizada em ${now}`);
+
     } catch (error) {
       console.error("[Sync] Erro durante sincronização:", error);
       setStatus(prev => ({ ...prev, isSyncing: false }));

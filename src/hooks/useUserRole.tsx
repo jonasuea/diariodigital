@@ -111,7 +111,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         
         // Se temos um role no snapshot, podemos parar o loading visual mais cedo se quisermos,
         // mas é melhor deixar o fetchUserRole terminar para garantir dados frescos.
-        console.log("[useUserRole] Snapshot carregado para o usuário:", user.uid);
+
       }
     }
   }, [user?.uid]);
@@ -465,7 +465,7 @@ export function UserRoleProvider({ children }: { children: ReactNode }) {
         // Em caso de erro (provavelmente offline), tentamos usar o snapshot uma última vez
         const snapshot = getInitialSnapshot(user.uid);
         if (snapshot && !role) {
-          console.log("[useUserRole] Usando snapshot como fallback após erro de rede.");
+
           setRole(snapshot.role);
           setEscolaAtivaId(snapshot.escolaAtivaId);
           setPermittedEscolas(snapshot.permittedEscolas);

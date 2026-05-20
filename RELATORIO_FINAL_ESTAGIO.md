@@ -28,7 +28,7 @@ Relatório Final Apresentado como requisito parcial para aprovação na componen
 
 **Orientador:** [Nome do Orientador]
 
-**ITACOATIARA-AM**
+**Município-AM**
 
 **DEZEMBRO – 2025**
 
@@ -149,11 +149,11 @@ Ao longo do desenvolvimento, foram realizados testes funcionais em cada módulo 
 
 ## 2.5 Apresentação da Instituição
 
-O estágio foi realizado no contexto da componente Estágio Curricular Supervisionado do curso de Engenharia de Software da Universidade Federal do Amazonas (UFAM), vinculada ao Instituto de Ciências Exatas e Tecnologia (ICET), localizado no município de Itacoatiara, Amazonas.
+O estágio foi realizado no contexto da componente Estágio Curricular Supervisionado do curso de Engenharia de Software da Universidade Federal do Amazonas (UFAM), vinculada ao Instituto de Ciências Exatas e Tecnologia (ICET), localizado no município de Município, Amazonas.
 
 O curso de Engenharia de Software da UFAM tem como objetivo formar profissionais capacitados para atuar no desenvolvimento de sistemas de software, aplicando princípios de engenharia para a construção de soluções tecnológicas de qualidade. A grade curricular contempla componentes teóricas e práticas que abrangem programação, banco de dados, engenharia de requisitos, arquitetura de software, testes, gerência de projetos e desenvolvimento web, entre outras.
 
-O projeto EducaFácil foi desenvolvido em parceria com a Escola Municipal Dom Paulo McHugh, instituição de ensino fundamental localizada no município de Itacoatiara. A escola forneceu o contexto real para o levantamento de requisitos e validação das funcionalidades desenvolvidas, possibilitando que o sistema fosse projetado para atender às necessidades concretas de uma instituição de ensino.
+O projeto EducaFácil foi desenvolvido em parceria com a Escola Municipal Dom Paulo McHugh, instituição de ensino fundamental localizada no município de Município. A escola forneceu o contexto real para o levantamento de requisitos e validação das funcionalidades desenvolvidas, possibilitando que o sistema fosse projetado para atender às necessidades concretas de uma instituição de ensino.
 
 A Escola Municipal Dom Paulo McHugh atende Estudantes do ensino fundamental e enfrenta os desafios típicos de gestão escolar, incluindo a necessidade de organizar informações de Estudantes, turmas, horários e eventos de forma eficiente. A parceria permitiu compreender as rotinas administrativas e pedagógicas da escola, orientando o desenvolvimento de funcionalidades que agregam valor real ao trabalho dos gestores e professores.
 
