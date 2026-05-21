@@ -255,62 +255,6 @@ export default function Painel() {
   const [alerts, setAlerts] = useState<DashboardAlert[]>([]);
   const [displayName, setDisplayName] = useState<string>('');
 
-  // ── Fetch user display name ──────────────────────────────────────────────
-  useEffect(() => {
-    async function fetchName() {
-      if (!user) return;
-      // Priority: Auth.displayName → profiles.displayName → user_roles.nome (skip placeholder) → email prefix
-      if (user.displayName) { setDisplayName(user.displayName); return; }
-      try {
-        const [roleDoc, profileDoc] = await Promise.all([
-          getDoc(doc(db, 'user_roles', user.uid)),
-          getDoc(doc(db, 'profiles', user.uid)),
-        ]);
-        const roleName = roleDoc.exists() ? roleDoc.data().nome : null;
-        const profileName = profileDoc.exists() ? (profileDoc.data().displayName || profileDoc.data().nome) : null;
-
-        const resolved = [profileName, roleName].find(
-          n => n && n !== 'Usuário sem Nome' && n.trim() !== ''
-        );
-        if (resolved) { setDisplayName(resolved); return; }
-
-        // Last resort: email prefix capitalised
-        if (user.email) {
-          const prefix = user.email.split('@')[0];
-          setDisplayName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
-        }
-      } catch { /* silent */ }
-    }
-    fetchName();
-  }, [user]);
-
-  // ── Main data fetch ──────────────────────────────────────────────────────
-  useEffect(() => {
-    async function fetchAllData() {
-      if (!escolaAtivaId) { setLoading(false); return; }
-      setLoading(true);
-      try {
-        await Promise.all([
-          fetchStatsAndEvents(),
-          fetchFrequenciaData(periodoFrequencia),
-          fetchAtividadesRecentes(),
-          fetchNotasBimestraisData(),
-          fetchAlerts(),
-        ]);
-      } catch (error) {
-        console.error('Painel load error:', error);
-        toast.error('Não foi possível carregar todos os dados do painel.');
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchAllData();
-  }, [escolaAtivaId, fetchStatsAndEvents, fetchFrequenciaData, fetchAtividadesRecentes, fetchNotasBimestraisData, fetchAlerts, periodoFrequencia]);
-
-  useEffect(() => {
-    fetchFrequenciaData(periodoFrequencia);
-  }, [periodoFrequencia, escolaAtivaId, fetchFrequenciaData]);
-
   // ── Fetch helpers ────────────────────────────────────────────────────────
 
   const fetchAlerts = useCallback(async () => {
@@ -539,6 +483,62 @@ export default function Painel() {
       if (navigator.onLine) { console.error('fetchAtividadesRecentes error:', error); }
     }
   }, [isAdmin, isProfessor, escolaAtivaId]);
+
+  // ── Fetch user display name ──────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchName() {
+      if (!user) return;
+      // Priority: Auth.displayName → profiles.displayName → user_roles.nome (skip placeholder) → email prefix
+      if (user.displayName) { setDisplayName(user.displayName); return; }
+      try {
+        const [roleDoc, profileDoc] = await Promise.all([
+          getDoc(doc(db, 'user_roles', user.uid)),
+          getDoc(doc(db, 'profiles', user.uid)),
+        ]);
+        const roleName = roleDoc.exists() ? roleDoc.data().nome : null;
+        const profileName = profileDoc.exists() ? (profileDoc.data().displayName || profileDoc.data().nome) : null;
+
+        const resolved = [profileName, roleName].find(
+          n => n && n !== 'Usuário sem Nome' && n.trim() !== ''
+        );
+        if (resolved) { setDisplayName(resolved); return; }
+
+        // Last resort: email prefix capitalised
+        if (user.email) {
+          const prefix = user.email.split('@')[0];
+          setDisplayName(prefix.charAt(0).toUpperCase() + prefix.slice(1));
+        }
+      } catch { /* silent */ }
+    }
+    fetchName();
+  }, [user]);
+
+  // ── Main data fetch ──────────────────────────────────────────────────────
+  useEffect(() => {
+    async function fetchAllData() {
+      if (!escolaAtivaId) { setLoading(false); return; }
+      setLoading(true);
+      try {
+        await Promise.all([
+          fetchStatsAndEvents(),
+          fetchFrequenciaData(periodoFrequencia),
+          fetchAtividadesRecentes(),
+          fetchNotasBimestraisData(),
+          fetchAlerts(),
+        ]);
+      } catch (error) {
+        console.error('Painel load error:', error);
+        toast.error('Não foi possível carregar todos os dados do painel.');
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAllData();
+  }, [escolaAtivaId, fetchStatsAndEvents, fetchFrequenciaData, fetchAtividadesRecentes, fetchNotasBimestraisData, fetchAlerts, periodoFrequencia]);
+
+  useEffect(() => {
+    fetchFrequenciaData(periodoFrequencia);
+  }, [periodoFrequencia, escolaAtivaId, fetchFrequenciaData]);
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 

@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.syncResponsibleData = exports.checkResponsibleByCPF = exports.cleanupExpiredReservations = exports.submitReservation = exports.checkEnrollmentStatus = exports.assignTeacherToTurma = exports.createUserAccount = void 0;
+exports.generateQuestionsWithIA = exports.syncResponsibleData = exports.checkResponsibleByCPF = exports.cleanupExpiredReservations = exports.submitReservation = exports.checkEnrollmentStatus = exports.assignTeacherToTurma = exports.createUserAccount = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
@@ -419,6 +419,69 @@ exports.syncResponsibleData = (0, https_1.onCall)(async (request) => {
     catch (error) {
         console.error(`Erro na sincronização de dados do CPF ${cpf}:`, error);
         throw new https_1.HttpsError("internal", `Erro durante o processamento: ${error.message}`);
+    }
+});
+exports.generateQuestionsWithIA = (0, https_1.onCall)(async (request) => {
+    var _a, _b, _c, _d, _e;
+    if (!request.auth) {
+        throw new https_1.HttpsError("unauthenticated", "Usuário não autenticado.");
+    }
+    const { topico, qtdObjetivas, qtdDescritivas, dificuldade, serie } = request.data;
+    if (!topico) {
+        throw new https_1.HttpsError("invalid-argument", "O tópico principal é obrigatório.");
+    }
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new https_1.HttpsError("failed-precondition", "Chave de API do Gemini não configurada no servidor.");
+    }
+    const prompt = `Atue como um professor elaborando uma prova para uma turma de ${serie || 'ensino básico'}.
+Crie uma avaliação sobre o tópico: "${topico}".
+O nível de dificuldade deve ser: ${dificuldade || 'Médio'}.
+Inclua o seguinte formato ESTRITAMENTE em JSON:
+{
+  "questoes": [
+    {
+      "tipo": "objetiva" ou "descritiva",
+      "enunciado": "Texto da questão...",
+      "alternativas": ["a) alt 1", "b) alt 2", "c) alt 3", "d) alt 4"] // Apenas se for objetiva. Forneça exatamente 4 alternativas limpas (sem a letra "a)" no texto, apenas a resposta).,
+      "valor": 1
+    }
+  ]
+}
+Gere exatamente ${qtdObjetivas || 5} questões objetivas com 4 alternativas e ${qtdDescritivas || 1} questões descritivas.
+Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                contents: [{
+                        parts: [{ text: prompt }]
+                    }]
+            })
+        });
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error("Erro na API do Gemini:", errText);
+            throw new https_1.HttpsError("internal", `Erro retornado pelo Gemini: ${response.statusText}`);
+        }
+        const resData = await response.json();
+        const textResponse = (_e = (_d = (_c = (_b = (_a = resData.candidates) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.parts) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.text;
+        if (!textResponse) {
+            throw new https_1.HttpsError("internal", "Nenhuma resposta de texto retornada pela IA.");
+        }
+        const cleanedText = textResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsedJSON = JSON.parse(cleanedText);
+        return parsedJSON;
+    }
+    catch (error) {
+        console.error("Erro ao gerar questões com Gemini:", error);
+        if (error instanceof https_1.HttpsError)
+            throw error;
+        throw new https_1.HttpsError("internal", error.message || "Erro interno de processamento.");
     }
 });
 //# sourceMappingURL=adminFunctions.js.map
