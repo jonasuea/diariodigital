@@ -27,6 +27,10 @@ export class OfflineDB extends Dexie {
   notas_parciais!: Table<any>;
   avaliacoes_infantil!: Table<any>;
 
+  // Mini Avaliações
+  mini_avaliacoes!: Table<any>;
+  respostas_mini_avaliacoes!: Table<any>;
+
   // Sincronização
   sync_queue!: Table<SyncOperation>;
 
@@ -64,6 +68,26 @@ export class OfflineDB extends Dexie {
       notas: 'id, avaliacao_id, estudante_id',
       notas_parciais: 'id, turma_id, estudante_id',
       avaliacoes_infantil: 'id, [turma_id+estudante_id+data_avaliacao]',
+      sync_queue: '++id, timestamp'
+    });
+    // Versão 4: adiciona mini_avaliacoes e respostas_mini_avaliacoes
+    this.version(4).stores({
+      turmas: 'id, escola_id',
+      estudantes: 'id, turma_id, escola_id',
+      dias_letivos: 'id, data, escola_id',
+      base_curricular: 'id, componente, *serie',
+      eventos: 'id, data, escola_id',
+      horarios: 'id, *turma_ids',
+      professores: 'id, escola_id, uid, email',
+      frequencias: 'id, [estudante_id+data], [turma_id+data]',
+      entradas_diario: 'id, [turma_id+data]',
+      registros_aulas: 'id, [turma_id+data+componente], [turma_id+componente]',
+      avaliacoes: 'id, turma_id, [turma_id+componente+data]',
+      notas: 'id, avaliacao_id, estudante_id',
+      notas_parciais: 'id, turma_id, estudante_id',
+      avaliacoes_infantil: 'id, [turma_id+estudante_id+data_avaliacao]',
+      mini_avaliacoes: 'id, turma_id, [turma_id+componente]',
+      respostas_mini_avaliacoes: 'id, mini_avaliacao_id, estudante_id, [mini_avaliacao_id+estudante_id]',
       sync_queue: '++id, timestamp'
     });
   }

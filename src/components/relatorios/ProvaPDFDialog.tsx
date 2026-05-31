@@ -17,22 +17,22 @@ export interface Questao {
 interface ProvaPDFDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  avaliacao: {
+  avaliacao?: {
     titulo: string;
     tipo: string;
     valor: number;
     bimestre: string;
-  };
-  turma: {
+  } | null;
+  turma?: {
     nome: string;
     serie: string;
     turno: string;
-  };
-  escolaInfo: {
+  } | null;
+  escolaInfo?: {
     nome: string;
     inep: string;
     decreto: string;
-  };
+  } | null;
   questoes: Questao[];
 }
 
@@ -62,28 +62,28 @@ export function ProvaPDFDialog({
           {/* Cabeçalho */}
           <div className="border border-black p-4 mb-6">
             <h1 className="text-center font-bold text-xl uppercase mb-4 border-b border-black pb-2">
-              {escolaInfo.nome || 'NOME DA ESCOLA'}
+              {escolaInfo?.nome || 'NOME DA ESCOLA'}
             </h1>
             <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
               <div className="flex border-b border-black pb-1">
                 <span className="font-bold mr-2">INEP:</span>
-                <span>{escolaInfo.inep || '---'}</span>
+                <span>{escolaInfo?.inep || '---'}</span>
               </div>
               <div className="flex border-b border-black pb-1">
                 <span className="font-bold mr-2">DECRETO:</span>
-                <span>{escolaInfo.decreto || '---'}</span>
+                <span>{escolaInfo?.decreto || '---'}</span>
               </div>
               <div className="flex border-b border-black pb-1">
                 <span className="font-bold mr-2">SÉRIE:</span>
-                <span>{turma.serie || '---'}</span>
+                <span>{turma?.serie || '---'}</span>
               </div>
               <div className="flex border-b border-black pb-1">
                 <span className="font-bold mr-2">TURMA:</span>
-                <span>{turma.nome || '---'}</span>
+                <span>{turma?.nome || '---'}</span>
               </div>
               <div className="flex border-b border-black pb-1">
                 <span className="font-bold mr-2">TURNO:</span>
-                <span>{turma.turno || '---'}</span>
+                <span>{turma?.turno || '---'}</span>
               </div>
               <div className="flex border-b border-black pb-1">
                 <span className="font-bold mr-2">DATA DE EMISSÃO:</span>
@@ -92,7 +92,7 @@ export function ProvaPDFDialog({
             </div>
 
             <div className="mt-4 bg-orange-100/50 p-2 border border-black text-center font-bold uppercase">
-              {avaliacao.titulo} - {avaliacao.bimestre} Bimentre ({avaliacao.valor} pontos)
+              {avaliacao?.titulo || 'Sem título'} - {avaliacao?.bimestre || '---'} Bimestre ({avaliacao?.valor || 0} pontos)
             </div>
           </div>
 

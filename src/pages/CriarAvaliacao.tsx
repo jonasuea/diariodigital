@@ -14,6 +14,8 @@ import { toast } from "sonner";
 import { logActivity } from "@/lib/logger";
 import { ProvaPDFDialog, Questao } from "@/components/relatorios/ProvaPDFDialog";
 import { useUserRole } from "@/hooks/useUserRole";
+import { avaliacaoRepo } from "@/repositories/AvaliacaoRepository";
+import { turmaRepo } from "@/repositories/CadastrosRepository";
 
 export default function CriarAvaliacao() {
   const { turmaId, avaliacaoId } = useParams<{ turmaId: string, avaliacaoId: string }>();
@@ -34,27 +36,56 @@ export default function CriarAvaliacao() {
     async function fetchData() {
       if (!turmaId || !avaliacaoId || !escolaAtivaId) return;
       try {
-        const [avSnap, turmaSnap, escolaSnap] = await Promise.all([
-          getDoc(doc(db, "avaliacoes", avaliacaoId)),
-          getDoc(doc(db, "turmas", turmaId)),
-          getDoc(doc(db, "escolas", escolaAtivaId))
-        ]);
+        // 1. Buscar avaliação localmente (Offline-First)
+        let avData = await avaliacaoRepo.getById(avaliacaoId);
+        if (!avData) {
+          try {
+            const avSnap = await getDoc(doc(db, "avaliacoes", avaliacaoId));
+            if (avSnap.exists()) {
+              avData = { id: avSnap.id, ...avSnap.data() };
+            }
+          } catch (avErr) {
+            console.warn("Não foi possível buscar a avaliação no Firestore (modo offline/sem rede):", avErr);
+          }
+        }
 
-        if (avSnap.exists()) {
-          const avData = avSnap.data();
+        if (avData) {
           setAvaliacao(avData);
           if (avData.questoes) {
             setQuestoes(avData.questoes);
           }
         }
-        if (turmaSnap.exists()) setTurma(turmaSnap.data());
-        if (escolaSnap.exists()) {
-          const eUrl = escolaSnap.data();
-          setEscolaInfo({ nome: eUrl.nome, inep: eUrl.inep, decreto: eUrl.decreto_criacao });
+
+        // 2. Buscar turma localmente (Offline-First)
+        let turmaData = await turmaRepo.getById(turmaId);
+        if (!turmaData) {
+          try {
+            const turmaSnap = await getDoc(doc(db, "turmas", turmaId));
+            if (turmaSnap.exists()) {
+              turmaData = { id: turmaSnap.id, ...turmaSnap.data() };
+            }
+          } catch (turmaErr) {
+            console.warn("Não foi possível buscar a turma no Firestore (modo offline/sem rede):", turmaErr);
+          }
+        }
+
+        if (turmaData) {
+          setTurma(turmaData);
+        }
+
+        // 3. Buscar informações da escola de forma resiliente
+        try {
+          const escolaSnap = await getDoc(doc(db, "escolas", escolaAtivaId));
+          if (escolaSnap.exists()) {
+            const eUrl = escolaSnap.data();
+            setEscolaInfo({ nome: eUrl.nome, inep: eUrl.inep, decreto: eUrl.decreto_criacao });
+          }
+        } catch (escolaErr) {
+          console.warn("Não foi possível buscar as informações da escola no Firestore (modo offline/sem rede):", escolaErr);
         }
       } catch (error) {
         console.error("Erro ao carregar dados:", error);
-        toast.error("Erro ao carregar avaliação.");
+        toast.error("Erro ao carregar dados da avaliação.");
       } finally {
         setLoading(false);
       }
@@ -129,9 +160,25 @@ export default function CriarAvaliacao() {
         valor: q.valor ?? 1,
         imagemUrl: q.imagemUrl ?? null,
       }));
-      await updateDoc(doc(db, "avaliacoes", avaliacaoId), {
+
+      // 1. Atualizar banco local IndexedDB e enfileirar para sincronização offline
+      const payload = {
+        ...avaliacao,
         questoes: questoesSanitizadas
-      });
+      };
+      await avaliacaoRepo.updateAvaliacao(avaliacaoId, payload);
+
+      // 2. Se estiver online, tentar sincronizar imediatamente no Firestore
+      if (navigator.onLine) {
+        try {
+          await updateDoc(doc(db, "avaliacoes", avaliacaoId), {
+            questoes: questoesSanitizadas
+          });
+        } catch (fsErr) {
+          console.warn("Falha ao salvar diretamente no Firestore, mas salvo localmente:", fsErr);
+        }
+      }
+
       toast.success("Avaliação salva com sucesso!");
       await logActivity(`salvou as questões da avaliação "${avaliacao?.titulo}" na turma "${turma?.nome}".`);
     } catch (error) {

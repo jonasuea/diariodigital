@@ -216,6 +216,16 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /mini_avaliacoes/{id} {
+      allow read: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
+    }
+
+    match /respostas_mini_avaliacoes/{id} {
+      allow read: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
+      allow write: if isAdmin() || isGestor() || isPedagogo() || isSecretario() || isProfessor();
+    }
+
     // =========================================================================
     // 4. REGRA RESIDUAL (COLEÇÕES NÃO LISTADAS ACIMA)
     // =========================================================================

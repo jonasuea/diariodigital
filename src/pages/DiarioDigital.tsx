@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Users, BookOpen, ClipboardList, GraduationCap, Filter } from 'lucide-react';
+import { Users, BookOpen, ClipboardList, GraduationCap, Filter, Sparkles } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, query, where, orderBy, getDocs, limit } from 'firebase/firestore';
 import { toast } from 'sonner';
@@ -243,6 +243,15 @@ export default function DiarioDigital() {
       color: 'text-yellow-500',
       bgColor: 'bg-yellow-50',
       action: () => selectedTurmaId && navigate(`/turmas/${selectedTurmaId}/notas-parciais?componente=${encodeURIComponent(selectedComponente || '')}&origem=diario`),
+      hide: isInfantil,
+    },
+    {
+      title: 'Mini Avaliações',
+      description: 'Avaliações quinzenais MEC com IA',
+      icon: Sparkles,
+      color: 'text-violet-500',
+      bgColor: 'bg-violet-50',
+      action: () => selectedTurmaId && navigate(`/diario-digital/mini-avaliacoes/${selectedTurmaId}?componente=${encodeURIComponent(selectedComponente || '')}`),
       hide: isInfantil,
     },
   ].filter(card => !card.hide);

@@ -597,3 +597,106 @@ Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
         throw new HttpsError("internal", error.message || "Erro interno de processamento.");
     }
 });
+
+/**
+ * Gera questões para Mini Avaliação (Quinzenal MEC) mapeadas por habilidade BNCC.
+ * Cada questão gerada inclui o código da habilidade e o gabarito, para permitir
+ * correção automática e análise de gargalos por habilidade.
+ */
+export const generateMiniQuestionsWithIA = onCall(async (request) => {
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "Usuário não autenticado.");
+    }
+
+    const {
+        habilidades,        // string[] — códigos BNCC selecionados (ex: ['EF15LP01', 'EF15LP02'])
+        descricaoHabilidades, // Record<string, string> — { code: description }
+        qtdQuestoes,        // number — total de questões
+        qtdAlternativas,    // number — nº de alternativas por questão (3, 4 ou 5)
+        dificuldade,        // 'Fácil' | 'Médio' | 'Difícil'
+        serie,              // string — série/ano da turma
+        componente          // string — componente curricular
+    } = request.data;
+
+    if (!habilidades || !Array.isArray(habilidades) || habilidades.length === 0) {
+        throw new HttpsError("invalid-argument", "É necessário informar pelo menos uma habilidade BNCC.");
+    }
+
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new HttpsError("failed-precondition", "Chave de API do Gemini não configurada no servidor.");
+    }
+
+    const numAlts = qtdAlternativas || 4;
+    const numQ = qtdQuestoes || 10;
+    const letras = ["A", "B", "C", "D", "E"].slice(0, numAlts);
+
+    // Montar descrição legível das habilidades para contextualizar o prompt
+    const habilidadesDesc = habilidades.map((code: string) => {
+        const desc = descricaoHabilidades?.[code] || code;
+        return `- ${code}: ${desc}`;
+    }).join("\n");
+
+    const prompt = `Você é um professor especialista elaborando uma mini-avaliação diagnóstica para o MEC.
+Série/Ano: ${serie || "Ensino Fundamental"}
+Componente Curricular: ${componente || "Não especificado"}
+Nível de Dificuldade: ${dificuldade || "Médio"}
+
+Habilidades BNCC a serem avaliadas:
+${habilidadesDesc}
+
+INSTRUÇÕES:
+- Crie exatamente ${numQ} questões objetivas.
+- Cada questão deve ter exatamente ${numAlts} alternativas (${letras.join(", ")}).
+- Distribua as questões entre as habilidades listadas (pelo menos 1 por habilidade, se possível).
+- Cada questão DEVE cobrir apenas UMA habilidade (informe o código no campo "habilidade").
+- Informe qual alternativa é a correta (campo "resposta_correta", ex: "A").
+- O gabarito deve estar correto e didaticamente justificável.
+
+Retorne APENAS JSON puro (sem markdown), com a seguinte estrutura:
+{
+  "questoes": [
+    {
+      "enunciado": "Texto completo da questão...",
+      "alternativas": ["Texto da alternativa A", "Texto da alternativa B", "Texto da alternativa C", "Texto da alternativa D"],
+      "resposta_correta": "A",
+      "habilidade": "EF15LP01",
+      "valor": 1
+    }
+  ]
+}
+
+Retorne APENAS o JSON puro, sem nenhuma marcação markdown.`;
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error("Erro na API do Gemini (mini):", errText);
+            throw new HttpsError("internal", `Erro retornado pelo Gemini: ${response.statusText}`);
+        }
+
+        const resData = await response.json() as any;
+        const textResponse = resData.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (!textResponse) {
+            throw new HttpsError("internal", "Nenhuma resposta de texto retornada pela IA.");
+        }
+
+        const cleanedText = textResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsedJSON = JSON.parse(cleanedText);
+        return parsedJSON;
+    } catch (error: any) {
+        console.error("Erro ao gerar mini questões com Gemini:", error);
+        if (error instanceof HttpsError) throw error;
+        throw new HttpsError("internal", error.message || "Erro interno de processamento.");
+    }
+});
+

@@ -6,7 +6,8 @@ import {
     cleanupExpiredReservations,
     checkResponsibleByCPF,
     syncResponsibleData,
-    generateQuestionsWithIA
+    generateQuestionsWithIA,
+    generateMiniQuestionsWithIA
 } from "./adminFunctions";
 
 
@@ -18,6 +19,7 @@ export {
     cleanupExpiredReservations,
     checkResponsibleByCPF,
     syncResponsibleData,
-    generateQuestionsWithIA
+    generateQuestionsWithIA,
+    generateMiniQuestionsWithIA
 };
 

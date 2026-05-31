@@ -40,3 +40,13 @@ export function safeToDate(dateValue: any): Date {
   
   return new Date();
 }
+
+/**
+ * Verifica se o aplicativo deve operar em modo Offline-First.
+ * Se retornar false, o sistema deve tentar ler/gravar diretamente no Firebase Firestore 
+ * quando possível, comportando-se como uma aplicação web convencional em tempo real.
+ */
+export function isOfflineModeEnabled(): boolean {
+  if (typeof window === 'undefined') return true;
+  return localStorage.getItem('sincronizacaoOffline') === 'true';
+}

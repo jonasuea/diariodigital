@@ -22,7 +22,7 @@ class OfflinePrefetchService {
       // 1. Sincronizar Coleções Essenciais (Turmas, Estudantes)
       // Se não houver escolaId explícito na action, buscaremos sem filtro ou com base no perfil. 
       // Mas recomendado é sincronizar as coleções básicas que listamos.
-      const collectionsToCache = ['turmas', 'estudantes', 'eventos', 'dias_letivos', 'horarios', 'professores'];
+      const collectionsToCache = ['turmas', 'estudantes', 'eventos', 'dias_letivos', 'horarios', 'professores', 'mini_avaliacoes', 'respostas_mini_avaliacoes'];
 
       for (const colName of collectionsToCache) {
         try {

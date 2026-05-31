@@ -23,7 +23,7 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateQuestionsWithIA = exports.syncResponsibleData = exports.checkResponsibleByCPF = exports.cleanupExpiredReservations = exports.submitReservation = exports.checkEnrollmentStatus = exports.assignTeacherToTurma = exports.createUserAccount = void 0;
+exports.generateMiniQuestionsWithIA = exports.generateQuestionsWithIA = exports.syncResponsibleData = exports.checkResponsibleByCPF = exports.cleanupExpiredReservations = exports.submitReservation = exports.checkEnrollmentStatus = exports.assignTeacherToTurma = exports.createUserAccount = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const admin = __importStar(require("firebase-admin"));
@@ -479,6 +479,86 @@ Retorne APENAS o JSON puro, sem marcações markdown como \`\`\`json.`;
     }
     catch (error) {
         console.error("Erro ao gerar questões com Gemini:", error);
+        if (error instanceof https_1.HttpsError)
+            throw error;
+        throw new https_1.HttpsError("internal", error.message || "Erro interno de processamento.");
+    }
+});
+exports.generateMiniQuestionsWithIA = (0, https_1.onCall)(async (request) => {
+    var _a, _b, _c, _d, _e;
+    if (!request.auth) {
+        throw new https_1.HttpsError("unauthenticated", "Usuário não autenticado.");
+    }
+    const { habilidades, descricaoHabilidades, qtdQuestoes, qtdAlternativas, dificuldade, serie, componente } = request.data;
+    if (!habilidades || !Array.isArray(habilidades) || habilidades.length === 0) {
+        throw new https_1.HttpsError("invalid-argument", "É necessário informar pelo menos uma habilidade BNCC.");
+    }
+    const apiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new https_1.HttpsError("failed-precondition", "Chave de API do Gemini não configurada no servidor.");
+    }
+    const numAlts = qtdAlternativas || 4;
+    const numQ = qtdQuestoes || 10;
+    const letras = ["A", "B", "C", "D", "E"].slice(0, numAlts);
+    const habilidadesDesc = habilidades.map((code) => {
+        const desc = (descricaoHabilidades === null || descricaoHabilidades === void 0 ? void 0 : descricaoHabilidades[code]) || code;
+        return `- ${code}: ${desc}`;
+    }).join("\n");
+    const prompt = `Você é um professor especialista elaborando uma mini-avaliação diagnóstica para o MEC.
+Série/Ano: ${serie || "Ensino Fundamental"}
+Componente Curricular: ${componente || "Não especificado"}
+Nível de Dificuldade: ${dificuldade || "Médio"}
+
+Habilidades BNCC a serem avaliadas:
+${habilidadesDesc}
+
+INSTRUÇÕES:
+- Crie exatamente ${numQ} questões objetivas.
+- Cada questão deve ter exatamente ${numAlts} alternativas (${letras.join(", ")}).
+- Distribua as questões entre as habilidades listadas (pelo menos 1 por habilidade, se possível).
+- Cada questão DEVE cobrir apenas UMA habilidade (informe o código no campo "habilidade").
+- Informe qual alternativa é a correta (campo "resposta_correta", ex: "A").
+- O gabarito deve estar correto e didaticamente justificável.
+
+Retorne APENAS JSON puro (sem markdown), com a seguinte estrutura:
+{
+  "questoes": [
+    {
+      "enunciado": "Texto completo da questão...",
+      "alternativas": ["Texto da alternativa A", "Texto da alternativa B", "Texto da alternativa C", "Texto da alternativa D"],
+      "resposta_correta": "A",
+      "habilidade": "EF15LP01",
+      "valor": 1
+    }
+  ]
+}
+
+Retorne APENAS o JSON puro, sem nenhuma marcação markdown.`;
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+        const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }]
+            })
+        });
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error("Erro na API do Gemini (mini):", errText);
+            throw new https_1.HttpsError("internal", `Erro retornado pelo Gemini: ${response.statusText}`);
+        }
+        const resData = await response.json();
+        const textResponse = (_e = (_d = (_c = (_b = (_a = resData.candidates) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.content) === null || _c === void 0 ? void 0 : _c.parts) === null || _d === void 0 ? void 0 : _d[0]) === null || _e === void 0 ? void 0 : _e.text;
+        if (!textResponse) {
+            throw new https_1.HttpsError("internal", "Nenhuma resposta de texto retornada pela IA.");
+        }
+        const cleanedText = textResponse.replace(/```json/gi, "").replace(/```/g, "").trim();
+        const parsedJSON = JSON.parse(cleanedText);
+        return parsedJSON;
+    }
+    catch (error) {
+        console.error("Erro ao gerar mini questões com Gemini:", error);
         if (error instanceof https_1.HttpsError)
             throw error;
         throw new https_1.HttpsError("internal", error.message || "Erro interno de processamento.");

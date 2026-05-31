@@ -40,6 +40,10 @@ import { useAutoUpdate } from "@/hooks/useAutoUpdate";
 import { UserRoleProvider } from "@/hooks/useUserRole";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MessageProvider } from "@/contexts/MessageContext";
+import MiniAvaliacoes from "./pages/MiniAvaliacoes";
+import CriarMiniAvaliacaoIA from "./pages/CriarMiniAvaliacaoIA";
+import CorretorMiniAvaliacao from "./pages/CorretorMiniAvaliacao";
+import DiagnosticoMiniAvaliacao from "./pages/DiagnosticoMiniAvaliacao";
 
 const queryClient = new QueryClient();
 
@@ -78,6 +82,10 @@ const router = createBrowserRouter([
       { path: "/diario-digital/avaliacoes/:turmaId/registro", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><RegistroAvaliacao /></ProtectedRoute> },
       { path: "/diario-digital/avaliacoes/:turmaId/criar/:avaliacaoId", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><CriarAvaliacao /></ProtectedRoute> },
       { path: "/diario-digital/avaliacoes/:turmaId/criar-ia/:avaliacaoId", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><CriarAvaliacaoIA /></ProtectedRoute> },
+      { path: "/diario-digital/mini-avaliacoes/:turmaId", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><MiniAvaliacoes /></ProtectedRoute> },
+      { path: "/diario-digital/mini-avaliacoes/:turmaId/criar", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><CriarMiniAvaliacaoIA /></ProtectedRoute> },
+      { path: "/diario-digital/mini-avaliacoes/:turmaId/corretor/:miniId", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><CorretorMiniAvaliacao /></ProtectedRoute> },
+      { path: "/diario-digital/mini-avaliacoes/:turmaId/diagnostico/:miniId", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><DiagnosticoMiniAvaliacao /></ProtectedRoute> },
       { path: "/mensagens", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><Mensagens /></ProtectedRoute> },
       { path: "/configuracoes", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><Configuracoes /></ProtectedRoute> },
       { path: "/manual-uso", element: <ProtectedRoute allowedRoles={['admin', 'professor']}><ManualUso /></ProtectedRoute> },
